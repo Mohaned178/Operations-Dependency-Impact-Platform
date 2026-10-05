@@ -96,6 +96,38 @@ const PROBES: RouteProbe[] = [
     expected: ADMIN_ONLY,
   },
   { name: 'GET /audit', method: 'get', path: '/api/audit', expected: ADMIN_ONLY },
+  { name: 'GET /entities', method: 'get', path: '/api/entities', expected: AUTHENTICATED },
+  {
+    name: 'GET /entities/:id',
+    method: 'get',
+    path: `/api/entities/${MISSING_ID}`,
+    expected: AUTHENTICATED,
+  },
+  {
+    name: 'GET /entities/:id/neighbors',
+    method: 'get',
+    path: `/api/entities/${MISSING_ID}/neighbors`,
+    expected: AUTHENTICATED,
+  },
+  {
+    name: 'GET /entities/:id/timeline',
+    method: 'get',
+    path: `/api/entities/${MISSING_ID}/timeline`,
+    expected: AUTHENTICATED,
+  },
+  {
+    name: 'GET /entities/:id/states',
+    method: 'get',
+    path: `/api/entities/${MISSING_ID}/states`,
+    expected: AUTHENTICATED,
+  },
+  {
+    name: 'GET /entities/:id/source-records',
+    method: 'get',
+    path: `/api/entities/${MISSING_ID}/source-records`,
+    expected: AUTHENTICATED,
+  },
+  { name: 'GET /source-systems', method: 'get', path: '/api/source-systems', expected: AUTHENTICATED },
 ];
 
 const CASES = PROBES.flatMap((probe) =>
