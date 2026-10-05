@@ -35,9 +35,12 @@ export class JwtAuthGuard implements CanActivate {
       throw Errors.unauthenticated();
     }
 
-    const { sub } = await this.tokens.verifyAccess(token);
+    const { sub, iat } = await this.tokens.verifyAccess(token);
     const user = await this.prisma.user.findUnique({ where: { id: sub } });
     if (!user || user.status !== 'ACTIVE') {
+      throw Errors.unauthenticated();
+    }
+    if (iat < Math.floor(user.passwordChangedAt.getTime() / 1000)) {
       throw Errors.unauthenticated();
     }
 

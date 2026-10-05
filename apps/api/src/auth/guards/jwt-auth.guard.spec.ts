@@ -156,6 +156,40 @@ describe('JwtAuthGuard', () => {
     ).resolves.toBe(true);
   });
 
+  it('rejects a token issued before the last password change', async () => {
+    const passwordChangedAt = new Date('2026-10-05T00:00:10.000Z');
+    const { guard, tokenService } = await createGuard(buildUser({ passwordChangedAt }));
+    tokenService.verifyAccess.mockResolvedValue({
+      sub: USER_ID,
+      iat: Math.floor(passwordChangedAt.getTime() / 1000) - 10,
+    });
+
+    await expect(
+      guard.canActivate(
+        buildContext(TestController.prototype.guardedRoute, {
+          headers: { authorization: 'Bearer valid' },
+        }),
+      ),
+    ).rejects.toMatchObject({ code: 'UNAUTHENTICATED' });
+  });
+
+  it('allows a token issued in the same second as the password change', async () => {
+    const passwordChangedAt = new Date('2026-10-05T00:00:10.000Z');
+    const { guard, tokenService } = await createGuard(buildUser({ passwordChangedAt }));
+    tokenService.verifyAccess.mockResolvedValue({
+      sub: USER_ID,
+      iat: Math.floor(passwordChangedAt.getTime() / 1000),
+    });
+
+    await expect(
+      guard.canActivate(
+        buildContext(TestController.prototype.guardedRoute, {
+          headers: { authorization: 'Bearer valid' },
+        }),
+      ),
+    ).resolves.toBe(true);
+  });
+
   it('attaches the user and registers the request context on success', async () => {
     const { guard, tokenService, requestContext } = await createGuard(buildUser());
     tokenService.verifyAccess.mockResolvedValue({ sub: USER_ID });

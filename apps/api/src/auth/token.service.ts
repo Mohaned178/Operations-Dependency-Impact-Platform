@@ -33,13 +33,13 @@ export class TokenService {
     return this.jwt.signAsync({ sub: userId });
   }
 
-  async verifyAccess(token: string): Promise<{ sub: string }> {
+  async verifyAccess(token: string): Promise<{ sub: string; iat: number }> {
     try {
-      const payload = await this.jwt.verifyAsync<{ sub?: string }>(token);
-      if (!payload.sub) {
-        throw new Error('Token payload is missing sub');
+      const payload = await this.jwt.verifyAsync<{ sub?: string; iat?: number }>(token);
+      if (!payload.sub || typeof payload.iat !== 'number') {
+        throw new Error('Token payload is incomplete');
       }
-      return { sub: payload.sub };
+      return { sub: payload.sub, iat: payload.iat };
     } catch {
       throw Errors.unauthenticated();
     }

@@ -279,6 +279,30 @@ describe('Auth (e2e)', () => {
       .expect(401);
   });
 
+  it('rejects access tokens issued before the last password change', async () => {
+    await createUser(prisma, { role: 'ANALYST', email: 'stale@test.local' });
+    const { session } = await signIn('stale@test.local', TEST_PASSWORD);
+
+    await new Promise((resolve) => setTimeout(resolve, 1100));
+
+    const changed = await request(server)
+      .post('/api/auth/change-password')
+      .set('Authorization', `Bearer ${session.accessToken}`)
+      .send({ currentPassword: TEST_PASSWORD, newPassword: NEW_PASSWORD })
+      .expect(200);
+    const changedBody: unknown = changed.body;
+    const changedSession = AuthSessionSchema.parse(changedBody);
+
+    await request(server)
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${session.accessToken}`)
+      .expect(401);
+    await request(server)
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${changedSession.accessToken}`)
+      .expect(200);
+  });
+
   it('never stores passwords in the audit trail', async () => {
     await createUser(prisma, { role: 'ANALYST', email: 'audit@test.local' });
     await signIn('audit@test.local', TEST_PASSWORD);

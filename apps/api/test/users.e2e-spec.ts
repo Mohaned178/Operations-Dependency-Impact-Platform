@@ -198,6 +198,24 @@ describe('Users (e2e)', () => {
     expect(stillAdmin.status).toBe('ACTIVE');
   });
 
+  it('rejects a user token issued before an admin password reset', async () => {
+    const target = await createUser(prisma, { role: 'ANALYST', email: 'stale-reset@test.local' });
+    const { accessToken } = await login(app, 'stale-reset@test.local', TEST_PASSWORD);
+
+    await new Promise((resolve) => setTimeout(resolve, 1100));
+
+    await request(server)
+      .post(`/api/users/${target.id}/reset-password`)
+      .set(asAdmin())
+      .send({ temporaryPassword: TEMPORARY_PASSWORD })
+      .expect(204);
+
+    await request(server)
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(401);
+  });
+
   it('resets a password and forces a change at next sign-in', async () => {
     const target = await createUser(prisma, { role: 'ANALYST', email: 'reset@test.local' });
 

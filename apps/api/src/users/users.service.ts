@@ -221,16 +221,17 @@ export class UsersService {
   }
 
   async resetPassword(id: string, temporaryPassword: string): Promise<void> {
+    const passwordHash = await this.passwords.hash(temporaryPassword);
+
     await this.prisma.$transaction(async (tx) => {
       const user = await tx.user.findUnique({ where: { id } });
       if (!user) {
         throw Errors.notFound('User');
       }
 
-      const passwordHash = await this.passwords.hash(temporaryPassword);
       await tx.user.update({
         where: { id },
-        data: { passwordHash, mustChangePassword: true },
+        data: { passwordHash, mustChangePassword: true, passwordChangedAt: new Date() },
       });
       await this.tokens.revokeAllForUser(tx, id);
       await this.audit.record(tx, {

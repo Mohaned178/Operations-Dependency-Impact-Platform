@@ -423,7 +423,7 @@ Then do quickstart step 10.
     This way, attempts that were already in flight when the lock was set don't extend `lockedUntil` or write another `auth.account_locked` row. Leave the rest unchanged.
   - **Test** (`auth.e2e-spec.ts`): create a user, then send 10 wrong-password logins at once with `Promise.all`. Afterwards the DB row has `lockedUntil` set in the future, there is **exactly one** `auth.account_locked` audit row for that user, and a login with the **correct** password returns 401 `INVALID_CREDENTIALS`.
 
-- [ ] T066 [US1] Reject access tokens issued before the last password change (FR-025).
+- [x] T066 [US1] Reject access tokens issued before the last password change (FR-025).
   - **Bug**: `passwordChangedAt` is written but never read, so an old access token keeps working for up to 15 minutes after a password change.
   - **Fix**:
     1. `token.service.ts` → `verifyAccess` returns `{ sub: string; iat: number }`. Reject the token if `iat` is missing (same `Errors.unauthenticated()`).
