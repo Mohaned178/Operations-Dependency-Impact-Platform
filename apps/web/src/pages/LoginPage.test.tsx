@@ -1,6 +1,6 @@
 import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthProvider } from '../auth/AuthProvider';
 import { LoginPage } from './LoginPage';
@@ -13,6 +13,21 @@ const unauthorizedBody = {
   },
 };
 
+const validSession = {
+  accessToken: 'access-token-1',
+  expiresIn: 900,
+  user: {
+    id: '7c9e6679-7425-40de-944b-e07fc1f90ae7',
+    email: 'analyst@opsgraph.local',
+    displayName: 'Ada Analyst',
+    role: 'ANALYST',
+    status: 'ACTIVE',
+    mustChangePassword: false,
+    createdAt: '2026-10-05T00:00:00.000Z',
+    updatedAt: '2026-10-05T00:00:00.000Z',
+  },
+};
+
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -20,7 +35,12 @@ function jsonResponse(status: number, body: unknown): Response {
   });
 }
 
-const fetchMock = vi.fn();
+function LocationProbe() {
+  const location = useLocation();
+  return <div data-testid="location">{location.pathname}</div>;
+}
+
+const fetchMock = vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>();
 
 describe('LoginPage', () => {
   beforeEach(() => {
@@ -64,5 +84,37 @@ describe('LoginPage', () => {
     await user.click(screen.getByRole('button', { name: 'Sign in' }));
 
     expect(await screen.findByText('Invalid email or password')).toBeInTheDocument();
+  });
+
+  it.each([
+    ['//evil.example', '/'],
+    ['/\\evil.example', '/'],
+    ['/admin/users', '/admin/users'],
+  ])('only follows a safe next=%s', async (next, expected) => {
+    const user = userEvent.setup();
+    fetchMock.mockImplementation((input) =>
+      Promise.resolve(
+        String(input) === '/api/auth/login'
+          ? jsonResponse(200, validSession)
+          : jsonResponse(401, unauthorizedBody),
+      ),
+    );
+
+    render(
+      <MemoryRouter initialEntries={[`/login?next=${next}`]}>
+        <AuthProvider>
+          <Routes>
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="*" element={<LocationProbe />} />
+          </Routes>
+        </AuthProvider>
+      </MemoryRouter>,
+    );
+
+    await user.type(screen.getByLabelText('Email'), 'analyst@opsgraph.local');
+    await user.type(screen.getByLabelText('Password'), 'some-password-123');
+    await user.click(screen.getByRole('button', { name: 'Sign in' }));
+
+    expect((await screen.findByTestId('location')).textContent).toBe(expected);
   });
 });

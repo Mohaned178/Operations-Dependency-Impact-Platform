@@ -461,7 +461,7 @@ Then do quickstart step 10.
   - **Fix**: `const NO_REFRESH_PATHS = new Set(['/auth/login', '/auth/refresh', '/auth/logout']);` and use `!NO_REFRESH_PATHS.has(path)`.
   - **Test** (`apps/web/src/lib/api-client.test.ts`): with a mocked `fetch`, `/auth/me` returns 401, then refresh returns 200 with a session, then `/auth/me` returns 200 → `apiFetch('/auth/me')` resolves. Also, `apiFetch('/auth/login')` returning 401 must **not** call `/api/auth/refresh`.
 
-- [ ] T072 [P] [US1] Block open redirects in `apps/web/src/pages/LoginPage.tsx`.
+- [x] T072 [P] [US1] Block open redirects in `apps/web/src/pages/LoginPage.tsx`.
   - **Fix**: add `function isSafeNext(next: string | null): next is string` that returns true only if `next` starts with `/` and does **not** start with `//` or `/\`. Navigate to `next` only when `isSafeNext(next)`, otherwise to `/`.
   - **Test** (`LoginPage.test.tsx`): `?next=//evil.example` → navigates to `/`. `?next=/\evil.example` → `/`. `?next=/admin/users` → `/admin/users`.
 

@@ -5,6 +5,10 @@ import { useNavigate, useSearchParams } from 'react-router';
 import { useAuth } from '../auth/useAuth';
 import { ApiError } from '../lib/api-client';
 
+function isSafeNext(next: string | null): next is string {
+  return next !== null && next.startsWith('/') && !next.startsWith('//') && !next.startsWith('/\\');
+}
+
 export function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
@@ -20,7 +24,7 @@ export function LoginPage() {
     try {
       await login(values.email, values.password);
       const next = searchParams.get('next');
-      await navigate(next && next.startsWith('/') ? next : '/', { replace: true });
+      await navigate(isSafeNext(next) ? next : '/', { replace: true });
     } catch (error) {
       if (error instanceof ApiError && error.code === 'INVALID_CREDENTIALS') {
         setError('root', { message: 'Invalid email or password' });
