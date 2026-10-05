@@ -40,6 +40,13 @@ function LocationProbe() {
   return <div data-testid="location">{location.pathname}</div>;
 }
 
+function urlOf(input: RequestInfo | URL): string {
+  if (typeof input === 'string') {
+    return input;
+  }
+  return input instanceof URL ? input.pathname : input.url;
+}
+
 const fetchMock = vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>();
 
 describe('LoginPage', () => {
@@ -94,7 +101,7 @@ describe('LoginPage', () => {
     const user = userEvent.setup();
     fetchMock.mockImplementation((input) =>
       Promise.resolve(
-        String(input) === '/api/auth/login'
+        urlOf(input) === '/api/auth/login'
           ? jsonResponse(200, validSession)
           : jsonResponse(401, unauthorizedBody),
       ),

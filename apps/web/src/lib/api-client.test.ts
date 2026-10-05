@@ -44,6 +44,13 @@ function jsonResponse(status: number, body: unknown): Response {
 
 const fetchMock = vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>();
 
+function urlOf(input: RequestInfo | URL): string {
+  if (typeof input === 'string') {
+    return input;
+  }
+  return input instanceof URL ? input.pathname : input.url;
+}
+
 describe('apiFetch silent refresh', () => {
   beforeEach(() => {
     setAccessToken(null);
@@ -58,7 +65,7 @@ describe('apiFetch silent refresh', () => {
   it('refreshes and retries /auth/me after a 401', async () => {
     let meCalls = 0;
     fetchMock.mockImplementation((input) => {
-      const url = String(input);
+      const url = urlOf(input);
       if (url === '/api/auth/refresh') {
         return Promise.resolve(jsonResponse(200, session));
       }
@@ -74,7 +81,7 @@ describe('apiFetch silent refresh', () => {
     const result = await apiFetch('/auth/me', { schema: PublicUserSchema });
 
     expect(result.email).toBe('analyst@opsgraph.local');
-    expect(fetchMock.mock.calls.map(([input]) => String(input))).toEqual([
+    expect(fetchMock.mock.calls.map(([input]) => urlOf(input))).toEqual([
       '/api/auth/me',
       '/api/auth/refresh',
       '/api/auth/me',
@@ -91,6 +98,6 @@ describe('apiFetch silent refresh', () => {
       }),
     ).rejects.toBeInstanceOf(ApiError);
 
-    expect(fetchMock.mock.calls.map(([input]) => String(input))).toEqual(['/api/auth/login']);
+    expect(fetchMock.mock.calls.map(([input]) => urlOf(input))).toEqual(['/api/auth/login']);
   });
 });
