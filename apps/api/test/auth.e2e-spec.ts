@@ -326,6 +326,21 @@ describe('Auth (e2e)', () => {
       .expect(200);
   });
 
+  it.each([
+    ['malformed JSON', '{bad', 400],
+    ['an oversized body', JSON.stringify({ email: 'a'.repeat(200_000) }), 413],
+  ])('rejects %s with VALIDATION_FAILED and a correlation id', async (_label, payload, status) => {
+    const response = await request(server)
+      .post('/api/auth/login')
+      .set('content-type', 'application/json')
+      .send(payload)
+      .expect(status);
+    const parsed = ErrorResponseSchema.parse(response.body as unknown);
+    expect(parsed.error.code).toBe('VALIDATION_FAILED');
+    expect(parsed.error.correlationId).toMatch(/^[0-9a-f-]{36}$/);
+    expect(response.headers['x-request-id']).toBe(parsed.error.correlationId);
+  });
+
   it('never stores passwords in the audit trail', async () => {
     await createUser(prisma, { role: 'ANALYST', email: 'audit@test.local' });
     await signIn('audit@test.local', TEST_PASSWORD);

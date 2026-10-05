@@ -97,7 +97,7 @@ describe('Users (e2e)', () => {
     const body: unknown = response.body;
     const parsed = ErrorResponseSchema.parse(body);
     expect(parsed.error.code).toBe('VALIDATION_FAILED');
-    expect(parsed.error.correlationId).toEqual(expect.any(String));
+    expect(parsed.error.correlationId).toMatch(/^[0-9a-f-]{36}$/);
   });
 
   it('lists, searches, filters and paginates users', async () => {

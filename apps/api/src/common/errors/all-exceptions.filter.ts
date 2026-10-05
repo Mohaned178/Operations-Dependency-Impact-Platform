@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import {
   ArgumentsHost,
   Catch,
@@ -27,7 +28,12 @@ export class AllExceptionsFilter implements ExceptionFilter {
 
   catch(exception: unknown, host: ArgumentsHost): void {
     const response = host.switchToHttp().getResponse<Response>();
-    const correlationId = this.requestContext.correlationId;
+    // Body-parser errors are raised before the request-context middleware runs.
+    let correlationId = this.requestContext.correlationId;
+    if (!correlationId) {
+      correlationId = randomUUID();
+      response.setHeader('x-request-id', correlationId);
+    }
     const body = this.toErrorBody(exception);
 
     response.status(body.status).json({
@@ -63,8 +69,29 @@ export class AllExceptionsFilter implements ExceptionFilter {
       };
     }
 
+    const clientStatus = this.exposedClientStatus(exception);
+    if (clientStatus !== undefined) {
+      return {
+        status: clientStatus,
+        code: this.httpStatusToCode(clientStatus),
+        message: clientStatus === 413 ? 'Request body too large' : 'Bad request',
+      };
+    }
+
     this.logger.error(exception instanceof Error ? exception.stack : String(exception));
     return { status: 500, code: 'INTERNAL', message: 'Internal error' };
+  }
+
+  // http-errors raised by body-parser (e.g. PayloadTooLargeError) are not HttpExceptions.
+  private exposedClientStatus(exception: unknown): number | undefined {
+    if (typeof exception !== 'object' || exception === null) {
+      return undefined;
+    }
+    const { status, expose } = exception as { status?: unknown; expose?: unknown };
+    if (expose === true && typeof status === 'number' && status >= 400 && status < 500) {
+      return status;
+    }
+    return undefined;
   }
 
   private httpStatusToCode(status: number): ErrorCode {
