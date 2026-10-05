@@ -7,6 +7,9 @@ import { ComingSoonPage } from './pages/ComingSoonPage';
 import { HomePage } from './pages/HomePage';
 import { LoginPage } from './pages/LoginPage';
 import { NotFoundPage } from './pages/NotFoundPage';
+import { UserCreatePage } from './pages/admin/UserCreatePage';
+import { UserDetailPage } from './pages/admin/UserDetailPage';
+import { UsersListPage } from './pages/admin/UsersListPage';
 
 export const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
@@ -25,7 +28,9 @@ export const router = createBrowserRouter([
             path: 'admin',
             element: <RequireRole role="ADMIN" />,
             children: [
-              { path: 'users', element: <ComingSoonPage /> },
+              { path: 'users', element: <UsersListPage /> },
+              { path: 'users/new', element: <UserCreatePage /> },
+              { path: 'users/:id', element: <UserDetailPage /> },
               { path: 'audit', element: <ComingSoonPage /> },
             ],
           },

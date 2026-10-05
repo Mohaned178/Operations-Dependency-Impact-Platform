@@ -266,8 +266,8 @@ Then do quickstart steps 1–3 manually.
 **Goal**: user CRUD with role changes, deactivate/reactivate, reset password, and the last-admin guard, plus the admin UI.
 **Independent test**: quickstart steps 4–7.
 
-- [ ] T041 [P] [US2] Create `packages/shared/src/users.ts`: `ListUsersQuerySchema`, `UserListResponseSchema`, `CreateUserRequestSchema`, `UpdateUserRequestSchema` (with a refine that at least one field is set), `ResetPasswordRequestSchema`, per contracts/api.md. Re-export from the index.
-- [ ] T042 [US2] Create `apps/api/src/users/users.service.ts`. Every mutation follows the plan.md design note 3 pattern.
+- [x] T041 [P] [US2] Create `packages/shared/src/users.ts`: `ListUsersQuerySchema`, `UserListResponseSchema`, `CreateUserRequestSchema`, `UpdateUserRequestSchema` (with a refine that at least one field is set), `ResetPasswordRequestSchema`, per contracts/api.md. Re-export from the index.
+- [x] T042 [US2] Create `apps/api/src/users/users.service.ts`. Every mutation follows the plan.md design note 3 pattern.
   - `list(query)`: keyset pagination on `(createdAt DESC, id DESC)`; `q` does an ILIKE on email and displayName.
   - `create(input)`: 409 `EMAIL_TAKEN` on a unique violation (Prisma `P2002`); `mustChangePassword=true`; audits `user.created`.
   - `get(id)`: 404 if missing.
@@ -276,12 +276,12 @@ Then do quickstart steps 1–3 manually.
   - `reactivate(id)`: if already active, no-op; otherwise audit.
   - `resetPassword(id, temp)`: hash, set `mustChangePassword=true`, revoke tokens, audit `user.password_reset`.
   - Put the last-admin check in a private `assertNotLastAdmin(tx, userId)` that takes `pg_advisory_xact_lock` via `tx.$executeRaw`.
-- [ ] T043 [US2] Create `apps/api/src/users/users.controller.ts` (`@Roles('ADMIN')` at class level; routes per contracts/api.md Users table; `ParseUUIDPipe` on `:id`) and `users.module.ts`. Import it in `AppModule`.
-- [ ] T044 [P] [US2] Write `apps/api/src/users/users.service.spec.ts` (real test DB via helpers, or mocked Prisma). Cover:
+- [x] T043 [US2] Create `apps/api/src/users/users.controller.ts` (`@Roles('ADMIN')` at class level; routes per contracts/api.md Users table; `ParseUUIDPipe` on `:id`) and `users.module.ts`. Import it in `AppModule`.
+- [x] T044 [P] [US2] Write `apps/api/src/users/users.service.spec.ts` (real test DB via helpers, or mocked Prisma). Cover:
   - demoting the last admin gives `LAST_ADMIN`
   - deactivating self while not the last admin is allowed
   - PATCH with both fields writes two audit entries
-- [ ] T045 [US2] Write `apps/api/test/users.e2e-spec.ts` covering:
+- [x] T045 [US2] Write `apps/api/test/users.e2e-spec.ts` covering:
   - create, then the new user can log in with `mustChangePassword=true`
   - duplicate email (in different case) gives 409
   - list with `q`, `role` and pagination (`nextCursor`)
@@ -289,15 +289,15 @@ Then do quickstart steps 1–3 manually.
   - deactivate revokes sessions: the target's existing access token gets 401 on its next call
   - last admin demote/deactivate gives 409
   - reset-password forces a password change
-- [ ] T046 [P] [US2] Create `apps/web/src/pages/admin/UsersListPage.tsx`: a table (name, email, role label, status, created) with a search box (debounced 300 ms), role and status filters, a "Load more" button using `nextCursor`, and a "New user" button. Use `useInfiniteQuery`.
-- [ ] T047 [P] [US2] Create `apps/web/src/pages/admin/UserCreatePage.tsx`: a form with `CreateUserRequestSchema`; maps `EMAIL_TAKEN` to the email field error; navigates to the detail page on success.
-- [ ] T048 [P] [US2] Create `apps/web/src/pages/admin/UserDetailPage.tsx`:
+- [x] T046 [P] [US2] Create `apps/web/src/pages/admin/UsersListPage.tsx`: a table (name, email, role label, status, created) with a search box (debounced 300 ms), role and status filters, a "Load more" button using `nextCursor`, and a "New user" button. Use `useInfiniteQuery`.
+- [x] T047 [P] [US2] Create `apps/web/src/pages/admin/UserCreatePage.tsx`: a form with `CreateUserRequestSchema`; maps `EMAIL_TAKEN` to the email field error; navigates to the detail page on success.
+- [x] T048 [P] [US2] Create `apps/web/src/pages/admin/UserDetailPage.tsx`:
   - edit displayName and role (select with `ROLE_LABELS`)
   - Deactivate/Reactivate button with a confirm dialog (`window.confirm` is acceptable)
   - a reset-password form
   - show `LAST_ADMIN` errors as a banner
   - invalidate the user queries on success
-- [ ] T049 [US2] Wire the admin routes in `apps/web/src/router.tsx` (`/admin/users`, `/admin/users/new`, `/admin/users/:id`) and add `UsersListPage.test.tsx` (renders rows from mocked fetch).
+- [x] T049 [US2] Wire the admin routes in `apps/web/src/router.tsx` (`/admin/users`, `/admin/users/new`, `/admin/users/:id`) and add `UsersListPage.test.tsx` (renders rows from mocked fetch).
 
 **Checkpoint**:
 ```bash
