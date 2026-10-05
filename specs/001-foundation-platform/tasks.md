@@ -370,14 +370,14 @@ Then do quickstart step 10.
 **Goal**: documented setup and a merge-blocking CI gate.
 **Independent test**: quickstart "Local setup" on a clean clone, plus a failing-test PR that turns CI red.
 
-- [ ] T058 [US5] Create `.github/workflows/ci.yml` per research R18:
+- [x] T058 [US5] Create `.github/workflows/ci.yml` per research R18:
   - `postgres:16-alpine` service (`POSTGRES_USER/PASSWORD=opsgraph`, `POSTGRES_DB=opsgraph_test`, health-cmd `pg_isready`)
   - env `DATABASE_URL=postgresql://opsgraph:opsgraph@localhost:5432/opsgraph_test`, `JWT_ACCESS_SECRET` set to a 40-character dummy, `NODE_ENV=test`
   - steps in this order: checkout, pnpm setup, node 22 with pnpm cache, `pnpm install --frozen-lockfile`, shared build, `prisma generate`, `prisma migrate deploy`, lint, typecheck, test, test:e2e, build
   - `timeout-minutes: 10`
   - make `test/load-env.ts` **not** override variables that are already set, so the CI env wins
-- [ ] T059 [P] [US5] Create the root `README.md`: a one-paragraph product summary linking to `Product Overview.md`, then "Prerequisites", "Local setup" (copied from quickstart.md), "Quality gate", "Seeded users (dev only)", "Project structure", and "Workflow" (link to CLAUDE.md).
-- [ ] T060 [US5] Verify on a clean state:
+- [x] T059 [P] [US5] Create the root `README.md`: a one-paragraph product summary linking to `Product Overview.md`, then "Prerequisites", "Local setup" (copied from quickstart.md), "Quality gate", "Seeded users (dev only)", "Project structure", and "Workflow" (link to CLAUDE.md).
+- [x] T060 [US5] Verify on a clean state:
   ```bash
   docker compose down -v
   ```
