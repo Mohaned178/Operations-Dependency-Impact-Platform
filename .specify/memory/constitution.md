@@ -1,50 +1,111 @@
-# [PROJECT_NAME] Constitution
-<!-- Example: Spec Constitution, TaskFlow Constitution, etc. -->
+<!--
+Sync Impact Report
+- Version change: (template, unversioned) → 1.0.0
+- Principles defined (initial ratification):
+  I. Source Traceability
+  II. Fact vs Inference
+  III. Explainability & Determinism
+  IV. Auditability
+  V. Test-Gated Changes
+  VI. MVP Scope Discipline
+- Added sections: Technical Constraints, Development Workflow, Governance
+- Removed sections: none
+- Templates:
+  ✅ .specify/templates/plan-template.md — "Constitution Check" gates are derived from this file
+     at plan time (generic placeholder; no edit required)
+  ✅ .specify/templates/spec-template.md — no mandatory section changes required
+  ✅ .specify/templates/tasks-template.md — test tasks are optional in the template; Principle V
+     makes them mandatory for OpsGraph (enforced at /speckit-tasks time, no template edit)
+  ✅ CLAUDE.md / AGENTS.md — runtime guidance already aligned with these principles
+- Deferred TODOs: none
+-->
+
+# OpsGraph Constitution
 
 ## Core Principles
 
-### [PRINCIPLE_1_NAME]
-<!-- Example: I. Library-First -->
-[PRINCIPLE_1_DESCRIPTION]
-<!-- Example: Every feature starts as a standalone library; Libraries must be self-contained, independently testable, documented; Clear purpose required - no organizational-only libraries -->
+### I. Source Traceability
 
-### [PRINCIPLE_2_NAME]
-<!-- Example: II. CLI Interface -->
-[PRINCIPLE_2_DESCRIPTION]
-<!-- Example: Every library exposes functionality via CLI; Text in/out protocol: stdin/args → stdout, errors → stderr; Support JSON + human-readable formats -->
+Every persisted operational fact (entity, relationship, state, event, evidence) MUST record its
+provenance: source system, source identifier, and `observed_at` timestamp. Normalization into
+unified concepts MUST NOT erase source-specific fields; the original source payload MUST remain
+retrievable. Any value shown to a user MUST be able to answer "where did this come from, and when?"
 
-### [PRINCIPLE_3_NAME]
-<!-- Example: III. Test-First (NON-NEGOTIABLE) -->
-[PRINCIPLE_3_DESCRIPTION]
-<!-- Example: TDD mandatory: Tests written → User approved → Tests fail → Then implement; Red-Green-Refactor cycle strictly enforced -->
+*Rationale*: Enterprise trust in OpsGraph depends entirely on being able to trace conclusions back
+to the systems of record (Product Overview §18, §27, §54, §55).
 
-### [PRINCIPLE_4_NAME]
-<!-- Example: IV. Integration Testing -->
-[PRINCIPLE_4_DESCRIPTION]
-<!-- Example: Focus areas requiring integration tests: New library contract tests, Contract changes, Inter-service communication, Shared schemas -->
+### II. Fact vs Inference
 
-### [PRINCIPLE_5_NAME]
-<!-- Example: V. Observability, VI. Versioning & Breaking Changes, VII. Simplicity -->
-[PRINCIPLE_5_DESCRIPTION]
-<!-- Example: Text I/O ensures debuggability; Structured logging required; Or: MAJOR.MINOR.BUILD format; Or: Start simple, YAGNI principles -->
+Relationships and conclusions MUST carry `origin` (`SOURCE` | `INFERRED` | `MANUAL`) and
+`confidence` (`HIGH` | `MEDIUM` | `LOW`). The UI and API MUST NOT present inferred data as fact.
+When sources disagree, all conflicting values MUST be stored with their sources and timestamps and
+surfaced as a conflict; the system MUST NOT silently choose one.
 
-## [SECTION_2_NAME]
-<!-- Example: Additional Constraints, Security Requirements, Performance Standards, etc. -->
+*Rationale*: Weak inference presented as fact causes severe operational errors (§10, §29, §30, §53).
 
-[SECTION_2_CONTENT]
-<!-- Example: Technology stack requirements, compliance standards, deployment policies, etc. -->
+### III. Explainability & Determinism
 
-## [SECTION_3_NAME]
-<!-- Example: Development Workflow, Review Process, Quality Gates, etc. -->
+Root-cause, impact, and risk results MUST return the dependency path, contributing factors, and
+evidence that produced them. Given the same graph state, these computations MUST be deterministic.
+Opaque scores are forbidden. AI/LLM components MAY assist interaction but MUST NOT be the source of
+truth for any conclusion.
 
-[SECTION_3_CONTENT]
-<!-- Example: Code review requirements, testing gates, deployment approval process, etc. -->
+*Rationale*: Every major automated conclusion must be inspectable (§15, §57, §58).
+
+### IV. Auditability
+
+Every mutation (user action, automated action, data change, workflow transition) MUST write an
+audit record containing actor, action, target entity, before value, after value, and timestamp.
+Audit records MUST be append-only.
+
+*Rationale*: Investigations, approvals, and exceptions require a durable history of who changed what
+and why (§37).
+
+### V. Test-Gated Changes
+
+No change merges unless lint, typecheck, and tests pass in CI. Every API endpoint MUST have its
+request/response schema defined with zod in `packages/shared` and at least one e2e test. Graph
+traversal logic MUST have unit tests covering cycles and depth limits.
+
+*Rationale*: Code is implemented by a lower-cost model; automated gates are the primary defense
+against regressions.
+
+### VI. MVP Scope Discipline
+
+The MVP targets the Logistics/Commerce vertical. Every feature MUST answer at least one of the
+twelve questions in Product Overview §65 and MUST NOT violate the §62 non-goals. Build only what the
+current feature spec requires (YAGNI); speculative abstractions require justification in the plan's
+Complexity Tracking table.
+
+*Rationale*: The biggest product risk is trying to support everything at once (§60, §61).
+
+## Technical Constraints
+
+- TypeScript in strict mode across all packages; `any` is prohibited.
+- pnpm workspaces monorepo: `apps/api` (NestJS + Prisma + PostgreSQL), `apps/web` (React + Vite),
+  `packages/shared` (zod schemas and shared types).
+- All graph traversal MUST go through `GraphRepository`, and every traversal MUST enforce a maximum
+  depth and a cycle guard. Traversal SQL MUST NOT appear elsewhere.
+- New runtime dependencies require explicit listing in the feature plan.
+
+## Development Workflow
+
+- Roles: Claude Opus authors specs, plans, and tasks and performs code review; the implementer
+  model (DeepSeek) works only from `specs/<feature>/tasks.md` and MUST NOT modify spec, plan,
+  constitution, or `CLAUDE.md`. Ambiguities go to `specs/<feature>/questions.md`.
+- One feature branch per Spec Kit feature; merge to `main` only after review findings are resolved
+  and CI is green.
+- Commits follow Conventional Commits (`feat(scope): ...`, `fix(scope): ...`).
 
 ## Governance
-<!-- Example: Constitution supersedes all other practices; Amendments require documentation, approval, migration plan -->
 
-[GOVERNANCE_RULES]
-<!-- Example: All PRs/reviews must verify compliance; Complexity must be justified; Use [GUIDANCE_FILE] for runtime development guidance -->
+This constitution supersedes other practices and guidance files. Every plan's Constitution Check
+and every code review MUST verify compliance with these principles; violations MUST be fixed or
+explicitly justified in Complexity Tracking.
 
-**Version**: [CONSTITUTION_VERSION] | **Ratified**: [RATIFICATION_DATE] | **Last Amended**: [LAST_AMENDED_DATE]
-<!-- Example: Version: 2.1.1 | Ratified: 2025-06-13 | Last Amended: 2025-07-16 -->
+Amendments are made via `/speckit-constitution`, recorded with a Sync Impact Report, and versioned
+semantically: MAJOR for removing or redefining a principle, MINOR for adding a principle or section
+or materially expanding guidance, PATCH for clarifications and wording. Runtime guidance lives in
+`CLAUDE.md`.
+
+**Version**: 1.0.0 | **Ratified**: 2026-10-05 | **Last Amended**: 2026-10-05
