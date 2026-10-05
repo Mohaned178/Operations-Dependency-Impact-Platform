@@ -134,11 +134,15 @@ export class AuthService {
 
   private async handleBadPassword(user: User, now: Date): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM users WHERE id = ${user.id}::uuid FOR UPDATE`;
+      const fresh = await tx.user.findUniqueOrThrow({ where: { id: user.id } });
       const withinWindow =
-        user.lastFailedLoginAt !== null &&
-        now.getTime() - user.lastFailedLoginAt.getTime() < ATTEMPT_WINDOW_MS;
-      const failedLoginCount = withinWindow ? user.failedLoginCount + 1 : 1;
-      const locked = failedLoginCount >= MAX_FAILED_LOGINS;
+        fresh.lastFailedLoginAt !== null &&
+        now.getTime() - fresh.lastFailedLoginAt.getTime() < ATTEMPT_WINDOW_MS;
+      const failedLoginCount = withinWindow ? fresh.failedLoginCount + 1 : 1;
+      const alreadyLocked =
+        fresh.lockedUntil !== null && fresh.lockedUntil.getTime() > now.getTime();
+      const locked = failedLoginCount >= MAX_FAILED_LOGINS && !alreadyLocked;
       const lockedUntil = locked ? new Date(now.getTime() + LOCK_DURATION_MS) : null;
 
       await tx.user.update({

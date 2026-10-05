@@ -413,7 +413,7 @@ Then do quickstart step 10.
     If `count !== 1`, throw `Errors.unauthenticated()` from inside the transaction so nothing is issued. Catch that case **outside** the transaction, call `this.refuse('concurrent_rotation', token.userId)`, and rethrow. Do **not** revoke the family in this case. The winning request's new token must stay valid, and a later reuse of the old token is still caught by the existing `token.revokedAt` branch.
   - **Test** (`apps/api/test/auth.e2e-spec.ts`): log in, then fire two `POST /api/auth/refresh` with the same cookie via `Promise.all`. Expect exactly one 200 and one 401. Expect that the 200 response's new cookie still refreshes successfully, and that one `auth.refresh_refused` audit row has `metadata.reason = 'concurrent_rotation'`.
 
-- [ ] T065 [US1] Make the failed-login counter atomic in `apps/api/src/auth/auth.service.ts` → `handleBadPassword` (FR-005).
+- [x] T065 [US1] Make the failed-login counter atomic in `apps/api/src/auth/auth.service.ts` → `handleBadPassword` (FR-005).
   - **Bug**: `failedLoginCount` is computed from the `user` row read before the transaction, so parallel bad guesses overwrite each other and the account never locks.
   - **Fix**: at the start of the transaction, lock the row with
     ``await tx.$queryRaw`SELECT id FROM users WHERE id = ${user.id}::uuid FOR UPDATE`;``

@@ -144,6 +144,32 @@ describe('Auth (e2e)', () => {
     await request(server).post('/api/auth/refresh').set('Cookie', secondCookie).expect(401);
   });
 
+  it('serializes concurrent failed logins and locks the account exactly once', async () => {
+    const user = await createUser(prisma, { role: 'ANALYST', email: 'parallel@test.local' });
+
+    const attempts = Array.from({ length: 10 }, () =>
+      request(server)
+        .post('/api/auth/login')
+        .send({ email: 'parallel@test.local', password: 'Wrong-Password-123' }),
+    );
+    const responses = await Promise.all(attempts);
+    expect(responses.map((response) => response.status)).toEqual(Array(10).fill(401));
+
+    const lockedUser = await prisma.user.findUniqueOrThrow({ where: { id: user.id } });
+    expect(lockedUser.lockedUntil?.getTime() ?? 0).toBeGreaterThan(Date.now());
+    expect(lockedUser.failedLoginCount).toBeGreaterThanOrEqual(5);
+
+    const lockAudits = await prisma.auditEntry.findMany({
+      where: { action: AUDIT_ACTIONS.AUTH_ACCOUNT_LOCKED, targetId: user.id },
+    });
+    expect(lockAudits).toHaveLength(1);
+
+    await request(server)
+      .post('/api/auth/login')
+      .send({ email: 'parallel@test.local', password: TEST_PASSWORD })
+      .expect(401);
+  });
+
   it('handles two concurrent refreshes with the same cookie atomically', async () => {
     await createUser(prisma, { role: 'ANALYST', email: 'race@test.local' });
     await Promise.all([prisma.$queryRaw`SELECT 1`, prisma.$queryRaw`SELECT 1`]);
