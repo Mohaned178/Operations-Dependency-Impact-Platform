@@ -99,6 +99,12 @@ export class TokenService {
       throw Errors.unauthenticated();
     }
 
+    const familyExpiresAt = token.familyCreatedAt.getTime() + env.REFRESH_TOKEN_TTL_DAYS * MS_PER_DAY;
+    if (familyExpiresAt <= Date.now()) {
+      await this.refuse('expired', token.userId);
+      throw Errors.unauthenticated();
+    }
+
     if (token.user.status !== 'ACTIVE') {
       await this.refuse('deactivated', token.userId);
       throw Errors.unauthenticated();

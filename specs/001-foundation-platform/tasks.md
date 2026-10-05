@@ -194,27 +194,27 @@ All pass. Also, `psql` → `DELETE FROM audit_entries` fails with "append-only".
 **Independent test**: quickstart steps 1–3. Each seeded user signs in and sees the correct role and nav, and is redirected after logout.
 
 ### Shared and seed
-- [ ] T027 [P] [US1] Create `packages/shared/src/auth.ts`: `LoginRequestSchema`, `ChangePasswordRequestSchema` (with a refine that the new password differs from the current one), `PublicUserSchema` (moved here or in `users.ts`, exported once), `AuthSessionSchema`, per contracts/api.md. Re-export from the index.
-- [ ] T028 [P] [US1] Create `apps/api/prisma/seed.ts` per data-model.md "Seed":
+- [x] T027 [P] [US1] Create `packages/shared/src/auth.ts`: `LoginRequestSchema`, `ChangePasswordRequestSchema` (with a refine that the new password differs from the current one), `PublicUserSchema` (moved here or in `users.ts`, exported once), `AuthSessionSchema`, per contracts/api.md. Re-export from the index.
+- [x] T028 [P] [US1] Create `apps/api/prisma/seed.ts` per data-model.md "Seed":
   - refuse to run if `NODE_ENV=production`
   - upsert 3 users with argon2 hashes
   - write a `user.created` audit entry with actorType `system` for each newly created user, using `prisma.$transaction`
 
 ### API
-- [ ] T029 [P] [US1] Create `apps/api/src/auth/password.service.ts`: `hash(pw)` (argon2id), `verify(hash, pw)`, and a precomputed `DUMMY_HASH` used for unknown emails (research R7, plan note 4).
-- [ ] T030 [US1] Create `apps/api/src/auth/auth.service.ts`:
+- [x] T029 [P] [US1] Create `apps/api/src/auth/password.service.ts`: `hash(pw)` (argon2id), `verify(hash, pw)`, and a precomputed `DUMMY_HASH` used for unknown emails (research R7, plan note 4).
+- [x] T030 [US1] Create `apps/api/src/auth/auth.service.ts`:
   - `login(email, password)`: implements R7 and plan note 4. In one transaction it updates the counters and audits `auth.login_failed` (plus `auth.account_locked` when the lock triggers), then throws `INVALID_CREDENTIALS` **after** the transaction. On success, in one transaction it resets the counters, issues a refresh token in a new family, and audits `auth.login_succeeded`.
   - `refresh(raw)` delegates to `TokenService.rotateRefresh`.
   - `logout(raw?)` revokes the family and audits `auth.logout` when the user is known.
   - `changePassword(user, current, next)`: verifies, hashes, sets `mustChangePassword=false` and `passwordChangedAt`, revokes all refresh tokens, issues a new family, and audits `auth.password_changed`, all in one transaction.
   - All methods return `AuthSession` built through `toPublicUser()`, which you create in `apps/api/src/users/user.mapper.ts`.
-- [ ] T031 [US1] Create `apps/api/src/auth/auth.controller.ts` with routes per contracts/api.md (Auth table):
+- [x] T031 [US1] Create `apps/api/src/auth/auth.controller.ts` with routes per contracts/api.md (Auth table):
   - `@Public()` on login, refresh and logout
   - `@AllowDuringPasswordChange()` on `me`, `change-password` and `logout`
   - read the cookie from `req.cookies.og_refresh`
   - set and clear it only via the helper `setRefreshCookie`/`clearRefreshCookie` in `apps/api/src/auth/refresh-cookie.ts` (`httpOnly`, `sameSite 'strict'`, `secure: cookieSecure`, `path '/api/auth'`, `expires`)
   - validate bodies with `ZodValidationPipe`
-- [ ] T032 [US1] Write `apps/api/test/auth.e2e-spec.ts` covering:
+- [x] T032 [US1] Write `apps/api/test/auth.e2e-spec.ts` covering:
   - login success returns the session and sets the cookie
   - a wrong password and an unknown email give identical 401 bodies apart from `correlationId`
   - the 5-failure lockout: the 6th attempt with the correct password gets 401, and an `auth.account_locked` audit row exists
@@ -227,29 +227,29 @@ All pass. Also, `psql` → `DELETE FROM audit_entries` fails with "append-only".
   - no audit row contains the string of the password used
 
 ### Web
-- [ ] T033 [P] [US1] Create `apps/web/src/lib/api-client.ts` per research R15:
+- [x] T033 [P] [US1] Create `apps/web/src/lib/api-client.ts` per research R15:
   - `setAccessToken`, `apiFetch<T>(path, { method, body, schema? })`: adds the Bearer token and `credentials: 'same-origin'`, parses the response with the zod schema when given, throws `ApiError {status, code, message, details}` built from `ErrorResponseSchema`
   - single-flight refresh on 401 (not for `/auth/*` calls) with one retry
   - an `onAuthFailure` callback hook
 
   Also create `apps/web/src/lib/query-client.ts`.
-- [ ] T034 [US1] Create the auth state in `apps/web/src/auth/`:
+- [x] T034 [US1] Create the auth state in `apps/web/src/auth/`:
   - `AuthProvider.tsx`: on mount calls `POST /api/auth/refresh` to restore the session; state `{ status: 'loading'|'authenticated'|'anonymous', user }`; methods `login`, `logout`, `changePassword`, `setSession`
   - `useAuth.ts`
   - `RequireAuth.tsx`: if loading, show a spinner; if anonymous, `<Navigate to={'/login?next='+encodeURIComponent(location.pathname)} />`; if `user.mustChangePassword`, navigate to `/change-password`
   - `RequireRole.tsx`: renders `ForbiddenPage` when the role does not match
-- [ ] T035 [P] [US1] Create `apps/web/src/pages/LoginPage.tsx`:
+- [x] T035 [P] [US1] Create `apps/web/src/pages/LoginPage.tsx`:
   - react-hook-form with `zodResolver(LoginRequestSchema)`
   - shows "Invalid email or password" on `INVALID_CREDENTIALS`
   - on success, navigates to the `next` query param if it starts with `/`, otherwise `/`
-- [ ] T036 [P] [US1] Create `apps/web/src/pages/ChangePasswordPage.tsx`: form with `ChangePasswordRequestSchema` plus a confirm field. On success it updates the session and navigates to `/`.
-- [ ] T037 [P] [US1] Create `apps/web/src/layout/AppShell.tsx`:
+- [x] T036 [P] [US1] Create `apps/web/src/pages/ChangePasswordPage.tsx`: form with `ChangePasswordRequestSchema` plus a confirm field. On success it updates the session and navigates to `/`.
+- [x] T037 [P] [US1] Create `apps/web/src/layout/AppShell.tsx`:
   - header with the app name, `user.displayName`, `ROLE_LABELS[user.role]` and a Sign out button
   - side nav: Home `/`, Investigations `/investigations`, Graph Explorer `/graph`, Exceptions `/exceptions`, and Admin (`/admin/users`, `/admin/audit`) only when the role is ADMIN
   - an `<Outlet/>`
-- [ ] T038 [P] [US1] Create `apps/web/src/pages/HomePage.tsx` ("Welcome, {name}"), `ForbiddenPage.tsx` ("You are not permitted to view this page"), `NotFoundPage.tsx` and `ComingSoonPage.tsx`.
-- [ ] T039 [US1] Create `apps/web/src/router.tsx` (`createBrowserRouter`) with the routes from plan.md design note 7. Admin child routes may temporarily point to `ComingSoonPage` until US2/US3. Update `main.tsx` to render `QueryClientProvider` > `AuthProvider` > `RouterProvider`.
-- [ ] T040 [US1] Write the web tests:
+- [x] T038 [P] [US1] Create `apps/web/src/pages/HomePage.tsx` ("Welcome, {name}"), `ForbiddenPage.tsx` ("You are not permitted to view this page"), `NotFoundPage.tsx` and `ComingSoonPage.tsx`.
+- [x] T039 [US1] Create `apps/web/src/router.tsx` (`createBrowserRouter`) with the routes from plan.md design note 7. Admin child routes may temporarily point to `ComingSoonPage` until US2/US3. Update `main.tsx` to render `QueryClientProvider` > `AuthProvider` > `RouterProvider`.
+- [x] T040 [US1] Write the web tests:
   - `apps/web/src/pages/LoginPage.test.tsx`: shows a validation error for a bad email; shows "Invalid email or password" for a mocked 401 (mock `fetch` with `vi.fn`)
   - `apps/web/src/layout/AppShell.test.tsx`: the Admin nav is hidden for ANALYST and shown for ADMIN
 
