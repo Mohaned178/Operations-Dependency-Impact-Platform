@@ -96,6 +96,7 @@ describe('LoginPage', () => {
   it.each([
     ['//evil.example', '/'],
     ['/\\evil.example', '/'],
+    ['/\t/evil.example', '/'],
     ['/admin/users', '/admin/users'],
   ])('only follows a safe next=%s', async (next, expected) => {
     const user = userEvent.setup();

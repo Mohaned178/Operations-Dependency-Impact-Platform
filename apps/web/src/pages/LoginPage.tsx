@@ -6,7 +6,11 @@ import { useAuth } from '../auth/useAuth';
 import { ApiError } from '../lib/api-client';
 
 function isSafeNext(next: string | null): next is string {
-  return next !== null && next.startsWith('/') && !next.startsWith('//') && !next.startsWith('/\\');
+  if (next === null || !next.startsWith('/') || next.startsWith('//') || next.startsWith('/\\')) {
+    return false;
+  }
+  // URL parsing strips tabs/newlines, so "/\t/evil.example" would become "//evil.example".
+  return new URL(next, window.location.origin).origin === window.location.origin;
 }
 
 export function LoginPage() {
