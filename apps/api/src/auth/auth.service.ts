@@ -68,6 +68,8 @@ export class AuthService {
       const refresh = await this.tokens.issueRefresh(tx, user.id);
       await this.audit.record(tx, {
         action: AUDIT_ACTIONS.AUTH_LOGIN_SUCCEEDED,
+        actorType: 'user',
+        actorId: user.id,
         targetType: 'user',
         targetId: user.id,
       });

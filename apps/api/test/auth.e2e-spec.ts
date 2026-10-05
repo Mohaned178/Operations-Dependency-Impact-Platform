@@ -2,6 +2,7 @@ import type { Server } from 'node:http';
 import { Controller, Get, type INestApplication } from '@nestjs/common';
 import {
   AUDIT_ACTIONS,
+  AuditListResponseSchema,
   AuthSessionSchema,
   ErrorResponseSchema,
   type AuthSession,
@@ -277,6 +278,28 @@ describe('Auth (e2e)', () => {
       .post('/api/auth/login')
       .send({ email: 'off@test.local', password: TEST_PASSWORD })
       .expect(401);
+  });
+
+  it('records the signed-in user as the actor of login_succeeded', async () => {
+    await createUser(prisma, { role: 'ADMIN', email: 'actor@test.local' });
+    const { session } = await signIn('actor@test.local', TEST_PASSWORD);
+
+    const entry = await prisma.auditEntry.findFirst({
+      where: { action: AUDIT_ACTIONS.AUTH_LOGIN_SUCCEEDED },
+    });
+    expect(entry).not.toBeNull();
+    expect(entry?.actorType).toBe('user');
+    expect(entry?.actorId).toBe(session.user.id);
+
+    const auditResponse = await request(server)
+      .get(`/api/audit?actorId=${session.user.id}`)
+      .set('Authorization', `Bearer ${session.accessToken}`)
+      .expect(200);
+    const auditBody: unknown = auditResponse.body;
+    const listed = AuditListResponseSchema.parse(auditBody);
+    expect(listed.items.some((item) => item.action === AUDIT_ACTIONS.AUTH_LOGIN_SUCCEEDED)).toBe(
+      true,
+    );
   });
 
   it('rejects access tokens issued before the last password change', async () => {

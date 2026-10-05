@@ -431,7 +431,7 @@ Then do quickstart step 10.
     3. `apps/api/src/users/users.service.ts` → `resetPassword`: also set `passwordChangedAt: new Date()`, and move `this.passwords.hash(...)` to **before** `$transaction`, like `create` does.
   - **Tests**: in `jwt-auth.guard.spec.ts`, a token with `iat` 10 s before `passwordChangedAt` → `UNAUTHENTICATED`, and a token with `iat` equal to it → allowed. In `auth.e2e-spec.ts`, log in to get token A, wait 1100 ms, call change-password, then `GET /api/auth/me` with token A → 401, and with the newly returned token → 200. In `users.e2e-spec.ts`, after an admin resets a user's password, that user's old token → 401.
 
-- [ ] T067 [US1] Record the signed-in user as the actor of `auth.login_succeeded` (FR-012, FR-013).
+- [x] T067 [US1] Record the signed-in user as the actor of `auth.login_succeeded` (FR-012, FR-013).
   - **Bug**: login is a public route, so the request context has no user and the row is written with `actorType = 'anonymous'` and `actorId = null`.
   - **Fix**: in `auth.service.ts` → `login`, pass `actorType: 'user', actorId: user.id` to that `audit.record` call. Make no other changes.
   - **Test** (`auth.e2e-spec.ts`): after a successful login, the `auth.login_succeeded` row has `actorType = 'user'` and `actorId = <user id>`, and `GET /api/audit?actorId=<user id>` returns it.
