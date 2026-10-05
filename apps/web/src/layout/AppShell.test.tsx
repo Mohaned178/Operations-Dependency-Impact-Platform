@@ -55,6 +55,7 @@ describe('AppShell', () => {
 
     expect(screen.getByText('Test User')).toBeInTheDocument();
     expect(screen.getByText('Operations Analyst')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Entities' })).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Users' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Audit' })).not.toBeInTheDocument();
   });
@@ -63,6 +64,7 @@ describe('AppShell', () => {
     auth.user = userWithRole('ADMIN');
     renderShell();
 
+    expect(screen.getByRole('link', { name: 'Entities' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Users' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Audit' })).toBeInTheDocument();
     expect(screen.getByText('Administrator')).toBeInTheDocument();

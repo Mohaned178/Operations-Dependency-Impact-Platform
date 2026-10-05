@@ -4,6 +4,8 @@ import { RequireRole } from './auth/RequireRole';
 import { AppShell } from './layout/AppShell';
 import { ChangePasswordPage } from './pages/ChangePasswordPage';
 import { ComingSoonPage } from './pages/ComingSoonPage';
+import { EntityDetailPage } from './pages/entities/EntityDetailPage';
+import { EntityListPage } from './pages/entities/EntityListPage';
 import { HomePage } from './pages/HomePage';
 import { LoginPage } from './pages/LoginPage';
 import { NotFoundPage } from './pages/NotFoundPage';
@@ -22,6 +24,8 @@ export const router = createBrowserRouter([
         element: <AppShell />,
         children: [
           { index: true, element: <HomePage /> },
+          { path: 'entities', element: <EntityListPage /> },
+          { path: 'entities/:id', element: <EntityDetailPage /> },
           { path: 'investigations', element: <ComingSoonPage /> },
           { path: 'graph', element: <ComingSoonPage /> },
           { path: 'exceptions', element: <ComingSoonPage /> },
