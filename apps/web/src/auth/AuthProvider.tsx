@@ -7,7 +7,7 @@ import {
   type ReactNode,
 } from 'react';
 import { AuthSessionSchema, type AuthSession, type PublicUser } from '@opsgraph/shared';
-import { apiFetch, setAccessToken, setOnAuthFailure } from '../lib/api-client';
+import { apiFetch, restoreSession, setAccessToken, setOnAuthFailure } from '../lib/api-client';
 
 export type AuthStatus = 'loading' | 'authenticated' | 'anonymous';
 
@@ -42,19 +42,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
 
     const restore = async (): Promise<void> => {
-      try {
-        const session = await apiFetch('/auth/refresh', {
-          method: 'POST',
-          schema: AuthSessionSchema,
-        });
-        if (!cancelled) {
-          setSession(session);
-        }
-      } catch {
-        if (!cancelled) {
-          clearSession();
-        }
+      const session = await restoreSession();
+      if (cancelled) {
+        return;
       }
+      if (session) {
+        setSession(session);
+        return;
+      }
+
+      const retried = await restoreSession();
+      if (cancelled) {
+        return;
+      }
+      if (retried) {
+        setSession(retried);
+        return;
+      }
+
+      clearSession();
     };
 
     void restore();

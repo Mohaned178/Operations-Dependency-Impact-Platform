@@ -1,4 +1,4 @@
-import { AuthSessionSchema, ErrorResponseSchema } from '@opsgraph/shared';
+import { AuthSessionSchema, ErrorResponseSchema, type AuthSession } from '@opsgraph/shared';
 import type { ZodType } from 'zod';
 
 export class ApiError extends Error {
@@ -20,7 +20,7 @@ export interface ApiFetchOptions<T> {
 }
 
 let accessToken: string | null = null;
-let refreshInFlight: Promise<string | null> | null = null;
+let refreshInFlight: Promise<AuthSession | null> | null = null;
 let onAuthFailure: (() => void) | null = null;
 
 export function setAccessToken(token: string | null): void {
@@ -67,7 +67,7 @@ async function parseResponse<T>(response: Response, schema?: ZodType<T>): Promis
   return schema ? schema.parse(payload) : (payload as T);
 }
 
-async function refreshAccessToken(): Promise<string | null> {
+async function refreshAccessToken(): Promise<AuthSession | null> {
   try {
     const response = await fetch('/api/auth/refresh', {
       method: 'POST',
@@ -82,25 +82,29 @@ async function refreshAccessToken(): Promise<string | null> {
       return null;
     }
     accessToken = parsed.data.accessToken;
-    return accessToken;
+    return parsed.data;
   } catch {
     return null;
   }
 }
 
-function singleFlightRefresh(): Promise<string | null> {
+function singleFlightRefresh(): Promise<AuthSession | null> {
   refreshInFlight ??= refreshAccessToken().finally(() => {
     refreshInFlight = null;
   });
   return refreshInFlight;
 }
 
+export function restoreSession(): Promise<AuthSession | null> {
+  return singleFlightRefresh();
+}
+
 export async function apiFetch<T>(path: string, options: ApiFetchOptions<T> = {}): Promise<T> {
   const response = await doFetch(path, options);
 
   if (response.status === 401 && !path.startsWith('/auth/')) {
-    const refreshed = await singleFlightRefresh();
-    if (refreshed) {
+    const refreshedToken = (await singleFlightRefresh())?.accessToken;
+    if (refreshedToken) {
       return parseResponse(await doFetch(path, options), options.schema);
     }
     onAuthFailure?.();

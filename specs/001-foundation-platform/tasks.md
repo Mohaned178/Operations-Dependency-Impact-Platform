@@ -448,7 +448,7 @@ Then do quickstart step 10.
 
 ### Web
 
-- [ ] T070 [US1] Route session restore through the single-flight refresh.
+- [x] T070 [US1] Route session restore through the single-flight refresh.
   - **Bug**: `AuthProvider` calls `apiFetch('/auth/refresh')` directly. Under `StrictMode` the effect runs twice and sends two refreshes with the same cookie.
   - **Fix**:
     1. In `apps/web/src/lib/api-client.ts`, change `refreshAccessToken` to return `Promise<AuthSession | null>`; it still stores `accessToken` itself. Make `singleFlightRefresh` share that promise.
