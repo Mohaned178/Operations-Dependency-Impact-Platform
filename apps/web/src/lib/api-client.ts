@@ -23,6 +23,8 @@ let accessToken: string | null = null;
 let refreshInFlight: Promise<AuthSession | null> | null = null;
 let onAuthFailure: (() => void) | null = null;
 
+const NO_REFRESH_PATHS = new Set(['/auth/login', '/auth/refresh', '/auth/logout']);
+
 export function setAccessToken(token: string | null): void {
   accessToken = token;
 }
@@ -102,7 +104,7 @@ export function restoreSession(): Promise<AuthSession | null> {
 export async function apiFetch<T>(path: string, options: ApiFetchOptions<T> = {}): Promise<T> {
   const response = await doFetch(path, options);
 
-  if (response.status === 401 && !path.startsWith('/auth/')) {
+  if (response.status === 401 && !NO_REFRESH_PATHS.has(path)) {
     const refreshedToken = (await singleFlightRefresh())?.accessToken;
     if (refreshedToken) {
       return parseResponse(await doFetch(path, options), options.schema);

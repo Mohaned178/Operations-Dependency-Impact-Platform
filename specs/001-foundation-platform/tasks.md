@@ -456,7 +456,7 @@ Then do quickstart step 10.
     3. In `AuthProvider.tsx`, `restore()` calls `restoreSession()`. If it returns `null`, call it **once more**, because another tab may have just rotated the cookie (see T064). If that also returns `null`, call `clearSession()`. Keep the `cancelled` flag.
   - **Test** (`apps/web/src/auth/AuthProvider.test.tsx`): render `<StrictMode><AuthProvider>…</AuthProvider></StrictMode>` with a mocked `fetch` that resolves the refresh after a tick. Assert that `fetch` was called with `/api/auth/refresh` exactly **once**, and that the provider ends in the authenticated state.
 
-- [ ] T071 [P] [US1] Only skip the silent refresh for the token endpoints in `api-client.ts` → `apiFetch`.
+- [x] T071 [P] [US1] Only skip the silent refresh for the token endpoints in `api-client.ts` → `apiFetch`.
   - **Bug**: `!path.startsWith('/auth/')` also skips the refresh for `/auth/me` and `/auth/change-password`.
   - **Fix**: `const NO_REFRESH_PATHS = new Set(['/auth/login', '/auth/refresh', '/auth/logout']);` and use `!NO_REFRESH_PATHS.has(path)`.
   - **Test** (`apps/web/src/lib/api-client.test.ts`): with a mocked `fetch`, `/auth/me` returns 401, then refresh returns 200 with a session, then `/auth/me` returns 200 → `apiFetch('/auth/me')` resolves. Also, `apiFetch('/auth/login')` returning 401 must **not** call `/api/auth/refresh`.
