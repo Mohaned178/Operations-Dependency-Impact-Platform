@@ -49,4 +49,12 @@ export const Errors = {
   lastAdmin(): AppError {
     return new AppError('LAST_ADMIN', 409, 'At least one active Administrator is required');
   },
+
+  importTooLarge(): AppError {
+    return new AppError(
+      'IMPORT_TOO_LARGE',
+      413,
+      'Imports are limited to 10 MB and 10,000 rows',
+    );
+  },
 };

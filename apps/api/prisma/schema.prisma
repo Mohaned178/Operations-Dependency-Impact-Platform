@@ -18,6 +18,96 @@ enum UserStatus {
   DEACTIVATED
 }
 
+enum EntityType {
+  Customer
+  Contract
+  Order
+  Product
+  Payment
+  Invoice
+  Approval
+  Warehouse
+  Shipment
+  Supplier
+  SLA
+  BudgetRequirement
+}
+
+enum RelationshipType {
+  HAS
+  PLACED
+  GOVERNS
+  CONTAINS
+  GENERATES
+  REQUIRES
+  DEPENDS_ON
+  BLOCKS
+  FULFILLED_BY
+  SUPPLIED_BY
+  DEFINES
+  RELATES_TO
+}
+
+enum RelationshipOrigin {
+  SOURCE
+  INFERRED
+  MANUAL
+}
+
+enum Confidence {
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum OperationalState {
+  ACTIVE
+  PENDING
+  WAITING
+  BLOCKED
+  MISSING
+  DELAYED
+  AT_RISK
+  COMPLETED
+  FAILED
+  CANCELLED
+  SUSPENDED
+  UNKNOWN
+}
+
+enum SourceRecordKind {
+  ENTITY
+  RELATIONSHIP
+  EVENT
+}
+
+enum ImportFormat {
+  JSON
+  CSV
+}
+
+enum ImportKind {
+  ENTITIES
+  RELATIONSHIPS
+  EVENTS
+}
+
+enum ImportOutcome {
+  APPLIED
+  REJECTED
+  DRY_RUN
+}
+
+enum ImportTrigger {
+  API
+  SEED
+}
+
+enum EventEntityRole {
+  SUBJECT
+  RELATED
+}
+
 model User {
   id                 String     @id @default(uuid()) @db.Uuid
   email              String     @unique
@@ -34,6 +124,7 @@ model User {
   updatedAt          DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   refreshTokens RefreshToken[]
+  imports       Import[]
 
   @@map("users")
 }
@@ -74,4 +165,181 @@ model AuditEntry {
   @@index([targetType, targetId, id(sort: Desc)])
   @@index([occurredAt])
   @@map("audit_entries")
+}
+
+model Import {
+  id            String        @id @db.Uuid
+  trigger       ImportTrigger
+  format        ImportFormat
+  csvKind       ImportKind?   @map("csv_kind")
+  dryRun        Boolean       @map("dry_run")
+  outcome       ImportOutcome
+  actorType     String        @map("actor_type") // 'user' | 'system'
+  submittedById String?       @map("submitted_by_id") @db.Uuid
+  fileName      String        @map("file_name")
+  byteSize      Int           @map("byte_size")
+  receivedAt    DateTime      @map("received_at") @db.Timestamptz(6)
+  counts        Json          // ImportCounts
+  fileErrors    Json          @map("file_errors") // string[]
+  rowErrors     Json          @map("row_errors") // ImportRowError[]
+  correlationId String        @map("correlation_id") @db.Uuid
+
+  submittedBy       User?              @relation(fields: [submittedById], references: [id], onDelete: Restrict)
+  sourceRecords     SourceRecord[]
+  stateObservations StateObservation[]
+  relationships     Relationship[]
+  events            Event[]
+
+  @@index([receivedAt(sort: Desc), id(sort: Desc)])
+  @@map("imports")
+}
+
+model Entity {
+  id             String           @id @db.Uuid
+  type           EntityType
+  displayName    String           @map("display_name")
+  attributes     Json             @default("{}")
+  currentState   OperationalState @default(UNKNOWN) @map("current_state")
+  lastObservedAt DateTime         @map("last_observed_at") @db.Timestamptz(6)
+  createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  identifiers       EntityIdentifier[]
+  sourceRecords     SourceRecord[]
+  stateObservations StateObservation[]
+  outgoing          Relationship[]     @relation("RelationshipFrom")
+  incoming          Relationship[]     @relation("RelationshipTo")
+  eventLinks        EventEntity[]
+
+  @@index([displayName, id])
+  @@index([type, displayName, id])
+  @@index([currentState, displayName, id])
+  @@map("entities")
+}
+
+model EntityIdentifier {
+  id           String     @id @db.Uuid
+  seq          BigInt     @unique @default(autoincrement())
+  entityId     String     @map("entity_id") @db.Uuid
+  entityType   EntityType @map("entity_type")
+  sourceSystem String     @map("source_system")
+  sourceId     String     @map("source_id")
+  createdAt    DateTime   @map("created_at") @db.Timestamptz(6) // = receivedAt of the import that introduced it
+
+  entity Entity @relation(fields: [entityId], references: [id], onDelete: Restrict)
+
+  @@unique([entityType, sourceSystem, sourceId])
+  @@index([entityId, seq])
+  @@index([sourceSystem])
+  @@index([sourceId])
+  @@map("entity_identifiers")
+}
+
+model SourceRecord {
+  id             String           @id @db.Uuid
+  seq            BigInt           @unique @default(autoincrement())
+  kind           SourceRecordKind
+  sourceSystem   String           @map("source_system")
+  sourceId       String           @map("source_id")
+  observedAt     DateTime         @map("observed_at") @db.Timestamptz(6)
+  receivedAt     DateTime         @map("received_at") @db.Timestamptz(6)
+  rawPayload     Json             @map("raw_payload")
+  payloadHash    String           @map("payload_hash") @db.Char(64)
+  normalized     Json // see "Normalized payloads" below
+  importId       String           @map("import_id") @db.Uuid
+  entityId       String?          @map("entity_id") @db.Uuid
+  relationshipId String?          @map("relationship_id") @db.Uuid
+  eventId        String?          @map("event_id") @db.Uuid
+
+  import           Import            @relation(fields: [importId], references: [id], onDelete: Restrict)
+  entity           Entity?           @relation(fields: [entityId], references: [id], onDelete: Restrict)
+  relationship     Relationship?     @relation(fields: [relationshipId], references: [id], onDelete: Restrict)
+  event            Event?            @relation(fields: [eventId], references: [id], onDelete: Restrict)
+  stateObservation StateObservation?
+
+  @@index([entityId, observedAt(sort: Desc), seq(sort: Desc)])
+  @@index([relationshipId])
+  @@index([eventId])
+  @@map("source_records")
+}
+
+model StateObservation {
+  id             String           @id @db.Uuid
+  seq            BigInt           @unique @default(autoincrement())
+  entityId       String           @map("entity_id") @db.Uuid
+  sourceRecordId String           @unique @map("source_record_id") @db.Uuid
+  state          OperationalState
+  sourceStatus   String?          @map("source_status")
+  sourceSystem   String           @map("source_system")
+  sourceId       String           @map("source_id")
+  observedAt     DateTime         @map("observed_at") @db.Timestamptz(6)
+  receivedAt     DateTime         @map("received_at") @db.Timestamptz(6)
+  importId       String           @map("import_id") @db.Uuid
+
+  entity       Entity       @relation(fields: [entityId], references: [id], onDelete: Restrict)
+  sourceRecord SourceRecord @relation(fields: [sourceRecordId], references: [id], onDelete: Restrict)
+  import       Import       @relation(fields: [importId], references: [id], onDelete: Restrict)
+
+  @@index([entityId, observedAt, seq])
+  @@map("state_observations")
+}
+
+model Relationship {
+  id           String             @id @db.Uuid
+  type         RelationshipType
+  fromEntityId String             @map("from_entity_id") @db.Uuid
+  toEntityId   String             @map("to_entity_id") @db.Uuid
+  origin       RelationshipOrigin
+  confidence   Confidence
+  basis        String?
+  sourceSystem String             @map("source_system")
+  sourceId     String             @map("source_id")
+  observedAt   DateTime           @map("observed_at") @db.Timestamptz(6) // of the current (latest) observation
+  importId     String             @map("import_id") @db.Uuid // of the current (latest) observation
+  createdAt    DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  from          Entity         @relation("RelationshipFrom", fields: [fromEntityId], references: [id], onDelete: Restrict)
+  to            Entity         @relation("RelationshipTo", fields: [toEntityId], references: [id], onDelete: Restrict)
+  import        Import         @relation(fields: [importId], references: [id], onDelete: Restrict)
+  sourceRecords SourceRecord[]
+
+  @@unique([sourceSystem, sourceId])
+  @@index([fromEntityId, type])
+  @@index([toEntityId, type])
+  @@map("relationships")
+}
+
+model Event {
+  id           String   @id @db.Uuid
+  type         String
+  occurredAt   DateTime @map("occurred_at") @db.Timestamptz(6)
+  observedAt   DateTime @map("observed_at") @db.Timestamptz(6)
+  description  String?
+  sourceSystem String   @map("source_system")
+  sourceId     String   @map("source_id")
+  importId     String   @map("import_id") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  import        Import         @relation(fields: [importId], references: [id], onDelete: Restrict)
+  entities      EventEntity[]
+  sourceRecords SourceRecord[]
+
+  @@unique([sourceSystem, sourceId])
+  @@index([occurredAt, id])
+  @@map("events")
+}
+
+model EventEntity {
+  eventId  String          @map("event_id") @db.Uuid
+  entityId String          @map("entity_id") @db.Uuid
+  role     EventEntityRole
+
+  event  Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  entity Entity @relation(fields: [entityId], references: [id], onDelete: Restrict)
+
+  @@id([eventId, entityId])
+  @@index([entityId])
+  @@map("event_entities")
 }

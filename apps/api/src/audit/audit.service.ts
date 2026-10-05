@@ -51,6 +51,14 @@ export class AuditService {
     await tx.auditEntry.create({ data: this.buildData(input) });
   }
 
+  async recordMany(tx: Tx, inputs: AuditRecordInput[]): Promise<void> {
+    const chunkSize = 1_000;
+    for (let offset = 0; offset < inputs.length; offset += chunkSize) {
+      const chunk = inputs.slice(offset, offset + chunkSize);
+      await tx.auditEntry.createMany({ data: chunk.map((input) => this.buildData(input)) });
+    }
+  }
+
   async recordStandalone(input: AuditRecordInput): Promise<void> {
     await this.prisma.auditEntry.create({ data: this.buildData(input) });
   }

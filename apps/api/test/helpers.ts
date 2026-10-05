@@ -3,13 +3,20 @@ import type { Server } from 'node:http';
 import type { INestApplication, Type } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import type { NestExpressApplication } from '@nestjs/platform-express';
-import type { Role, UserStatus } from '@opsgraph/shared';
-import type { User } from '@prisma/client';
+import type {
+  ImportKind,
+  ImportReport,
+  Role,
+  UserStatus,
+} from '@opsgraph/shared';
+import { Prisma, type User } from '@prisma/client';
 import argon2 from 'argon2';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { configureApp } from '../src/bootstrap';
-import type { PrismaService } from '../src/prisma/prisma.service';
+import { RequestContext } from '../src/common/context/request-context';
+import { ImportService } from '../src/ingestion/import.service';
+import { PrismaService } from '../src/prisma/prisma.service';
 
 export const TEST_PASSWORD = 'OpsGraph-Test-2026!';
 
@@ -27,9 +34,13 @@ export async function createTestApp(
 }
 
 export async function resetDb(prisma: PrismaService): Promise<void> {
-  await prisma.$executeRaw`TRUNCATE users, refresh_tokens CASCADE`;
   await prisma.$executeRaw`ALTER TABLE audit_entries DISABLE TRIGGER USER`;
+  await prisma.$executeRaw`ALTER TABLE source_records DISABLE TRIGGER USER`;
+  await prisma.$executeRaw`ALTER TABLE state_observations DISABLE TRIGGER USER`;
+  await prisma.$executeRaw`TRUNCATE users, refresh_tokens, imports, entities, entity_identifiers, source_records, state_observations, relationships, events, event_entities CASCADE`;
   await prisma.$executeRaw`DELETE FROM audit_entries`;
+  await prisma.$executeRaw`ALTER TABLE source_records ENABLE TRIGGER USER`;
+  await prisma.$executeRaw`ALTER TABLE state_observations ENABLE TRIGGER USER`;
   await prisma.$executeRaw`ALTER TABLE audit_entries ENABLE TRIGGER USER`;
 }
 
@@ -58,6 +69,61 @@ export function createUser(prisma: PrismaService, options: CreateUserOptions): P
       },
     });
   })();
+}
+
+const IMPORT_ADMIN_EMAIL = 'imports-admin@test.local';
+
+async function ensureImportAdmin(prisma: PrismaService): Promise<User> {
+  const existing = await prisma.user.findUnique({ where: { email: IMPORT_ADMIN_EMAIL } });
+  if (existing) {
+    return existing;
+  }
+  try {
+    return await createUser(prisma, { role: 'ADMIN', email: IMPORT_ADMIN_EMAIL });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      const created = await prisma.user.findUnique({ where: { email: IMPORT_ADMIN_EMAIL } });
+      if (created) {
+        return created;
+      }
+    }
+    throw error;
+  }
+}
+
+export interface RunImportOptions {
+  format: 'json' | 'csv';
+  kind?: ImportKind;
+  content: string | Uint8Array;
+  dryRun?: boolean;
+  skipIfNoChanges?: boolean;
+  trigger?: 'API' | 'SEED';
+}
+
+export async function runImport(
+  app: INestApplication,
+  options: RunImportOptions,
+): Promise<ImportReport | null> {
+  const prisma = app.get(PrismaService);
+  const importService = app.get(ImportService);
+  const requestContext = app.get(RequestContext);
+  const admin = await ensureImportAdmin(prisma);
+  const content =
+    typeof options.content === 'string' ? Buffer.from(options.content, 'utf8') : options.content;
+
+  return requestContext.runDetached(() =>
+    importService.run({
+      format: options.format,
+      kind: options.kind,
+      fileName: `test.${options.format}`,
+      byteSize: content.byteLength,
+      content,
+      dryRun: options.dryRun,
+      skipIfNoChanges: options.skipIfNoChanges,
+      trigger: options.trigger,
+      actor: { type: 'user', id: admin.id },
+    }),
+  );
 }
 
 export async function login(

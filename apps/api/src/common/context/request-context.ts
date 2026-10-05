@@ -29,6 +29,14 @@ export class RequestContext {
   setUserId(id: string): void {
     this.cls.set(USER_ID_KEY, id);
   }
+
+  runDetached<T>(fn: () => Promise<T>): Promise<T> {
+    return this.cls.run(() => {
+      this.cls.set(CORRELATION_ID_KEY, randomUUID());
+      this.cls.set(USER_ID_KEY, undefined);
+      return fn();
+    });
+  }
 }
 
 @Global()

@@ -18,6 +18,25 @@ export const PageQuerySchema = z.object({
 });
 export type PageQuery = z.infer<typeof PageQuerySchema>;
 
+export type JsonValue =
+  | string
+  | number
+  | boolean
+  | null
+  | JsonValue[]
+  | { [key: string]: JsonValue };
+
+export const JsonValueSchema: z.ZodType<JsonValue> = z.lazy(() =>
+  z.union([
+    z.string(),
+    z.number(),
+    z.boolean(),
+    z.null(),
+    z.array(JsonValueSchema),
+    z.record(JsonValueSchema),
+  ]),
+);
+
 export const ErrorCodeSchema = z.enum([
   'VALIDATION_FAILED',
   'INVALID_CREDENTIALS',
@@ -27,6 +46,7 @@ export const ErrorCodeSchema = z.enum([
   'NOT_FOUND',
   'EMAIL_TAKEN',
   'LAST_ADMIN',
+  'IMPORT_TOO_LARGE',
   'INTERNAL',
 ]);
 export type ErrorCode = z.infer<typeof ErrorCodeSchema>;

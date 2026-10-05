@@ -15,6 +15,17 @@ export const AUDIT_ACTIONS = {
   USER_DEACTIVATED: 'user.deactivated',
   USER_REACTIVATED: 'user.reactivated',
   USER_PASSWORD_RESET: 'user.password_reset',
+  IMPORT_APPLIED: 'import.applied',
+  IMPORT_REJECTED: 'import.rejected',
+  IMPORT_DRY_RUN: 'import.dry_run',
+  IMPORT_REFUSED: 'import.refused',
+  ENTITY_CREATED: 'entity.created',
+  ENTITY_OBSERVED: 'entity.observed',
+  ENTITY_STATE_OBSERVED: 'entity.state_observed',
+  RELATIONSHIP_CREATED: 'relationship.created',
+  RELATIONSHIP_OBSERVED: 'relationship.observed',
+  EVENT_CREATED: 'event.created',
+  EVENT_OBSERVED: 'event.observed',
 } as const;
 export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS];
 

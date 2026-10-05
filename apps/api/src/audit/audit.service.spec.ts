@@ -16,17 +16,28 @@ interface AuditCreateArgs {
   data: Record<string, unknown>;
 }
 
+interface AuditCreateManyArgs {
+  data: Record<string, unknown>[];
+}
+
 function createService(context: MockContext): {
   service: AuditService;
   create: jest.Mock<Promise<unknown>, [AuditCreateArgs]>;
+  createMany: jest.Mock<Promise<unknown>, [AuditCreateManyArgs]>;
   standaloneCreate: jest.Mock<Promise<unknown>, [AuditCreateArgs]>;
 } {
   const create = jest.fn<Promise<unknown>, [AuditCreateArgs]>().mockResolvedValue({});
+  const createMany = jest.fn<Promise<unknown>, [AuditCreateManyArgs]>().mockResolvedValue({});
   const standaloneCreate = jest.fn<Promise<unknown>, [AuditCreateArgs]>().mockResolvedValue({});
   const prisma = { auditEntry: { create: standaloneCreate } } as unknown as PrismaService;
   const requestContext = context as unknown as RequestContext;
 
-  return { service: new AuditService(prisma, requestContext), create, standaloneCreate };
+  return {
+    service: new AuditService(prisma, requestContext),
+    create,
+    createMany,
+    standaloneCreate,
+  };
 }
 
 describe('AuditService', () => {
@@ -114,5 +125,64 @@ describe('AuditService', () => {
     expect(standaloneCreate).toHaveBeenCalledTimes(1);
     const arg = standaloneCreate.mock.calls[0]?.[0];
     expect(arg?.data).toMatchObject({ actorType: 'user', actorId: ACTOR_ID });
+  });
+
+  describe('recordMany', () => {
+    it('chunks 2,500 inputs into 1,000 / 1,000 / 500 rows', async () => {
+      const { service, createMany } = createService({
+        correlationId: CORRELATION_ID,
+        userId: ACTOR_ID,
+      });
+      const tx = { auditEntry: { createMany } } as unknown as Tx;
+      const inputs = Array.from({ length: 2_500 }, (_, index) => ({
+        action: AUDIT_ACTIONS.ENTITY_OBSERVED,
+        targetType: 'entity',
+        targetId: ACTOR_ID,
+        metadata: { index },
+      }));
+
+      await service.recordMany(tx, inputs);
+
+      expect(createMany).toHaveBeenCalledTimes(3);
+      expect(createMany.mock.calls[0]?.[0].data).toHaveLength(1_000);
+      expect(createMany.mock.calls[1]?.[0].data).toHaveLength(1_000);
+      expect(createMany.mock.calls[2]?.[0].data).toHaveLength(500);
+    });
+
+    it('makes no call for an empty array', async () => {
+      const { service, createMany } = createService({ correlationId: CORRELATION_ID });
+      const tx = { auditEntry: { createMany } } as unknown as Tx;
+
+      await service.recordMany(tx, []);
+
+      expect(createMany).not.toHaveBeenCalled();
+    });
+
+    it('resolves the context actor and redacts secrets', async () => {
+      const { service, createMany } = createService({
+        correlationId: CORRELATION_ID,
+        ip: '10.0.0.7',
+        userId: ACTOR_ID,
+      });
+      const tx = { auditEntry: { createMany } } as unknown as Tx;
+
+      await service.recordMany(tx, [
+        {
+          action: AUDIT_ACTIONS.ENTITY_CREATED,
+          targetType: 'entity',
+          targetId: ACTOR_ID,
+          metadata: { refreshToken: 'raw-token', importId: ACTOR_ID },
+        },
+      ]);
+
+      const data = createMany.mock.calls[0]?.[0].data[0];
+      expect(data).toMatchObject({
+        actorType: 'user',
+        actorId: ACTOR_ID,
+        correlationId: CORRELATION_ID,
+        ipAddress: '10.0.0.7',
+        metadata: { importId: ACTOR_ID },
+      });
+    });
   });
 });
