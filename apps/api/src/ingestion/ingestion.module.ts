@@ -2,9 +2,10 @@ import { Module } from '@nestjs/common';
 import { ImportService } from './import.service';
 import { ImportSnapshotLoader } from './persistence/import-snapshot.loader';
 import { ImportWriter } from './persistence/import-writer';
+import { SeedService } from './seed/seed.service';
 
 @Module({
-  providers: [ImportService, ImportSnapshotLoader, ImportWriter],
-  exports: [ImportService],
+  providers: [ImportService, ImportSnapshotLoader, ImportWriter, SeedService],
+  exports: [ImportService, SeedService],
 })
 export class IngestionModule {}

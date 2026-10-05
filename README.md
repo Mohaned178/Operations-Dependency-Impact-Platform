@@ -14,7 +14,7 @@ docker compose up -d db
 cp apps/api/.env.example apps/api/.env      # dev defaults work as-is
 pnpm --filter @opsgraph/shared build
 pnpm --filter api prisma migrate dev
-pnpm --filter api prisma db seed
+pnpm --filter api prisma db seed             # 3 users + the §39 Acme Corp / Order #18492 scenario
 pnpm dev                                     # api :3000, web :5173
 ```
 

@@ -1,6 +1,9 @@
 import { randomUUID } from 'node:crypto';
+import { NestFactory } from '@nestjs/core';
 import { PrismaClient, type Role } from '@prisma/client';
 import argon2 from 'argon2';
+import { AppModule } from '../src/app.module';
+import { SeedService } from '../src/ingestion/seed/seed.service';
 import { toPublicUser } from '../src/users/user.mapper';
 
 const prisma = new PrismaClient();
@@ -61,6 +64,16 @@ async function main(): Promise<void> {
         });
       }
     });
+  }
+
+  const app = await NestFactory.createApplicationContext(AppModule, {
+    logger: ['error', 'warn'],
+  });
+  try {
+    const report = await app.get(SeedService).seedScenario39();
+    console.log(report === null ? '§39 scenario already present' : '§39 scenario seeded');
+  } finally {
+    await app.close();
   }
 }
 
