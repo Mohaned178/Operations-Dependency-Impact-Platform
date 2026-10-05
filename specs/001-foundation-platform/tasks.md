@@ -465,7 +465,7 @@ Then do quickstart step 10.
   - **Fix**: add `function isSafeNext(next: string | null): next is string` that returns true only if `next` starts with `/` and does **not** start with `//` or `/\`. Navigate to `next` only when `isSafeNext(next)`, otherwise to `/`.
   - **Test** (`LoginPage.test.tsx`): `?next=//evil.example` → navigates to `/`. `?next=/\evil.example` → `/`. `?next=/admin/users` → `/admin/users`.
 
-- [ ] T073 [P] [US1] Restore the "new password must differ" check in `apps/web/src/pages/ChangePasswordPage.tsx`.
+- [x] T073 [P] [US1] Restore the "new password must differ" check in `apps/web/src/pages/ChangePasswordPage.tsx`.
   - **Bug**: `.innerType()` drops the shared schema's `refine`.
   - **Fix**: chain a second `.refine((d) => d.newPassword !== d.currentPassword, { path: ['newPassword'], message: 'New password must differ from the current password' })` onto `ChangePasswordFormSchema`, using the same message as `packages/shared/src/auth.ts`.
   - **Test** (`ChangePasswordPage.test.tsx`): entering the same current and new password shows that message under the new-password field and sends no request.

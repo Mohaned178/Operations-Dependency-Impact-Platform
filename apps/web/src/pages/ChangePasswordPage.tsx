@@ -11,6 +11,10 @@ const ChangePasswordFormSchema = ChangePasswordRequestSchema.innerType()
   .refine((data) => data.newPassword === data.confirmPassword, {
     path: ['confirmPassword'],
     message: 'Passwords do not match',
+  })
+  .refine((data) => data.newPassword !== data.currentPassword, {
+    path: ['newPassword'],
+    message: 'New password must differ from the current password',
   });
 
 type ChangePasswordForm = z.infer<typeof ChangePasswordFormSchema>;
