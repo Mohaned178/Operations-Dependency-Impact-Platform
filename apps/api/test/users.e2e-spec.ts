@@ -89,6 +89,17 @@ describe('Users (e2e)', () => {
     expect(ErrorResponseSchema.parse(body).error.code).toBe('EMAIL_TAKEN');
   });
 
+  it('maps a malformed uuid to VALIDATION_FAILED with a correlation id', async () => {
+    const response = await request(server)
+      .get('/api/users/not-a-uuid')
+      .set(asAdmin())
+      .expect(400);
+    const body: unknown = response.body;
+    const parsed = ErrorResponseSchema.parse(body);
+    expect(parsed.error.code).toBe('VALIDATION_FAILED');
+    expect(parsed.error.correlationId).toEqual(expect.any(String));
+  });
+
   it('lists, searches, filters and paginates users', async () => {
     const zoe = await createUser(prisma, { role: 'ANALYST', email: 'zoe@test.local' });
     await prisma.user.update({ where: { id: zoe.id }, data: { displayName: 'Zoe Keeper' } });

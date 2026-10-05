@@ -436,7 +436,7 @@ Then do quickstart step 10.
   - **Fix**: in `auth.service.ts` → `login`, pass `actorType: 'user', actorId: user.id` to that `audit.record` call. Make no other changes.
   - **Test** (`auth.e2e-spec.ts`): after a successful login, the `auth.login_succeeded` row has `actorType = 'user'` and `actorId = <user id>`, and `GET /api/audit?actorId=<user id>` returns it.
 
-- [ ] T068 [P] Map built-in Nest HTTP errors to the correct error code in `apps/api/src/common/errors/all-exceptions.filter.ts` (FR-021).
+- [x] T068 [P] Map built-in Nest HTTP errors to the correct error code in `apps/api/src/common/errors/all-exceptions.filter.ts` (FR-021).
   - **Bug**: every `HttpException` except 404 gets code `INTERNAL`. For example, `ParseUUIDPipe` returns 400 with code `INTERNAL`.
   - **Fix**: map by status. 400, 413, 415 and 422 → `VALIDATION_FAILED`. 401 → `UNAUTHENTICATED`. 403 → `FORBIDDEN`. 404 → `NOT_FOUND`. Any other status below 500 → `VALIDATION_FAILED`, keeping the original status. 500 and above → status 500, code `INTERNAL`, message `'Internal error'`, and log the stack the same way the unknown-error branch does. Don't add new error codes.
   - **Test** (`users.e2e-spec.ts`): as an admin, `GET /api/users/not-a-uuid` → 400, `error.code = 'VALIDATION_FAILED'`, and the body has a `correlationId`.

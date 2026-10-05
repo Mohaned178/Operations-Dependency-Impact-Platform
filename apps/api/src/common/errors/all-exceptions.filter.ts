@@ -52,15 +52,32 @@ export class AllExceptionsFilter implements ExceptionFilter {
 
     if (exception instanceof HttpException) {
       const status = exception.getStatus();
+      if (status >= 500) {
+        this.logger.error(exception instanceof Error ? exception.stack : String(exception));
+        return { status: 500, code: 'INTERNAL', message: 'Internal error' };
+      }
       return {
         status,
-        code: status === 404 ? 'NOT_FOUND' : 'INTERNAL',
+        code: this.httpStatusToCode(status),
         message: this.extractMessage(exception.getResponse()),
       };
     }
 
     this.logger.error(exception instanceof Error ? exception.stack : String(exception));
     return { status: 500, code: 'INTERNAL', message: 'Internal error' };
+  }
+
+  private httpStatusToCode(status: number): ErrorCode {
+    switch (status) {
+      case 401:
+        return 'UNAUTHENTICATED';
+      case 403:
+        return 'FORBIDDEN';
+      case 404:
+        return 'NOT_FOUND';
+      default:
+        return 'VALIDATION_FAILED';
+    }
   }
 
   private extractMessage(payload: string | object): string {
