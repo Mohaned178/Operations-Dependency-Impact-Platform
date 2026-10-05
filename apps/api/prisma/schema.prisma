@@ -30,7 +30,7 @@ model User {
   lastFailedLoginAt  DateTime?  @map("last_failed_login_at") @db.Timestamptz(6)
   lockedUntil        DateTime?  @map("locked_until") @db.Timestamptz(6)
   passwordChangedAt  DateTime   @default(now()) @map("password_changed_at") @db.Timestamptz(6)
-  createdAt          DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  createdAt          DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt          DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   refreshTokens RefreshToken[]

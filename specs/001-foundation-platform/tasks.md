@@ -441,7 +441,7 @@ Then do quickstart step 10.
   - **Fix**: map by status. 400, 413, 415 and 422 → `VALIDATION_FAILED`. 401 → `UNAUTHENTICATED`. 403 → `FORBIDDEN`. 404 → `NOT_FOUND`. Any other status below 500 → `VALIDATION_FAILED`, keeping the original status. 500 and above → status 500, code `INTERNAL`, message `'Internal error'`, and log the stack the same way the unknown-error branch does. Don't add new error codes.
   - **Test** (`users.e2e-spec.ts`): as an admin, `GET /api/users/not-a-uuid` → 400, `error.code = 'VALIDATION_FAILED'`, and the body has a `correlationId`.
 
-- [ ] T069 [P] [US2] Make the users list cursor exact (data-model.md, `User.createdAt`).
+- [x] T069 [P] [US2] Make the users list cursor exact (data-model.md, `User.createdAt`).
   - **Bug**: `createdAt` is `timestamptz(6)` (microseconds), but the cursor comparison uses a JavaScript `Date` (milliseconds), so a row in the same millisecond as the cursor can be skipped.
   - **Test first** (`users.e2e-spec.ts`): create 3 users. With `prisma.$executeRaw`, set their `created_at` to `'2026-01-01 00:00:00.123100+00'`, `'…123400+00'` and `'…123700+00'`. Page through `GET /api/users?limit=1` (adding the other seeded or created users to the expected count) and assert that every user id appears exactly once.
   - **Fix**: in `schema.prisma`, change `User.createdAt` to `@db.Timestamptz(3)`. Generate the migration with `pnpm --filter api prisma migrate dev --name users_created_at_ms`. Don't hand-edit the generated SQL. Leave `users.service.ts` unchanged.

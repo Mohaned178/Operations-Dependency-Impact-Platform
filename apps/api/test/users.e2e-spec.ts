@@ -140,6 +140,36 @@ describe('Users (e2e)', () => {
     expect(secondPage.items.some((user) => firstIds.has(user.id))).toBe(false);
   });
 
+  it('pages users with sub-millisecond createdAt values without gaps or duplicates', async () => {
+    const first = await createUser(prisma, { role: 'ANALYST', email: 'ms1@test.local' });
+    const second = await createUser(prisma, { role: 'ANALYST', email: 'ms2@test.local' });
+    const third = await createUser(prisma, { role: 'ANALYST', email: 'ms3@test.local' });
+
+    await prisma.$executeRaw`UPDATE users SET created_at = '2026-01-01 00:00:00.123100+00' WHERE id = ${first.id}::uuid`;
+    await prisma.$executeRaw`UPDATE users SET created_at = '2026-01-01 00:00:00.123400+00' WHERE id = ${second.id}::uuid`;
+    await prisma.$executeRaw`UPDATE users SET created_at = '2026-01-01 00:00:00.123700+00' WHERE id = ${third.id}::uuid`;
+
+    const allUsers = await prisma.user.findMany({ select: { id: true } });
+    const expected = new Set(allUsers.map((user) => user.id));
+    const seen: string[] = [];
+    let cursor: string | null = null;
+    let pages = 0;
+
+    do {
+      const url = cursor ? `/api/users?limit=1&cursor=${cursor}` : '/api/users?limit=1';
+      const response = await request(server).get(url).set(asAdmin()).expect(200);
+      const body: unknown = response.body;
+      const page = UserListResponseSchema.parse(body);
+      seen.push(...page.items.map((user) => user.id));
+      cursor = page.nextCursor;
+      pages += 1;
+      expect(pages).toBeLessThanOrEqual(expected.size + 1);
+    } while (cursor !== null);
+
+    expect(new Set(seen).size).toBe(seen.length);
+    expect(new Set(seen)).toEqual(expected);
+  });
+
   it('audits a role change with before and after', async () => {
     const target = await createUser(prisma, { role: 'ANALYST', email: 'promote@test.local' });
 
