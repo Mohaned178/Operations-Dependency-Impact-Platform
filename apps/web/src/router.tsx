@@ -7,6 +7,7 @@ import { ComingSoonPage } from './pages/ComingSoonPage';
 import { HomePage } from './pages/HomePage';
 import { LoginPage } from './pages/LoginPage';
 import { NotFoundPage } from './pages/NotFoundPage';
+import { AuditPage } from './pages/admin/AuditPage';
 import { UserCreatePage } from './pages/admin/UserCreatePage';
 import { UserDetailPage } from './pages/admin/UserDetailPage';
 import { UsersListPage } from './pages/admin/UsersListPage';
@@ -31,7 +32,7 @@ export const router = createBrowserRouter([
               { path: 'users', element: <UsersListPage /> },
               { path: 'users/new', element: <UserCreatePage /> },
               { path: 'users/:id', element: <UserDetailPage /> },
-              { path: 'audit', element: <ComingSoonPage /> },
+              { path: 'audit', element: <AuditPage /> },
             ],
           },
           { path: '*', element: <NotFoundPage /> },

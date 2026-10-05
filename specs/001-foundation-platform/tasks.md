@@ -312,21 +312,21 @@ Then do quickstart steps 4–7.
 **Goal**: the Admin audit browser, with append-only and atomicity proven by tests.
 **Independent test**: quickstart steps 8–9.
 
-- [ ] T050 [US3] Add `list(query)` to `apps/api/src/audit/audit.service.ts`:
+- [x] T050 [US3] Add `list(query)` to `apps/api/src/audit/audit.service.ts`:
   - keyset on `id DESC` (`cursor` is a bigint string; `where id < cursor`)
   - filters `actorId`, `action`, `targetType`, `targetId`, `from`/`to` on `occurredAt`
   - limit default 50, max 200
   - join the actor email via a second query (`users where id in [...]`), since there is no FK
   - map to `AuditEntryDto` (`id.toString()`)
-- [ ] T051 [US3] Create `apps/api/src/audit/audit.controller.ts`: `@Roles('ADMIN')`, `GET /audit` only, query validated with `ListAuditQuerySchema`. Register it in `audit.module.ts`.
-- [ ] T052 [US3] Write `apps/api/test/audit.e2e-spec.ts` covering:
+- [x] T051 [US3] Create `apps/api/src/audit/audit.controller.ts`: `@Roles('ADMIN')`, `GET /audit` only, query validated with `ListAuditQuerySchema`. Register it in `audit.module.ts`.
+- [x] T052 [US3] Write `apps/api/test/audit.e2e-spec.ts` covering:
   - the actions from quickstart step 8 produce exactly one matching row each, with correct before/after
   - each filter narrows the results, and pagination returns no duplicates or gaps across 3 pages (insert 120 rows)
   - raw `prisma.$executeRaw\`UPDATE audit_entries SET action='x'\`` and `DELETE` and `TRUNCATE` all reject with "append-only"
   - **atomicity**: use `jest.spyOn(auditService, 'record').mockRejectedValueOnce(new Error('boom'))` and call PATCH role; the response is 500 and the user's role is unchanged in the DB
   - no row contains a password, `passwordHash` or token value (scan `JSON.stringify(rows)`)
-- [ ] T053 [US3] Write `apps/api/test/authz-matrix.e2e-spec.ts`. Run a table-driven `it.each` over every route in contracts/api.md × {anonymous, ANALYST, OPS_MANAGER, ADMIN}, asserting the status from the "Authorization matrix" table. Each 403 must also produce an `auth.forbidden` audit row.
-- [ ] T054 [P] [US3] Create `apps/web/src/pages/admin/AuditPage.tsx`:
+- [x] T053 [US3] Write `apps/api/test/authz-matrix.e2e-spec.ts`. Run a table-driven `it.each` over every route in contracts/api.md × {anonymous, ANALYST, OPS_MANAGER, ADMIN}, asserting the status from the "Authorization matrix" table. Each 403 must also produce an `auth.forbidden` audit row.
+- [x] T054 [P] [US3] Create `apps/web/src/pages/admin/AuditPage.tsx`:
   - filters: actor (select from the users list), action (select from `Object.values(AUDIT_ACTIONS)`), target type/id, from/to (datetime-local)
   - a table of occurredAt (local time), actor email or "system"/"anonymous", action, target, and an expandable before/after/metadata view (pretty-printed JSON)
   - "Load more" via `nextCursor`
