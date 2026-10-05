@@ -82,26 +82,26 @@ All pass.
 **Purpose**: DB schema, shared primitives, error handling, request context, the audit writer, the auth guards and the e2e harness.
 
 ### Shared primitives
-- [ ] T008 [P] Create `packages/shared/src/common.ts` with:
+- [x] T008 [P] Create `packages/shared/src/common.ts` with:
   - `RoleSchema`, `UserStatusSchema`, `EmailSchema`, `PasswordSchema`, `PageQuerySchema` (contracts/api.md, "Shared base schemas")
   - `ErrorCodeSchema` (the codes in research R12) and `ErrorResponseSchema`
   - `ROLE_LABELS: Record<Role,string>`
   - inferred types for every schema
 
   Re-export everything from `src/index.ts`.
-- [ ] T009 [P] Create `packages/shared/src/audit.ts`:
+- [x] T009 [P] Create `packages/shared/src/audit.ts`:
   - `AUDIT_ACTIONS` as a `const` object (keys like `USER_ROLE_CHANGED`, values `'user.role_changed'`) for all 13 codes in data-model.md
   - type `AuditAction`
   - `AuditEntryDtoSchema`, `ListAuditQuerySchema`, `AuditListResponseSchema` (contracts/api.md, Audit)
 
   Re-export from the index.
-- [ ] T010 [P] Write `packages/shared/src/common.spec.ts`:
+- [x] T010 [P] Write `packages/shared/src/common.spec.ts`:
   - `EmailSchema` lowercases and trims `'  A@B.COM '` to `'a@b.com'`
   - `PasswordSchema` rejects 11 characters and accepts 12
   - `PageQuerySchema` coerces `limit='20'` to 20 and rejects 201
 
 ### Database
-- [ ] T011 Create `apps/api/prisma/schema.prisma` exactly per data-model.md:
+- [x] T011 Create `apps/api/prisma/schema.prisma` exactly per data-model.md:
   - models `User`, `RefreshToken`, `AuditEntry`; enums `Role`, `UserStatus`
   - snake_case `@@map`/`@map`
   - all indexes listed; `AuditEntry.id BigInt @id @default(autoincrement())`; `before`/`after`/`metadata Json?`
@@ -118,31 +118,31 @@ All pass.
   SEED_PASSWORD=OpsGraph-Dev-2026!
   ```
   Also create `apps/api/.env.test` with the same values but `DATABASE_URL=.../opsgraph_test` and `NODE_ENV=test`.
-- [ ] T012 Generate the migration `init` (`pnpm --filter api prisma migrate dev --name init`). Then create the migration `audit_append_only` (`prisma migrate dev --create-only --name audit_append_only`) and paste the exact SQL from data-model.md ("DB enforcement") into its `migration.sql`. Apply it.
-- [ ] T013 Create `apps/api/src/prisma/prisma.service.ts` (extends `PrismaClient`, implements `OnModuleInit` → `$connect`) and `prisma.module.ts` (`@Global()`, exports `PrismaService`). Export the type `export type Tx = Prisma.TransactionClient;` from `prisma.service.ts`.
+- [x] T012 Generate the migration `init` (`pnpm --filter api prisma migrate dev --name init`). Then create the migration `audit_append_only` (`prisma migrate dev --create-only --name audit_append_only`) and paste the exact SQL from data-model.md ("DB enforcement") into its `migration.sql`. Apply it.
+- [x] T013 Create `apps/api/src/prisma/prisma.service.ts` (extends `PrismaClient`, implements `OnModuleInit` → `$connect`) and `prisma.module.ts` (`@Global()`, exports `PrismaService`). Export the type `export type Tx = Prisma.TransactionClient;` from `prisma.service.ts`.
 
 ### Config, context, errors, validation
-- [ ] T014 [P] Create `apps/api/src/config/env.ts`: a zod schema per research R14, `export const env = EnvSchema.parse(process.env)` (throws on boot if invalid), and a derived `cookieSecure` (`COOKIE_SECURE` defaults to true when `NODE_ENV=production`).
-- [ ] T015 [P] Create `apps/api/src/common/errors/app-error.ts`:
+- [x] T014 [P] Create `apps/api/src/config/env.ts`: a zod schema per research R14, `export const env = EnvSchema.parse(process.env)` (throws on boot if invalid), and a derived `cookieSecure` (`COOKIE_SECURE` defaults to true when `NODE_ENV=production`).
+- [x] T015 [P] Create `apps/api/src/common/errors/app-error.ts`:
   - `class AppError extends Error { constructor(code: ErrorCode, status: number, message: string, details?: {path:string;message:string}[]) }`
   - factory helpers `Errors.validation(details)`, `invalidCredentials()`, `unauthenticated()`, `passwordChangeRequired()`, `forbidden()`, `notFound(what)`, `emailTaken()`, `lastAdmin()`. Use the messages in quickstart; the last-admin message is "At least one active Administrator is required".
-- [ ] T016 [P] Create `apps/api/src/common/context/request-context.ts`:
+- [x] T016 [P] Create `apps/api/src/common/context/request-context.ts`:
   - nestjs-cls `ClsModule.forRoot({ global: true, middleware: { mount: true, setup } })`. `setup` sets `correlationId` (incoming `x-request-id` if it is a valid UUID, else `randomUUID()`) and `ip` (`req.ip`), and sets the response header `x-request-id`.
   - export a `RequestContext` injectable with typed getters `correlationId`, `ip`, `userId`, and the setter `setUserId(id)`
-- [ ] T017 Create `apps/api/src/common/errors/all-exceptions.filter.ts` (global `@Catch()`). Map:
+- [x] T017 Create `apps/api/src/common/errors/all-exceptions.filter.ts` (global `@Catch()`). Map:
   - `AppError` → its status and code
   - Nest `HttpException` 404 → `NOT_FOUND`, other `HttpException` → `INTERNAL` with its status
   - anything else → log with `Logger.error(err.stack)` and return 500 `INTERNAL`, message "Internal error"
 
   The body must be `{ error: { code, message, details?, correlationId } }`.
-- [ ] T018 [P] Create `apps/api/src/common/validation/zod-validation.pipe.ts`: `ZodValidationPipe<T>(schema: ZodType<T>)`. Its `transform` uses `safeParse`, and on failure throws `Errors.validation(issues.map(i => ({ path: i.path.join('.'), message: i.message })))`.
-- [ ] T019 Wire up `apps/api/src/main.ts` and `app.module.ts`:
+- [x] T018 [P] Create `apps/api/src/common/validation/zod-validation.pipe.ts`: `ZodValidationPipe<T>(schema: ZodType<T>)`. Its `transform` uses `safeParse`, and on failure throws `Errors.validation(issues.map(i => ({ path: i.path.join('.'), message: i.message })))`.
+- [x] T019 Wire up `apps/api/src/main.ts` and `app.module.ts`:
   - `setGlobalPrefix('api')`, `app.use(cookieParser())`, `enableShutdownHooks()`, `app.set('trust proxy', 'loopback')`, global filter `AllExceptionsFilter`, listen on `env.PORT`
   - `AppModule` imports `ClsModule` config, `PrismaModule`
 
 ### Audit writer (reused by every later feature, FR-018)
-- [ ] T020 [P] Create `apps/api/src/audit/redact.ts`: `redact(value: unknown): unknown` deep-clones and removes the keys `password`, `passwordHash`, `currentPassword`, `newPassword`, `temporaryPassword`, `token`, `tokenHash`, `refreshToken`, `accessToken` at any depth. Write `redact.spec.ts` covering nested objects and arrays.
-- [ ] T021 Create `apps/api/src/audit/audit.service.ts` and `audit.module.ts` (`@Global()`, exports `AuditService`):
+- [x] T020 [P] Create `apps/api/src/audit/redact.ts`: `redact(value: unknown): unknown` deep-clones and removes the keys `password`, `passwordHash`, `currentPassword`, `newPassword`, `temporaryPassword`, `token`, `tokenHash`, `refreshToken`, `accessToken` at any depth. Write `redact.spec.ts` covering nested objects and arrays.
+- [x] T021 Create `apps/api/src/audit/audit.service.ts` and `audit.module.ts` (`@Global()`, exports `AuditService`):
   - `record(tx: Tx, input: { action: AuditAction; targetType?: string; targetId?: string; before?: unknown; after?: unknown; metadata?: unknown; actorType?: 'user'|'system'|'anonymous'; actorId?: string })` inserts via `tx.auditEntry.create`
     - the actor defaults to `RequestContext.userId` (`actorType 'user'`), or `'anonymous'` when there is none
     - `correlationId` and `ip` come from `RequestContext`
@@ -151,18 +151,18 @@ All pass.
   - write `audit.service.spec.ts` (mocked tx) asserting redaction and context defaults
 
 ### Auth guards (deny-by-default)
-- [ ] T022 [P] Create the decorators in `apps/api/src/auth/decorators/`: `public.decorator.ts` (`@Public()`), `roles.decorator.ts` (`@Roles(...roles: Role[])`), `allow-password-change.decorator.ts` (`@AllowDuringPasswordChange()`), and `current-user.decorator.ts` (`@CurrentUser()` returns `request.user` typed as `AuthUser = { id, email, displayName, role, status, mustChangePassword }`).
-- [ ] T023 Create `apps/api/src/auth/token.service.ts`, part of `AuthModule`, which imports `JwtModule.register({ secret: env.JWT_ACCESS_SECRET, signOptions: { expiresIn: env.ACCESS_TOKEN_TTL_SECONDS } })`. It provides:
+- [x] T022 [P] Create the decorators in `apps/api/src/auth/decorators/`: `public.decorator.ts` (`@Public()`), `roles.decorator.ts` (`@Roles(...roles: Role[])`), `allow-password-change.decorator.ts` (`@AllowDuringPasswordChange()`), and `current-user.decorator.ts` (`@CurrentUser()` returns `request.user` typed as `AuthUser = { id, email, displayName, role, status, mustChangePassword }`).
+- [x] T023 Create `apps/api/src/auth/token.service.ts`, part of `AuthModule`, which imports `JwtModule.register({ secret: env.JWT_ACCESS_SECRET, signOptions: { expiresIn: env.ACCESS_TOKEN_TTL_SECONDS } })`. It provides:
   - `signAccess(userId)` and `verifyAccess(token): {sub}` (throws `Errors.unauthenticated()`)
   - `issueRefresh(tx, userId, familyId?, familyCreatedAt?)`: random 32 bytes base64url, stores the sha256 hex hash, `expiresAt` per data-model; returns `{ raw, expiresAt }`
   - `rotateRefresh(raw)`: implements data-model "RefreshToken rules" including reuse detection; returns `{ user, raw, expiresAt }` or throws `unauthenticated` after `recordStandalone(auth.refresh_refused)` with a reason
   - `revokeFamilyByRaw(raw)` and `revokeAllForUser(tx, userId, exceptFamilyId?)`
-- [ ] T024 Create `apps/api/src/auth/guards/jwt-auth.guard.ts` following plan.md design note 2 exactly. Then create `apps/api/src/auth/guards/roles.guard.ts`:
+- [x] T024 Create `apps/api/src/auth/guards/jwt-auth.guard.ts` following plan.md design note 2 exactly. Then create `apps/api/src/auth/guards/roles.guard.ts`:
   - if there is no `@Roles`, allow
   - if the user's role is not in the list, call `audit.recordStandalone({ action: 'auth.forbidden', metadata: { method, path, role } })` and throw `Errors.forbidden()`
 
   Register both as `APP_GUARD` (Jwt first) in `apps/api/src/auth/auth.module.ts`, and import `AuthModule` and `AuditModule` in `AppModule`.
-- [ ] T025 Write `apps/api/src/auth/guards/jwt-auth.guard.spec.ts` covering:
+- [x] T025 Write `apps/api/src/auth/guards/jwt-auth.guard.spec.ts` covering:
   - a public route bypasses the guard
   - a missing or invalid token gives `UNAUTHENTICATED`
   - a deactivated user gives `UNAUTHENTICATED`
@@ -170,7 +170,7 @@ All pass.
   - a valid token sets `request.user`
 
 ### e2e harness
-- [ ] T026 Create the e2e harness in `apps/api/test/`:
+- [x] T026 Create the e2e harness in `apps/api/test/`:
   - `jest-e2e.config.ts`: `testRegex .e2e-spec.ts$`, `globalSetup ./global-setup.ts`, `setupFiles ['./load-env.ts']`
   - `load-env.ts`: loads `.env.test` into `process.env` using `node:fs` (no dotenv dependency)
   - `global-setup.ts`: runs `prisma migrate reset --force --skip-seed` against `opsgraph_test` via `execSync`

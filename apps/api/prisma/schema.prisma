@@ -1,0 +1,77 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  OPS_MANAGER
+  ANALYST
+}
+
+enum UserStatus {
+  ACTIVE
+  DEACTIVATED
+}
+
+model User {
+  id                 String     @id @default(uuid()) @db.Uuid
+  email              String     @unique
+  displayName        String     @map("display_name")
+  passwordHash       String     @map("password_hash")
+  role               Role
+  status             UserStatus @default(ACTIVE)
+  mustChangePassword Boolean    @default(false) @map("must_change_password")
+  failedLoginCount   Int        @default(0) @map("failed_login_count")
+  lastFailedLoginAt  DateTime?  @map("last_failed_login_at") @db.Timestamptz(6)
+  lockedUntil        DateTime?  @map("locked_until") @db.Timestamptz(6)
+  passwordChangedAt  DateTime   @default(now()) @map("password_changed_at") @db.Timestamptz(6)
+  createdAt          DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  refreshTokens RefreshToken[]
+
+  @@map("users")
+}
+
+model RefreshToken {
+  id              String    @id @default(uuid()) @db.Uuid
+  userId          String    @map("user_id") @db.Uuid
+  tokenHash       String    @unique @map("token_hash")
+  familyId        String    @map("family_id") @db.Uuid
+  familyCreatedAt DateTime  @map("family_created_at") @db.Timestamptz(6)
+  expiresAt       DateTime  @map("expires_at") @db.Timestamptz(6)
+  revokedAt       DateTime? @map("revoked_at") @db.Timestamptz(6)
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([familyId])
+  @@map("refresh_tokens")
+}
+
+model AuditEntry {
+  id            BigInt   @id @default(autoincrement())
+  occurredAt    DateTime @default(now()) @map("occurred_at") @db.Timestamptz(6)
+  actorType     String   @map("actor_type")
+  actorId       String?  @map("actor_id") @db.Uuid
+  action        String
+  targetType    String?  @map("target_type")
+  targetId      String?  @map("target_id")
+  before        Json?
+  after         Json?
+  metadata      Json?
+  correlationId String   @map("correlation_id") @db.Uuid
+  ipAddress     String?  @map("ip_address")
+
+  @@index([actorId, id(sort: Desc)])
+  @@index([action, id(sort: Desc)])
+  @@index([targetType, targetId, id(sort: Desc)])
+  @@index([occurredAt])
+  @@map("audit_entries")
+}
