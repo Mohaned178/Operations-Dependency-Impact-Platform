@@ -398,6 +398,82 @@ Then do quickstart step 10.
 
 ---
 
+## Phase 9: Review fixes (from `/code-review high`, 2026-10-05)
+
+**Goal**: Fix the concurrency, security and contract bugs found in review before feature 002 starts.
+
+**Rules for this phase**: For each task, **write the test first, run it, and confirm that it fails** on the current code. Then apply the fix and confirm that the test passes. If a test passes before the fix, write that in `questions.md` and stop. Don't change the fix to make a test pass. Commit one task per commit with the `fix(<scope>): …` prefix.
+
+### API
+
+- [ ] T064 [US1] Make refresh-token rotation atomic in `apps/api/src/auth/token.service.ts` → `rotateRefresh`.
+  - **Bug**: the token is read outside the transaction and revoked with `update({ where: { id } })`. Two concurrent refreshes with the same cookie both succeed and create two live children in one family.
+  - **Fix**: inside the existing `$transaction`, replace the `update` with
+    `const { count } = await tx.refreshToken.updateMany({ where: { id: token.id, revokedAt: null }, data: { revokedAt: new Date() } });`
+    If `count !== 1`, throw `Errors.unauthenticated()` from inside the transaction so nothing is issued. Catch that case **outside** the transaction, call `this.refuse('concurrent_rotation', token.userId)`, and rethrow. Do **not** revoke the family in this case. The winning request's new token must stay valid, and a later reuse of the old token is still caught by the existing `token.revokedAt` branch.
+  - **Test** (`apps/api/test/auth.e2e-spec.ts`): log in, then fire two `POST /api/auth/refresh` with the same cookie via `Promise.all`. Expect exactly one 200 and one 401. Expect that the 200 response's new cookie still refreshes successfully, and that one `auth.refresh_refused` audit row has `metadata.reason = 'concurrent_rotation'`.
+
+- [ ] T065 [US1] Make the failed-login counter atomic in `apps/api/src/auth/auth.service.ts` → `handleBadPassword` (FR-005).
+  - **Bug**: `failedLoginCount` is computed from the `user` row read before the transaction, so parallel bad guesses overwrite each other and the account never locks.
+  - **Fix**: at the start of the transaction, lock the row with
+    ``await tx.$queryRaw`SELECT id FROM users WHERE id = ${user.id}::uuid FOR UPDATE`;``
+    then re-read it with `const fresh = await tx.user.findUniqueOrThrow({ where: { id: user.id } });`. Compute `withinWindow` and `failedLoginCount` from `fresh`, not from `user`. Lock only on the transition into the locked state:
+    `const alreadyLocked = fresh.lockedUntil !== null && fresh.lockedUntil.getTime() > now.getTime();`
+    `const locked = failedLoginCount >= MAX_FAILED_LOGINS && !alreadyLocked;`
+    This way, attempts that were already in flight when the lock was set don't extend `lockedUntil` or write another `auth.account_locked` row. Leave the rest unchanged.
+  - **Test** (`auth.e2e-spec.ts`): create a user, then send 10 wrong-password logins at once with `Promise.all`. Afterwards the DB row has `lockedUntil` set in the future, there is **exactly one** `auth.account_locked` audit row for that user, and a login with the **correct** password returns 401 `INVALID_CREDENTIALS`.
+
+- [ ] T066 [US1] Reject access tokens issued before the last password change (FR-025).
+  - **Bug**: `passwordChangedAt` is written but never read, so an old access token keeps working for up to 15 minutes after a password change.
+  - **Fix**:
+    1. `token.service.ts` → `verifyAccess` returns `{ sub: string; iat: number }`. Reject the token if `iat` is missing (same `Errors.unauthenticated()`).
+    2. `jwt-auth.guard.ts`: after loading the user, if `iat < Math.floor(user.passwordChangedAt.getTime() / 1000)`, throw `Errors.unauthenticated()`. Use `<`, not `<=`, so the access token returned by `change-password` in the same second stays valid.
+    3. `apps/api/src/users/users.service.ts` → `resetPassword`: also set `passwordChangedAt: new Date()`, and move `this.passwords.hash(...)` to **before** `$transaction`, like `create` does.
+  - **Tests**: in `jwt-auth.guard.spec.ts`, a token with `iat` 10 s before `passwordChangedAt` → `UNAUTHENTICATED`, and a token with `iat` equal to it → allowed. In `auth.e2e-spec.ts`, log in to get token A, wait 1100 ms, call change-password, then `GET /api/auth/me` with token A → 401, and with the newly returned token → 200. In `users.e2e-spec.ts`, after an admin resets a user's password, that user's old token → 401.
+
+- [ ] T067 [US1] Record the signed-in user as the actor of `auth.login_succeeded` (FR-012, FR-013).
+  - **Bug**: login is a public route, so the request context has no user and the row is written with `actorType = 'anonymous'` and `actorId = null`.
+  - **Fix**: in `auth.service.ts` → `login`, pass `actorType: 'user', actorId: user.id` to that `audit.record` call. Make no other changes.
+  - **Test** (`auth.e2e-spec.ts`): after a successful login, the `auth.login_succeeded` row has `actorType = 'user'` and `actorId = <user id>`, and `GET /api/audit?actorId=<user id>` returns it.
+
+- [ ] T068 [P] Map built-in Nest HTTP errors to the correct error code in `apps/api/src/common/errors/all-exceptions.filter.ts` (FR-021).
+  - **Bug**: every `HttpException` except 404 gets code `INTERNAL`. For example, `ParseUUIDPipe` returns 400 with code `INTERNAL`.
+  - **Fix**: map by status. 400, 413, 415 and 422 → `VALIDATION_FAILED`. 401 → `UNAUTHENTICATED`. 403 → `FORBIDDEN`. 404 → `NOT_FOUND`. Any other status below 500 → `VALIDATION_FAILED`, keeping the original status. 500 and above → status 500, code `INTERNAL`, message `'Internal error'`, and log the stack the same way the unknown-error branch does. Don't add new error codes.
+  - **Test** (`users.e2e-spec.ts`): as an admin, `GET /api/users/not-a-uuid` → 400, `error.code = 'VALIDATION_FAILED'`, and the body has a `correlationId`.
+
+- [ ] T069 [P] [US2] Make the users list cursor exact (data-model.md, `User.createdAt`).
+  - **Bug**: `createdAt` is `timestamptz(6)` (microseconds), but the cursor comparison uses a JavaScript `Date` (milliseconds), so a row in the same millisecond as the cursor can be skipped.
+  - **Test first** (`users.e2e-spec.ts`): create 3 users. With `prisma.$executeRaw`, set their `created_at` to `'2026-01-01 00:00:00.123100+00'`, `'…123400+00'` and `'…123700+00'`. Page through `GET /api/users?limit=1` (adding the other seeded or created users to the expected count) and assert that every user id appears exactly once.
+  - **Fix**: in `schema.prisma`, change `User.createdAt` to `@db.Timestamptz(3)`. Generate the migration with `pnpm --filter api prisma migrate dev --name users_created_at_ms`. Don't hand-edit the generated SQL. Leave `users.service.ts` unchanged.
+
+### Web
+
+- [ ] T070 [US1] Route session restore through the single-flight refresh.
+  - **Bug**: `AuthProvider` calls `apiFetch('/auth/refresh')` directly. Under `StrictMode` the effect runs twice and sends two refreshes with the same cookie.
+  - **Fix**:
+    1. In `apps/web/src/lib/api-client.ts`, change `refreshAccessToken` to return `Promise<AuthSession | null>`; it still stores `accessToken` itself. Make `singleFlightRefresh` share that promise.
+    2. Export `restoreSession(): Promise<AuthSession | null>`, which returns `singleFlightRefresh()`. In `apiFetch`, use `(await singleFlightRefresh())?.accessToken`.
+    3. In `AuthProvider.tsx`, `restore()` calls `restoreSession()`. If it returns `null`, call it **once more**, because another tab may have just rotated the cookie (see T064). If that also returns `null`, call `clearSession()`. Keep the `cancelled` flag.
+  - **Test** (`apps/web/src/auth/AuthProvider.test.tsx`): render `<StrictMode><AuthProvider>…</AuthProvider></StrictMode>` with a mocked `fetch` that resolves the refresh after a tick. Assert that `fetch` was called with `/api/auth/refresh` exactly **once**, and that the provider ends in the authenticated state.
+
+- [ ] T071 [P] [US1] Only skip the silent refresh for the token endpoints in `api-client.ts` → `apiFetch`.
+  - **Bug**: `!path.startsWith('/auth/')` also skips the refresh for `/auth/me` and `/auth/change-password`.
+  - **Fix**: `const NO_REFRESH_PATHS = new Set(['/auth/login', '/auth/refresh', '/auth/logout']);` and use `!NO_REFRESH_PATHS.has(path)`.
+  - **Test** (`apps/web/src/lib/api-client.test.ts`): with a mocked `fetch`, `/auth/me` returns 401, then refresh returns 200 with a session, then `/auth/me` returns 200 → `apiFetch('/auth/me')` resolves. Also, `apiFetch('/auth/login')` returning 401 must **not** call `/api/auth/refresh`.
+
+- [ ] T072 [P] [US1] Block open redirects in `apps/web/src/pages/LoginPage.tsx`.
+  - **Fix**: add `function isSafeNext(next: string | null): next is string` that returns true only if `next` starts with `/` and does **not** start with `//` or `/\`. Navigate to `next` only when `isSafeNext(next)`, otherwise to `/`.
+  - **Test** (`LoginPage.test.tsx`): `?next=//evil.example` → navigates to `/`. `?next=/\evil.example` → `/`. `?next=/admin/users` → `/admin/users`.
+
+- [ ] T073 [P] [US1] Restore the "new password must differ" check in `apps/web/src/pages/ChangePasswordPage.tsx`.
+  - **Bug**: `.innerType()` drops the shared schema's `refine`.
+  - **Fix**: chain a second `.refine((d) => d.newPassword !== d.currentPassword, { path: ['newPassword'], message: 'New password must differ from the current password' })` onto `ChangePasswordFormSchema`, using the same message as `packages/shared/src/auth.ts`.
+  - **Test** (`ChangePasswordPage.test.tsx`): entering the same current and new password shows that message under the new-password field and sends no request.
+
+**Checkpoint**: `pnpm lint && pnpm typecheck && pnpm test && pnpm test:e2e` all pass. Every new test failed before its fix (record any exceptions in `questions.md`). Then `/code-review medium` by the orchestrator.
+
+---
+
 ## Dependencies & Execution Order
 
 - **Phase 1** comes first.

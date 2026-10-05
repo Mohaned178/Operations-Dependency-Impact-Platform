@@ -26,7 +26,7 @@ Display labels live in `@opsgraph/shared` (`ROLE_LABELS`): ADMIN → "Administra
 | lastFailedLoginAt | timestamptz? | |
 | lockedUntil | timestamptz? | login refused while `> now()` |
 | passwordChangedAt | timestamptz | default now() |
-| createdAt / updatedAt | timestamptz | `@default(now())` / `@updatedAt` |
+| createdAt / updatedAt | timestamptz | `@default(now())` / `@updatedAt`. `createdAt` is `@db.Timestamptz(3)` (millisecond precision) so the `(createdAt, id)` list cursor compares exactly with JavaScript `Date` values |
 
 **State transitions**: ACTIVE → DEACTIVATED (Admin, not the last active ADMIN, revokes all refresh tokens) → ACTIVE (Admin).
 
