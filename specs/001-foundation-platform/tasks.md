@@ -345,13 +345,13 @@ Then do quickstart steps 8–9.
 **Goal**: liveness and readiness.
 **Independent test**: quickstart step 10.
 
-- [ ] T055 [P] [US4] Create `packages/shared/src/health.ts`: `HealthLiveSchema` and `HealthReadySchema` per contracts/api.md. Re-export from the index.
-- [ ] T056 [US4] Create `apps/api/src/health/health.controller.ts` and `health.module.ts`:
+- [x] T055 [P] [US4] Create `packages/shared/src/health.ts`: `HealthLiveSchema` and `HealthReadySchema` per contracts/api.md. Re-export from the index.
+- [x] T056 [US4] Create `apps/api/src/health/health.controller.ts` and `health.module.ts`:
   - `@Public()` on both routes
   - `ready` runs `prisma.$queryRaw\`SELECT 1\`` raced against a 2 s timeout, and returns 503 via `@Res({passthrough:true}) res.status(503)` on failure
   - `version` is read once from `apps/api/package.json` via `readFileSync`
   - import the module in `AppModule`
-- [ ] T057 [US4] Write `apps/api/test/health.e2e-spec.ts`:
+- [x] T057 [US4] Write `apps/api/test/health.e2e-spec.ts`:
   - live gives 200
   - ready gives 200 with `database: 'up'`
   - ready with `prisma.$queryRaw` mocked to reject gives 503 with `database: 'down'`
