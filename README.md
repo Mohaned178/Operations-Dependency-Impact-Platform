@@ -26,6 +26,8 @@ Open http://localhost:5173 and sign in as `admin@opsgraph.local` / `OpsGraph-Dev
 pnpm lint && pnpm typecheck && pnpm test && pnpm test:e2e && pnpm build
 ```
 
+Audit performance (SC-006): `RUN_PERF=1 pnpm test:e2e` also runs `apps/api/test/perf-audit.e2e-spec.ts`, which inserts 100,000 audit rows in one statement and asserts that `GET /api/audit?action=user.role_changed` answers in under 2 s. It is skipped by default.
+
 ## Seeded users (dev only)
 
 | Email | Role | Password |

@@ -389,12 +389,12 @@ Then do quickstart step 10.
 
 ## Phase 8: Polish & cross-cutting
 
-- [ ] T061 [P] Do a sweep: `grep -rn "any\b\|TODO\|console.log" apps packages --include=*.ts --include=*.tsx` must return nothing relevant. Remove any unused dependencies.
-- [ ] T062 [P] Create `apps/api/test/perf-audit.e2e-spec.ts`:
+- [x] T061 [P] Do a sweep: `grep -rn "any\b\|TODO\|console.log" apps packages --include=*.ts --include=*.tsx` must return nothing relevant. Remove any unused dependencies.
+- [x] T062 [P] Create `apps/api/test/perf-audit.e2e-spec.ts`:
   - insert 100,000 audit rows with a single `INSERT ... SELECT generate_series`
   - assert that `GET /api/audit?action=user.role_changed` returns in under 2000 ms (SC-006)
   - skip it unless `RUN_PERF=1`, and document that in the README
-- [ ] T063 Run the full quickstart manual validation (steps 1–11) and tick each step in `quickstart.md` notes inside `questions.md`.
+- [x] T063 Run the full quickstart manual validation (steps 1–11) and tick each step in `quickstart.md` notes inside `questions.md`.
 
 ---
 
