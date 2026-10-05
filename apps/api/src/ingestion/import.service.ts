@@ -54,6 +54,11 @@ function sortRowErrors(errors: readonly RowError[]): RowError[] {
   );
 }
 
+// One row can produce several errors (one per invalid field); counts are per row.
+function countRejectedRows(errors: readonly RowError[], kind: ImportKind): number {
+  return new Set(errors.filter((error) => error.kind === kind).map((error) => error.row)).size;
+}
+
 @Injectable()
 export class ImportService {
   constructor(
@@ -196,8 +201,8 @@ export class ImportService {
         unchanged: 0,
         rejected: 0,
       };
-      const parserRejected = parsed.rowErrors.filter((error) => error.kind === kind).length;
-      const staticRejected = staticErrors.filter((error) => error.kind === kind).length;
+      const parserRejected = countRejectedRows(parsed.rowErrors, kind);
+      const staticRejected = countRejectedRows(staticErrors, kind);
       return {
         received,
         created: planCounts.created,

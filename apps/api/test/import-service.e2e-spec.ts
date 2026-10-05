@@ -202,6 +202,22 @@ describe('ImportService (e2e)', () => {
     expect(audits.map((audit) => audit.action)).toEqual([AUDIT_ACTIONS.IMPORT_REJECTED]);
   });
 
+  it('counts a row with several invalid fields as one rejected row', async () => {
+    const invalid = {
+      ...DOCUMENT,
+      entities: [DOCUMENT.entities[0], { ...ORDER_ROW, displayName: '', sourceId: '' }],
+    };
+    const report = await runImport(app, { format: 'json', content: JSON.stringify(invalid) });
+    const result = report as ImportReport;
+
+    expect(result.outcome).toBe('REJECTED');
+    expect(
+      result.rowErrors.filter((error) => error.kind === 'entities' && error.row === 2).length,
+    ).toBeGreaterThan(1);
+    expect(result.counts.entities.rejected).toBe(1);
+    expectInvariant(result);
+  });
+
   it('writes nothing but the report and audit for a dry run', async () => {
     const report = await runImport(app, { format: 'json', content: document(), dryRun: true });
     const result = report as ImportReport;

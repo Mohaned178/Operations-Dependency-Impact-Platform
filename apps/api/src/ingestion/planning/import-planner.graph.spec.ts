@@ -549,6 +549,9 @@ describe('planImport events', () => {
     expect(plan.counts.events.updated).toBe(1);
     expect(plan.write.eventUpdates).toHaveLength(1);
     expect(plan.write.eventRelatedReplacements).toEqual([EVENT_ID]);
+    expect(plan.write.eventEntityInserts).toEqual([
+      { eventId: EVENT_ID, entityId: SUPPLIER_ID, role: 'RELATED' },
+    ]);
   });
 
   it('does not replace the related links when they are unchanged', () => {

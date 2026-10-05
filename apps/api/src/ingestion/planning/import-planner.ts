@@ -1163,6 +1163,9 @@ export function planImport(
       const storedRelated = snapshot.eventsById.get(eventId)?.relatedEntityIds ?? [];
       if (!sameSet(storedRelated, projection.relatedEntityIds)) {
         write.eventRelatedReplacements.push(eventId);
+        for (const relatedEntityId of projection.relatedEntityIds) {
+          write.eventEntityInserts.push({ eventId, entityId: relatedEntityId, role: 'RELATED' });
+        }
       }
     }
   }
