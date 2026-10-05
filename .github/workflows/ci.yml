@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  quality:
+    name: Lint, typecheck and tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: opsgraph
+          POSTGRES_PASSWORD: opsgraph
+          POSTGRES_DB: opsgraph_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U opsgraph"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://opsgraph:opsgraph@localhost:5432/opsgraph_test
+      JWT_ACCESS_SECRET: 0123456789abcdef0123456789abcdef01234567
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Build shared package
+        run: pnpm --filter @opsgraph/shared build
+      - name: Generate the Prisma client
+        run: pnpm --filter api prisma generate
+      - name: Apply migrations
+        run: pnpm --filter api prisma migrate deploy
+      - name: Lint
+        run: pnpm lint
+      - name: Typecheck
+        run: pnpm typecheck
+      - name: Unit tests
+        run: pnpm test
+      - name: E2E tests
+        run: pnpm test:e2e
+      - name: Build
+        run: pnpm build
