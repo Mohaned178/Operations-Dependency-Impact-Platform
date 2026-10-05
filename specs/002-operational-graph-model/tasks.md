@@ -17,7 +17,7 @@
 
 ## Phase 1: Setup
 
-- [ ] T001 In `apps/api/package.json` add runtime dep `csv-parse@^5` and dev dep `@types/multer`. Run `pnpm install`. Commit the lockfile. (research R19)
+- [x] T001 In `apps/api/package.json` add runtime dep `csv-parse@^5` and dev dep `@types/multer`. Run `pnpm install`. Commit the lockfile. (research R19)
 
 ---
 
