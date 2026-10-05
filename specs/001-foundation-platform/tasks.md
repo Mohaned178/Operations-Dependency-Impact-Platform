@@ -406,7 +406,7 @@ Then do quickstart step 10.
 
 ### API
 
-- [ ] T064 [US1] Make refresh-token rotation atomic in `apps/api/src/auth/token.service.ts` → `rotateRefresh`.
+- [x] T064 [US1] Make refresh-token rotation atomic in `apps/api/src/auth/token.service.ts` → `rotateRefresh`.
   - **Bug**: the token is read outside the transaction and revoked with `update({ where: { id } })`. Two concurrent refreshes with the same cookie both succeed and create two live children in one family.
   - **Fix**: inside the existing `$transaction`, replace the `update` with
     `const { count } = await tx.refreshToken.updateMany({ where: { id: token.id, revokedAt: null }, data: { revokedAt: new Date() } });`

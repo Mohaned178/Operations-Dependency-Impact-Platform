@@ -4,7 +4,7 @@ import { JwtService } from '@nestjs/jwt';
 import { AUDIT_ACTIONS } from '@opsgraph/shared';
 import type { User } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
-import { Errors } from '../common/errors/app-error';
+import { AppError, Errors } from '../common/errors/app-error';
 import { env } from '../config/env';
 import { PrismaService, type Tx } from '../prisma/prisma.service';
 
@@ -110,14 +110,29 @@ export class TokenService {
       throw Errors.unauthenticated();
     }
 
-    return this.prisma.$transaction(async (tx) => {
-      await tx.refreshToken.update({
-        where: { id: token.id },
-        data: { revokedAt: new Date() },
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        const { count } = await tx.refreshToken.updateMany({
+          where: { id: token.id, revokedAt: null },
+          data: { revokedAt: new Date() },
+        });
+        if (count !== 1) {
+          throw Errors.unauthenticated();
+        }
+        const issued = await this.issueRefresh(
+          tx,
+          token.userId,
+          token.familyId,
+          token.familyCreatedAt,
+        );
+        return { user: token.user, raw: issued.raw, expiresAt: issued.expiresAt };
       });
-      const issued = await this.issueRefresh(tx, token.userId, token.familyId, token.familyCreatedAt);
-      return { user: token.user, raw: issued.raw, expiresAt: issued.expiresAt };
-    });
+    } catch (error) {
+      if (error instanceof AppError && error.code === 'UNAUTHENTICATED') {
+        await this.refuse('concurrent_rotation', token.userId);
+      }
+      throw error;
+    }
   }
 
   async revokeFamilyByRaw(raw: string): Promise<string | undefined> {

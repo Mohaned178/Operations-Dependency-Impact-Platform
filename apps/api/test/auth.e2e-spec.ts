@@ -144,6 +144,31 @@ describe('Auth (e2e)', () => {
     await request(server).post('/api/auth/refresh').set('Cookie', secondCookie).expect(401);
   });
 
+  it('handles two concurrent refreshes with the same cookie atomically', async () => {
+    await createUser(prisma, { role: 'ANALYST', email: 'race@test.local' });
+    await Promise.all([prisma.$queryRaw`SELECT 1`, prisma.$queryRaw`SELECT 1`]);
+    const { cookie } = await signIn('race@test.local', TEST_PASSWORD);
+
+    const [first, second] = await Promise.all([
+      request(server).post('/api/auth/refresh').set('Cookie', cookie),
+      request(server).post('/api/auth/refresh').set('Cookie', cookie),
+    ]);
+
+    expect([first.status, second.status].sort()).toEqual([200, 401]);
+
+    const winner = first.status === 200 ? first : second;
+    const newCookie = readCookie(winner, 'og_refresh');
+    await request(server).post('/api/auth/refresh').set('Cookie', newCookie).expect(200);
+
+    const refused = await prisma.auditEntry.findMany({
+      where: { action: AUDIT_ACTIONS.AUTH_REFRESH_REFUSED },
+    });
+    const concurrent = refused.filter(
+      (row) => (row.metadata as { reason?: string } | null)?.reason === 'concurrent_rotation',
+    );
+    expect(concurrent).toHaveLength(1);
+  });
+
   it('refuses to rotate a family older than 7 days', async () => {
     const user = await createUser(prisma, { role: 'ANALYST', email: 'old@test.local' });
     const { cookie } = await signIn('old@test.local', TEST_PASSWORD);
