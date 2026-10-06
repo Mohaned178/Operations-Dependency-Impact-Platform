@@ -314,7 +314,7 @@ describe('EntityDetailPage', () => {
   });
 
   it('shows the blocker callout in the header and the Blockers section between Current state and Relationships', async () => {
-    renderPage();
+    const { container } = renderPage();
 
     const callout = await screen.findByRole('note');
     expect(within(callout).getByText(F1_BLOCKERS.summary)).toBeInTheDocument();
@@ -337,6 +337,15 @@ describe('EntityDetailPage', () => {
       'Timeline',
       'Source records',
     ]);
+
+    // FR-032: no risks, exceptions, impact or investigations sections, not even placeholders.
+    expect(
+      screen.queryAllByRole('heading', { name: /risk|exception|impact|investigation/i }),
+    ).toEqual([]);
+
+    // FR-031: tracing views are text and structured lists, never a graph diagram.
+    expect(container.querySelector('svg')).toBeNull();
+    expect(container.querySelector('canvas')).toBeNull();
   });
 
   it('shows one failing section without blanking the others', async () => {
@@ -389,6 +398,61 @@ describe('EntityDetailPage', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Unable to load relationships.');
     expect(screen.getByText('12,480.00 USD')).toBeInTheDocument();
     expect(await screen.findByText('order.created')).toBeInTheDocument();
+  });
+
+  it('shows the Blockers error while Identity, Dependencies and Relationships still render', async () => {
+    apiFetchMock.mockImplementation((path: string) => {
+      if (path === `/entities/${ENTITY_ID}/blockers`) {
+        return Promise.reject(new Error('down'));
+      }
+      if (path === `/entities/${ENTITY_ID}`) {
+        return Promise.resolve(ENTITY);
+      }
+      if (path.startsWith(`/entities/${ENTITY_ID}/neighbors`)) {
+        return Promise.resolve(NEIGHBORS);
+      }
+      if (path.startsWith(`/entities/${ENTITY_ID}/timeline`)) {
+        return Promise.resolve(TIMELINE);
+      }
+      if (path.startsWith(`/entities/${ENTITY_ID}/states`)) {
+        return Promise.resolve(STATES);
+      }
+      if (path.startsWith(`/entities/${ENTITY_ID}/dependencies`)) {
+        return Promise.resolve({
+          query: {
+            entityId: ENTITY_ID,
+            kind: 'upstream',
+            depth: 6,
+            relationshipTypes: ['REQUIRES'],
+            entityTypes: [],
+          },
+          computedAt: '2026-10-06T09:00:00.000Z',
+          start: {
+            id: ENTITY_ID,
+            type: 'Order',
+            displayName: 'Order #18492',
+            currentState: 'BLOCKED',
+            state: { classification: 'UNSATISFIED', observation: null, latestBySource: [] },
+          },
+          truncation: { depthLimit: false, explorationLimit: false, pathLimit: false },
+          totalReached: 0,
+          items: [],
+          nextCursor: null,
+          cycleClosingHops: [],
+          cycleClosingHopCount: 0,
+        });
+      }
+      return Promise.resolve(SOURCE_RECORDS);
+    });
+
+    renderPage();
+
+    expect(await screen.findByText('Unable to load blockers.')).toBeInTheDocument();
+    expect(screen.getByText('12,480.00 USD')).toBeInTheDocument();
+    expect(await screen.findByText('Nothing found within 6 steps.')).toBeInTheDocument();
+    expect(
+      await within(await relationshipsSection()).findByText('Payment PAY-88213'),
+    ).toBeInTheDocument();
   });
 
   it('shows "Entity not found" for a 404', async () => {

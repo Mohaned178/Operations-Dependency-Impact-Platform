@@ -345,9 +345,9 @@
 **Goal**: the page shows all sections in the FR-027 order, the most relevant answer is above the fold, links are shareable, and nothing outside the scope is shown.
 **Independent test**: quickstart steps 6 and 8, plus the tests below.
 
-- [ ] T041 [US3] In `EntityDetailPage.test.tsx`, add a test that the `h2` headings appear in exactly this order: `Identity`, `Current state`, `Blockers`, `Dependencies`, `Relationships`, `Timeline`, `Source records`. Read the existing section components for their exact heading texts, and adjust the expected strings to match them without renaming anything. Also assert that no heading matches `/risk|exception|impact|investigation/i` (FR-032), and that no `svg` or canvas graph is rendered (FR-031).
-- [ ] T042 [US3] Add a test to `EntityDetailPage.test.tsx` that a failing `/blockers` request shows the Blockers section's error while Identity, Dependencies and Relationships still render (plan KDN 8: one failing section must not blank the page). If this fails, fix the components so each section handles its own query state.
-- [ ] T043 [US3] Add a test to `apps/api/test/tracing.e2e-spec.ts` that tracing is read-only:
+- [x] T041 [US3] In `EntityDetailPage.test.tsx`, add a test that the `h2` headings appear in exactly this order: `Identity`, `Current state`, `Blockers`, `Dependencies`, `Relationships`, `Timeline`, `Source records`. Read the existing section components for their exact heading texts, and adjust the expected strings to match them without renaming anything. Also assert that no heading matches `/risk|exception|impact|investigation/i` (FR-032), and that no `svg` or canvas graph is rendered (FR-031).
+- [x] T042 [US3] Add a test to `EntityDetailPage.test.tsx` that a failing `/blockers` request shows the Blockers section's error while Identity, Dependencies and Relationships still render (plan KDN 8: one failing section must not blank the page). If this fails, fix the components so each section handles its own query state.
+- [x] T043 [US3] Add a test to `apps/api/test/tracing.e2e-spec.ts` that tracing is read-only:
   1. count `audit_entries`, `entities`, `relationships` and `state_observations`;
   2. call blockers and both dependency directions 5 times each, as ANALYST, OPS_MANAGER and ADMIN (all must return 200);
   3. assert all four counts are unchanged (FR-023, FR-024).
