@@ -358,7 +358,7 @@
 
 ## Phase 6: Polish and cross-cutting
 
-- [ ] T044 Create `apps/api/test/perf-tracing.e2e-spec.ts` exactly per research R11:
+- [x] T044 Create `apps/api/test/perf-tracing.e2e-spec.ts` exactly per research R11:
   - wrap it in `describePerf`, as `perf-graph.e2e-spec.ts` does;
   - deterministic ids via `md5('perf-' || g)::uuid`;
   - 50,000 entities and the R1–R4 relationship sets (150,000 rows), plus one `imports` row;
@@ -368,12 +368,12 @@
   - `console.log` of the timings.
 
   Run `RUN_PERF=1 pnpm --filter api test:e2e -- perf-tracing` locally, and write the measured p95s into the table in `specs/003-dependency-tracing/quickstart.md` § Performance. If a budget is missed, stop and report the numbers in `questions.md`. Do not add caching or change the algorithms on your own.
-- [ ] T045 Cross-check against the spec.
+- [x] T045 Cross-check against the spec.
   - For every FR-001 to FR-034 and SC-001 to SC-007, name the test or code that covers it, and write any gap to `questions.md`.
   - Run `grep -rn "WITH RECURSIVE" apps/` to confirm it appears only in `prisma-graph.repository.ts` and the T009 smoke test.
   - Run `grep -rn "localeCompare" apps/api/src/graph apps/api/src/tracing` and confirm it finds nothing.
-- [ ] T046 Walk the whole of `quickstart.md` by hand and tick each step. Fix any step that doesn't behave as written, in the code. The quickstart may only be edited to correct factual errors.
-- [ ] T047 Final gate: `pnpm lint && pnpm typecheck && pnpm test && pnpm test:e2e && pnpm build`. Confirm:
+- [x] T046 Walk the whole of `quickstart.md` by hand and tick each step. Fix any step that doesn't behave as written, in the code. The quickstart may only be edited to correct factual errors.
+- [x] T047 Final gate: `pnpm lint && pnpm typecheck && pnpm test && pnpm test:e2e && pnpm build`. Confirm:
   - no `TODO`s, dead code, `not implemented` stubs or new dependencies (`git diff main -- '**/package.json'` shows no changes);
   - `questions.md` has every open question resolved or explicitly deferred.
 
