@@ -6,6 +6,8 @@ import { RelationshipTypeSchema } from '@opsgraph/shared';
 import { decodeCursor, encodeCursor } from '../common/pagination/cursor';
 import { PrismaService } from '../prisma/prisma.service';
 import type {
+  BlockerTrace,
+  DependencyTrace,
   GraphRepository,
   NeighborPage,
   NeighborQuery,
@@ -148,5 +150,13 @@ export class PrismaGraphRepository implements GraphRepository {
       FROM relationships
       WHERE from_entity_id = ${entityId}::uuid OR to_entity_id = ${entityId}::uuid`;
     return Number(rows[0]?.count ?? 0n);
+  }
+
+  traceDependencies(): Promise<DependencyTrace | null> {
+    return Promise.reject(new Error('not implemented'));
+  }
+
+  traceBlockers(): Promise<BlockerTrace | null> {
+    return Promise.reject(new Error('not implemented'));
   }
 }
