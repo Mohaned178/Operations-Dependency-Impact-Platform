@@ -5,6 +5,7 @@ import { ApiError, apiFetch } from '../../lib/api-client';
 import { BlockerCallout } from './BlockerCallout';
 import { BlockersSection } from './BlockersSection';
 import { CurrentStateSection } from './CurrentStateSection';
+import { DependenciesSection } from './DependenciesSection';
 import { IdentitySection } from './IdentitySection';
 import { RelationshipsSection } from './RelationshipsSection';
 import { SourceRecordsSection } from './SourceRecordsSection';
@@ -59,6 +60,7 @@ export function EntityDetailPage() {
       <IdentitySection entity={entity} />
       <CurrentStateSection entity={entity} />
       <BlockersSection entityId={entity.id} />
+      <DependenciesSection entityId={entity.id} />
       <RelationshipsSection entityId={entity.id} />
       <TimelineSection entityId={entity.id} />
       <SourceRecordsSection entityId={entity.id} />

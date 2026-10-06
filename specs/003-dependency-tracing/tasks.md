@@ -236,7 +236,7 @@
 
 ### Backend
 
-- [ ] T029 [US2] Create `apps/api/src/graph/traversal/canonical-paths.ts`: `selectCanonicalPaths(startId, edges, maxDepth): CanonicalPathsResult`, exactly per the research R5 pseudocode. It covers:
+- [x] T029 [US2] Create `apps/api/src/graph/traversal/canonical-paths.ts`: `selectCanonicalPaths(startId, edges, maxDepth): CanonicalPathsResult`, exactly per the research R5 pseudocode. It covers:
   - the thresholds HIGH → MEDIUM → LOW;
   - the layered DP with `compareLabels`;
   - never re-entering the start entity;
@@ -246,7 +246,7 @@
   - `endsInCycle` always `false`;
   - the cycle-closing edges;
   - the repeated-entity invariant throw.
-- [ ] T030 [US2] Create `canonical-paths.spec.ts` with hand-built edges:
+- [x] T030 [US2] Create `canonical-paths.spec.ts` with hand-built edges:
   - depth 1 sees only neighbours;
   - **SHP→PAY**: a direct MANUAL/MEDIUM edge versus a 2-hop SOURCE/HIGH route picks the 2-hop route;
   - **rule 2**: equal weakest confidence, so fewer non-SOURCE hops wins even when longer;
@@ -256,7 +256,7 @@
   - an edge back to the start entity is cycle-closing and never a path;
   - `maxDepth = 10` on an 11-chain reaches 10 entities and the last has `continuesBeyondDepth`;
   - an unreachable entity is absent.
-- [ ] T031 [US2] Create `apps/api/src/graph/traversal/traversal-property.spec.ts` (research R10, SC-007). It has:
+- [x] T031 [US2] Create `apps/api/src/graph/traversal/traversal-property.spec.ts` (research R10, SC-007). It has:
   - an inline `mulberry32(seed)` PRNG;
   - 1,000 random graphs (2–9 entities, 0–20 edges, random types from the traceable set, origins and confidences, cycles and parallel edges allowed);
   - for each graph and depth 1–4:
@@ -265,7 +265,7 @@
     - no path is longer than the depth, and no entity repeats.
 
   Use fixed seeds so the test is deterministic.
-- [ ] T032 [US2] Implement `PrismaGraphRepository.traceDependencies` exactly per plan KDN 3 (steps 1–7):
+- [x] T032 [US2] Implement `PrismaGraphRepository.traceDependencies` exactly per plan KDN 3 (steps 1–7):
   - the CTE without the state filter, using `walkTypes(q.direction, q.relationshipTypes)` and `maxDepth + 1`;
   - `null` when there is no start entity;
   - `within`, `depthLimitReached`, and the sort and 10,000 cap;
@@ -277,7 +277,7 @@
   - the cycle-closing hops.
 
   Remove the T008 stub. Confirm with `grep -rn "not implemented" apps/api/src` that no stubs remain.
-- [ ] T033 [US2] Add `dependencies(id: string, query: DependenciesQuery): Promise<DependenciesResponse>` to `TracingService` (plan KDN 5 "Dependencies"):
+- [x] T033 [US2] Add `dependencies(id: string, query: DependenciesQuery): Promise<DependenciesResponse>` to `TracingService` (plan KDN 5 "Dependencies"):
   - map the direction;
   - default the types;
   - `null` throws 404;
@@ -290,14 +290,14 @@
   - include the query echo (`kind: 'upstream' | 'downstream'`).
 
   Add `@Get(':id/dependencies')` to `TracingController` with `ZodValidationPipe(DependenciesQuerySchema)`.
-- [ ] T034 [US2] Extend `apps/api/test/tracing-seed.e2e-spec.ts`. Parse each response with `DependenciesResponseSchema`, and use `limit=200` to get every item in one page. Assert every line of:
+- [x] T034 [US2] Extend `apps/api/test/tracing-seed.e2e-spec.ts`. Parse each response with `DependenciesResponseSchema`, and use `limit=200` to get every item in one page. Assert every line of:
   - fixtures F5, F6, F7, F8 and F9;
   - the downstream item of F10 (`depth=2`).
 
   Also assert:
   - **SC-005**: 100 sequential calls each of blockers(SHP-77120), blockers(Order #18492), downstream(BR-18492) and upstream(Order #18492) give bodies that are deep-equal once `computedAt` is removed;
   - **SC-006**: for every entity in the seed, call blockers and upstream. Every hop must have `effectiveOrigin`, `effectiveConfidence` and at least one assertion with non-empty `sourceSystem`, `sourceId` and `observedAt`. Every hop whose `entity.state.observation` is non-null must have a non-empty `sourceSystem`. Every non-SOURCE hop in a blocking path must have its explanation sentence contain `inferred,` or `manually recorded,`.
-- [ ] T035 [US2] Extend `apps/api/test/tracing.e2e-spec.ts` (dependencies part):
+- [x] T035 [US2] Extend `apps/api/test/tracing.e2e-spec.ts` (dependencies part):
   - **401** and **404**;
   - **400** for the dependency rows of the validation table: missing direction, `sideways`, `RELATES_TO` at index 1;
   - **RELATES_TO ignored**: A RELATES_TO B is never traversed, so the result is empty;
@@ -306,17 +306,17 @@
   - an **invalid cursor** gives 400 with path `cursor`;
   - **depth 10** on an 11-chain: 10 reached, and `truncation.depthLimit = true`;
   - **upstream vs downstream** symmetry on A REQUIRES B: upstream(A) = [B] and downstream(B) = [A].
-- [ ] T036 [US2] In `apps/api/test/authz-matrix.e2e-spec.ts`, add the probe `GET /entities/:id/dependencies` → `/api/entities/${MISSING_ID}/dependencies?direction=upstream`, expected `AUTHENTICATED`.
+- [x] T036 [US2] In `apps/api/test/authz-matrix.e2e-spec.ts`, add the probe `GET /entities/:id/dependencies` → `/api/entities/${MISSING_ID}/dependencies?direction=upstream`, expected `AUTHENTICATED`.
 
 ### Web (`apps/web/src/pages/entities/`)
 
-- [ ] T037 [P] [US2] Create `tracing-params.ts` (pure) with:
+- [x] T037 [P] [US2] Create `tracing-params.ts` (pure) with:
   - `parseTracingParams(sp: URLSearchParams): { dep: 'upstream' | 'downstream'; depth: number; rel: TraceableRelationshipType[]; types: EntityType[] }`, falling back to the defaults for invalid values as plan KDN 8 describes;
   - `writeTracingParams(current: URLSearchParams, next: Partial<…>): URLSearchParams`, which keeps unrelated params and omits defaults (`dep=upstream`, `depth=6`, empty lists);
   - `toDependenciesQueryString(params, cursor?, limit = 50): string`.
 
   Create `tracing-params.test.ts` covering the round trip, defaults omitted, invalid values falling back, and unrelated params kept.
-- [ ] T038 [US2] Create `DependenciesSection.tsx` (heading `Dependencies`, research R12). It reads its state only from `useSearchParams()` through `parseTracingParams`, and writes with `setSearchParams(writeTracingParams(...), { replace: true })`. It contains:
+- [x] T038 [US2] Create `DependenciesSection.tsx` (heading `Dependencies`, research R12). It reads its state only from `useSearchParams()` through `parseTracingParams`, and writes with `setSearchParams(writeTracingParams(...), { replace: true })`. It contains:
   - tab buttons, `Upstream — what this depends on` and `Downstream — what depends on this`, with `aria-pressed`;
   - a depth `<select>` with options 1–10;
   - a relationship-type checkbox group with the 11 types, where all checked means no filter;
@@ -327,14 +327,14 @@
   - `Load more`;
   - an empty state, `Nothing found within N steps.`;
   - notices for `depthLimit` (`More entities exist beyond depth N.`), `explorationLimit`, and `cycleClosingHopCount > 0`.
-- [ ] T039 [US2] Create `DependenciesSection.test.tsx`. Render it inside a `MemoryRouter` with `initialEntries` and mock `apiFetch`. Cover:
+- [x] T039 [US2] Create `DependenciesSection.test.tsx`. Render it inside a `MemoryRouter` with `initialEntries` and mock `apiFetch`. Cover:
   - the default request: `/entities/<id>/dependencies?direction=upstream&depth=6&limit=50`, with no type params;
   - clicking Downstream changes the URL to `dep=downstream` and requests `direction=downstream`;
   - ticking Order adds `types=Order` to the URL and `entityTypes=Order` to the request;
   - opening with `?dep=downstream&depth=3&types=Order` reproduces that state (FR-030);
   - `Load more` requests the next cursor;
   - the `path shown` text appears when the path length differs from the distance.
-- [ ] T040 [US2] In `EntityDetailPage.tsx`, render `<DependenciesSection entityId={entity.id} />` between `BlockersSection` and `RelationshipsSection`. In `EntityDetailPage.test.tsx`, add a mock answer for `/dependencies`.
+- [x] T040 [US2] In `EntityDetailPage.tsx`, render `<DependenciesSection entityId={entity.id} />` between `BlockersSection` and `RelationshipsSection`. In `EntityDetailPage.test.tsx`, add a mock answer for `/dependencies`.
 
 **Checkpoint**: standard gate. Then walk quickstart steps 4–5 against the seeded dev DB.
 

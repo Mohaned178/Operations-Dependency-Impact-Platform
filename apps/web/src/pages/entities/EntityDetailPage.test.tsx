@@ -229,6 +229,31 @@ function mockHappyPath(): void {
     if (path === `/entities/${ENTITY_ID}/blockers`) {
       return Promise.resolve(F1_BLOCKERS);
     }
+    if (path.startsWith(`/entities/${ENTITY_ID}/dependencies`)) {
+      return Promise.resolve({
+        query: {
+          entityId: ENTITY_ID,
+          kind: 'upstream',
+          depth: 6,
+          relationshipTypes: ['REQUIRES'],
+          entityTypes: [],
+        },
+        computedAt: '2026-10-06T09:00:00.000Z',
+        start: {
+          id: ENTITY_ID,
+          type: 'Order',
+          displayName: 'Order #18492',
+          currentState: 'BLOCKED',
+          state: { classification: 'UNSATISFIED', observation: null, latestBySource: [] },
+        },
+        truncation: { depthLimit: false, explorationLimit: false, pathLimit: false },
+        totalReached: 0,
+        items: [],
+        nextCursor: null,
+        cycleClosingHops: [],
+        cycleClosingHopCount: 0,
+      });
+    }
     return Promise.reject(new Error(`Unexpected path ${path}`));
   });
 }
@@ -273,7 +298,7 @@ describe('EntityDetailPage', () => {
     renderPage();
 
     expect(await screen.findByRole('heading', { name: 'Order #18492' })).toBeInTheDocument();
-    expect(screen.getByText('Order')).toBeInTheDocument();
+    expect(screen.getAllByText('Order').length).toBeGreaterThan(0);
 
     expect(await screen.findByText('12,480.00 USD')).toBeInTheDocument();
     expect(screen.getAllByText(/OMS · 18492/).length).toBeGreaterThan(0);
@@ -307,6 +332,7 @@ describe('EntityDetailPage', () => {
       'Identity',
       'Current state',
       'Blockers',
+      'Dependencies',
       'Relationships',
       'Timeline',
       'Source records',
@@ -329,6 +355,31 @@ describe('EntityDetailPage', () => {
       }
       if (path === `/entities/${ENTITY_ID}/blockers`) {
         return Promise.resolve(F1_BLOCKERS);
+      }
+      if (path.startsWith(`/entities/${ENTITY_ID}/dependencies`)) {
+        return Promise.resolve({
+          query: {
+            entityId: ENTITY_ID,
+            kind: 'upstream',
+            depth: 6,
+            relationshipTypes: ['REQUIRES'],
+            entityTypes: [],
+          },
+          computedAt: '2026-10-06T09:00:00.000Z',
+          start: {
+            id: ENTITY_ID,
+            type: 'Order',
+            displayName: 'Order #18492',
+            currentState: 'BLOCKED',
+            state: { classification: 'UNSATISFIED', observation: null, latestBySource: [] },
+          },
+          truncation: { depthLimit: false, explorationLimit: false, pathLimit: false },
+          totalReached: 0,
+          items: [],
+          nextCursor: null,
+          cycleClosingHops: [],
+          cycleClosingHopCount: 0,
+        });
       }
       return Promise.resolve(SOURCE_RECORDS);
     });
