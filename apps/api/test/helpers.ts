@@ -126,6 +126,38 @@ export async function runImport(
   );
 }
 
+export interface ImportFileOptions {
+  format: 'json' | 'csv';
+  kind?: ImportKind;
+  dryRun?: boolean;
+  fileName?: string;
+}
+
+export function importFile(
+  app: INestApplication,
+  token: string,
+  content: string | Uint8Array,
+  options: ImportFileOptions,
+): request.Test {
+  const fileName = options.fileName ?? `test.${options.format}`;
+  const req = request(app.getHttpServer() as Server)
+    .post('/api/imports')
+    .set('Authorization', `Bearer ${token}`)
+    .field('format', options.format)
+    .attach(
+      'file',
+      typeof content === 'string' ? Buffer.from(content, 'utf8') : Buffer.from(content),
+      fileName,
+    );
+  if (options.kind !== undefined) {
+    req.field('kind', options.kind);
+  }
+  if (options.dryRun !== undefined) {
+    req.field('dryRun', String(options.dryRun));
+  }
+  return req;
+}
+
 export async function login(
   app: INestApplication,
   email: string,

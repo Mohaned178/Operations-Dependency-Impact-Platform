@@ -96,6 +96,14 @@ const PROBES: RouteProbe[] = [
     expected: ADMIN_ONLY,
   },
   { name: 'GET /audit', method: 'get', path: '/api/audit', expected: ADMIN_ONLY },
+  { name: 'GET /imports', method: 'get', path: '/api/imports', expected: ADMIN_ONLY },
+  { name: 'POST /imports', method: 'post', path: '/api/imports', body: {}, expected: ADMIN_ONLY },
+  {
+    name: 'GET /imports/:id',
+    method: 'get',
+    path: `/api/imports/${MISSING_ID}`,
+    expected: ADMIN_ONLY,
+  },
   { name: 'GET /entities', method: 'get', path: '/api/entities', expected: AUTHENTICATED },
   {
     name: 'GET /entities/:id',

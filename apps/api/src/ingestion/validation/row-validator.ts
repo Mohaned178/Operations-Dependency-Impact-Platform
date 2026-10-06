@@ -19,10 +19,23 @@ function translateField(parsed: ParsedRow, path: string): string {
   if (parsed.columnMap === undefined) {
     return path;
   }
-  for (const [column, fieldPath] of Object.entries(parsed.columnMap)) {
-    if (fieldPath === path) {
-      return column;
-    }
+  const entries = Object.entries(parsed.columnMap);
+  const exact = entries.find(([, fieldPath]) => fieldPath === path);
+  if (exact !== undefined) {
+    return exact[0];
+  }
+  const length = ([, fieldPath]: [string, string]): number => fieldPath.length;
+  const nested = entries
+    .filter(([, fieldPath]) => path.startsWith(`${fieldPath}.`))
+    .sort((left, right) => length(right) - length(left))[0];
+  if (nested !== undefined) {
+    return nested[0];
+  }
+  const parent = entries
+    .filter(([, fieldPath]) => fieldPath.startsWith(`${path}.`))
+    .sort((left, right) => length(right) - length(left))[0];
+  if (parent !== undefined) {
+    return parent[0];
   }
   return path;
 }

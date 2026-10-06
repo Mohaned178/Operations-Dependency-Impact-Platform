@@ -1,18 +1,24 @@
 import { randomUUID } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
-import type { Import } from '@prisma/client';
+import type { Import, Prisma } from '@prisma/client';
 import {
   AUDIT_ACTIONS,
   IMPORT_MAX_ROWS,
   type ImportCounts,
   type ImportKind,
+  type ImportListResponse,
   type ImportReport,
+  type ImportSummaryDto,
+  type PageQuery,
 } from '@opsgraph/shared';
+import { z } from 'zod';
 import { AuditService, type AuditRecordInput } from '../audit/audit.service';
 import { RequestContext } from '../common/context/request-context';
 import { Errors } from '../common/errors/app-error';
+import { decodeCursor, encodeCursor } from '../common/pagination/cursor';
 import { PrismaService } from '../prisma/prisma.service';
 import { toDbKind, toImportReport } from './import.mapper';
+import { parseCsvImport } from './parsing/csv-import.parser';
 import { parseJsonImport } from './parsing/json-import.parser';
 import type { ParsedImport, RowError } from './parsing/parsed-import';
 import { ImportSnapshotLoader } from './persistence/import-snapshot.loader';
@@ -32,6 +38,11 @@ export interface RunImportInput {
   trigger?: 'API' | 'SEED';
   actor: ImportActor;
 }
+
+const ImportListCursorSchema = z.object({
+  receivedAt: z.string().datetime(),
+  id: z.string().uuid(),
+});
 
 const KIND_ORDER: Record<ImportKind, number> = {
   entities: 0,
@@ -77,6 +88,8 @@ export class ImportService {
     throw Errors.importTooLarge();
   }
 
+  async run(input: RunImportInput & { skipIfNoChanges: true }): Promise<ImportReport | null>;
+  async run(input: RunImportInput): Promise<ImportReport>;
   async run(input: RunImportInput): Promise<ImportReport | null> {
     const now = new Date();
     const receivedAt = new Date();
@@ -164,22 +177,111 @@ export class ImportService {
       return null;
     }
 
-    const submitter =
-      importRow.submittedById === null
-        ? null
-        : await this.prisma.user.findUnique({
-            where: { id: importRow.submittedById },
-            select: { id: true, email: true },
-          });
-
+    const submitter = await this.loadSubmitter(importRow.submittedById);
     return toImportReport(importRow, submitter);
+  }
+
+  async list(query: PageQuery): Promise<ImportListResponse> {
+    const where: Prisma.ImportWhereInput = {};
+    if (query.cursor !== undefined) {
+      const cursor = decodeCursor(ImportListCursorSchema, query.cursor);
+      const receivedAt = new Date(cursor.receivedAt);
+      where.OR = [
+        { receivedAt: { lt: receivedAt } },
+        { receivedAt, id: { lt: cursor.id } },
+      ];
+    }
+
+    const rows = await this.prisma.import.findMany({
+      where,
+      orderBy: [{ receivedAt: 'desc' }, { id: 'desc' }],
+      take: query.limit + 1,
+    });
+    const hasMore = rows.length > query.limit;
+    const page = hasMore ? rows.slice(0, query.limit) : rows;
+    const submitters = await this.loadSubmitters(
+      page.flatMap((row) => (row.submittedById === null ? [] : [row.submittedById])),
+    );
+
+    const items = page.map((row) =>
+      this.toSummary(row, submitters.get(row.submittedById ?? '') ?? null),
+    );
+    const last = items.at(-1);
+
+    return {
+      items,
+      nextCursor:
+        hasMore && last !== undefined
+          ? encodeCursor({ receivedAt: last.receivedAt, id: last.id })
+          : null,
+    };
+  }
+
+  async get(id: string): Promise<ImportReport> {
+    const row = await this.prisma.import.findUnique({ where: { id } });
+    if (row === null) {
+      throw Errors.notFound('Import');
+    }
+    const submitter = await this.loadSubmitter(row.submittedById);
+    return toImportReport(row, submitter);
   }
 
   private parse(input: RunImportInput): ParsedImport {
     if (input.format === 'json') {
       return parseJsonImport(input.content);
     }
-    throw Errors.validation([{ path: 'format', message: 'CSV imports are not supported yet' }]);
+    if (input.kind === undefined) {
+      throw Errors.validation([{ path: 'kind', message: 'kind is required when format is csv' }]);
+    }
+    return parseCsvImport(input.content, input.kind);
+  }
+
+  private async loadSubmitter(
+    id: string | null,
+  ): Promise<{ id: string; email: string } | null> {
+    if (id === null) {
+      return null;
+    }
+    return this.prisma.user.findUnique({
+      where: { id },
+      select: { id: true, email: true },
+    });
+  }
+
+  private async loadSubmitters(
+    ids: readonly string[],
+  ): Promise<Map<string, { id: string; email: string }>> {
+    const unique = [...new Set(ids)];
+    if (unique.length === 0) {
+      return new Map();
+    }
+    const users = await this.prisma.user.findMany({
+      where: { id: { in: unique } },
+      select: { id: true, email: true },
+    });
+    return new Map(users.map((user) => [user.id, user]));
+  }
+
+  private toSummary(
+    row: Import,
+    submitter: { id: string; email: string } | null,
+  ): ImportSummaryDto {
+    const report = toImportReport(row, submitter);
+    return {
+      id: report.id,
+      outcome: report.outcome,
+      countsAreProjected: report.countsAreProjected,
+      trigger: report.trigger,
+      format: report.format,
+      kind: report.kind,
+      dryRun: report.dryRun,
+      fileName: report.fileName,
+      byteSize: report.byteSize,
+      receivedAt: report.receivedAt,
+      submittedBy: report.submittedBy,
+      counts: report.counts,
+      errorCount: report.rowErrors.length + report.fileErrors.length,
+    };
   }
 
   private buildCounts(
