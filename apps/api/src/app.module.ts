@@ -8,6 +8,7 @@ import { GraphModule } from './graph/graph.module';
 import { HealthModule } from './health/health.module';
 import { IngestionModule } from './ingestion/ingestion.module';
 import { PrismaModule } from './prisma/prisma.module';
+import { TracingModule } from './tracing/tracing.module';
 import { UsersModule } from './users/users.module';
 
 @Module({
@@ -20,6 +21,7 @@ import { UsersModule } from './users/users.module';
     HealthModule,
     GraphModule,
     IngestionModule,
+    TracingModule,
   ],
   providers: [{ provide: APP_FILTER, useClass: AllExceptionsFilter }],
 })

@@ -135,6 +135,12 @@ const PROBES: RouteProbe[] = [
     path: `/api/entities/${MISSING_ID}/source-records`,
     expected: AUTHENTICATED,
   },
+  {
+    name: 'GET /entities/:id/blockers',
+    method: 'get',
+    path: `/api/entities/${MISSING_ID}/blockers`,
+    expected: AUTHENTICATED,
+  },
   { name: 'GET /source-systems', method: 'get', path: '/api/source-systems', expected: AUTHENTICATED },
 ];
 

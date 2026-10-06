@@ -114,14 +114,14 @@
 
 ### Backend
 
-- [ ] T013 [US1] Create `apps/api/src/graph/traversal/blocking-paths.ts`: `enumerateBlockingPaths(startId, edges, maxDepth, maxEnumerated): BlockingPathsResult` (research R6 pseudocode, **including** the combined end condition). Details:
+- [x] T013 [US1] Create `apps/api/src/graph/traversal/blocking-paths.ts`: `enumerateBlockingPaths(startId, edges, maxDepth, maxEnumerated): BlockingPathsResult` (research R6 pseudocode, **including** the combined end condition). Details:
   - adjacency is sorted by `(targetId, key)` with `compareCodeUnits`;
   - `cycleClosing` is unique by `key`;
   - each path's `weakestConfidence` and `nonSourceHops` are computed from its edges;
   - the output is sorted with `comparePaths`;
   - stop as soon as `maxEnumerated` paths have been emitted, and set `enumerationCapped`;
   - assert no repeated entity per path, and throw `Error('traversal invariant: repeated entity')` if one repeats.
-- [ ] T014 [US1] Create `blocking-paths.spec.ts` with hand-built `TraversalEdge`s:
+- [x] T014 [US1] Create `blocking-paths.spec.ts` with hand-built `TraversalEdge`s:
   - a linear chain gives 1 maximal path, with no prefixes emitted;
   - a branch gives 2 paths in comparator order;
   - a 2-node cycle A→B→A from A gives 1 path A→B, `endsInCycle`, and 1 cycle-closing edge;
@@ -131,7 +131,7 @@
   - `maxEnumerated = 2` with 3 possible paths gives 2 paths and `enumerationCapped`;
   - a start with no edges gives `[]`;
   - the SHP-77120 shape (DEPENDS_ON chain plus a MANUAL/MEDIUM BLOCKS shortcut) gives the 4-hop all-HIGH path first.
-- [ ] T015 [US1] Implement `PrismaGraphRepository.traceBlockers` (plan KDN 3 and 4, research R3 blocker variant, research R8 limits):
+- [x] T015 [US1] Implement `PrismaGraphRepository.traceBlockers` (plan KDN 3 and 4, research R3 blocker variant, research R8 limits):
   - the CTE with the `JOIN entities n` and `<> ALL(${SATISFIED_STATES}::"OperationalState"[])` lines, using `walkTypes('UPSTREAM', q.relationshipTypes)` and `maxDepth + 1`;
   - return `null` when there is no depth-0 row;
   - the exploration cap;
@@ -142,8 +142,8 @@
   - cycle-closing hops grouped, sorted, capped at 100, with the total count.
 
   Use `Prisma.sql` and `Prisma.empty` fragments only. Remove the T008 stub for this method.
-- [ ] T016 [US1] Create `apps/api/src/tracing/explanation.ts` (pure): `explainBlockingPath(start: TracedEntityDto, path: BlockingPathDto-without-explanation | PathDto): string[]` and `summarizeBlockers(start: TracedEntityDto, deepest: BlockerDto[], depth: number): string`, exactly per contracts/api.md § Explanation text (subject, object and qualifier tables, `steps()`, summary pseudocode). A hop type other than REQUIRES, DEPENDS_ON or BLOCKS throws.
-- [ ] T017 [US1] Create `apps/api/src/tracing/explanation.spec.ts`. Build the DTOs by hand (no DB) and assert these **exact** strings:
+- [x] T016 [US1] Create `apps/api/src/tracing/explanation.ts` (pure): `explainBlockingPath(start: TracedEntityDto, path: BlockingPathDto-without-explanation | PathDto): string[]` and `summarizeBlockers(start: TracedEntityDto, deepest: BlockerDto[], depth: number): string`, exactly per contracts/api.md § Explanation text (subject, object and qualifier tables, `steps()`, summary pseudocode). A hop type other than REQUIRES, DEPENDS_ON or BLOCKS throws.
+- [x] T017 [US1] Create `apps/api/src/tracing/explanation.spec.ts`. Build the DTOs by hand (no DB) and assert these **exact** strings:
   - all 4 sentences of F1 `paths[0]` and F1 `paths[1].explanation[0]`;
   - F2 `explanation[0]`;
   - F3 `paths[0].explanation[0]`;
@@ -156,7 +156,7 @@
   - a single possible blocker: `state unknown, possible blocker`;
   - `inCycle`: ` It is part of a dependency cycle.`;
   - `steps(1)` gives `1 step`.
-- [ ] T018 [US1] Create `apps/api/src/tracing/tracing.service.ts` with `blockers(id: string, query: BlockersQuery): Promise<BlockersResponse>` (plan KDN 5 "Blockers", research R6 blocker lists):
+- [x] T018 [US1] Create `apps/api/src/tracing/tracing.service.ts` with `blockers(id: string, query: BlockersQuery): Promise<BlockersResponse>` (plan KDN 5 "Blockers", research R6 blocker lists):
   - `computedAt`;
   - the default types;
   - `null` throws `Errors.notFound('Entity')`;
@@ -169,11 +169,11 @@
   - the `truncation` flags;
   - `totalPaths = kept.length`;
   - the query echo (`kind: 'blockers'`).
-- [ ] T019 [US1] Create `apps/api/src/tracing/tracing.controller.ts`: `@Controller('entities')` with `@Get(':id/blockers')`, using `ParseUUIDPipe` and `ZodValidationPipe(BlockersQuerySchema)`, and calling `TracingService.blockers`. Create `tracing.module.ts` (imports `GraphModule` and `PrismaModule`; provides `TracingService` and `StateEvidenceReader`; declares the controller) and add `TracingModule` to `apps/api/src/app.module.ts`.
-- [ ] T020 [US1] Create `apps/api/test/tracing-seed.e2e-spec.ts`. In `beforeAll`: `resetDb`, `SeedService.seedScenario39()`, then create an ANALYST and log in. Resolve the ids with `entityIdByKey`. For each request, parse the response with `BlockersResponseSchema` and assert **every line** of:
+- [x] T019 [US1] Create `apps/api/src/tracing/tracing.controller.ts`: `@Controller('entities')` with `@Get(':id/blockers')`, using `ParseUUIDPipe` and `ZodValidationPipe(BlockersQuerySchema)`, and calling `TracingService.blockers`. Create `tracing.module.ts` (imports `GraphModule` and `PrismaModule`; provides `TracingService` and `StateEvidenceReader`; declares the controller) and add `TracingModule` to `apps/api/src/app.module.ts`.
+- [x] T020 [US1] Create `apps/api/test/tracing-seed.e2e-spec.ts`. In `beforeAll`: `resetDb`, `SeedService.seedScenario39()`, then create an ANALYST and log in. Resolve the ids with `entityIdByKey`. For each request, parse the response with `BlockersResponseSchema` and assert **every line** of:
   - fixtures F1, F2, F3 and F4;
   - the two blocker items of F10 (`depth=3` on the SLA, and `depth=10` on SHP-77120).
-- [ ] T021 [US1] Create `apps/api/test/tracing.e2e-spec.ts` (blockers part). Each test imports its own small graph with `runImport` after `resetDb`. Cover:
+- [x] T021 [US1] Create `apps/api/test/tracing.e2e-spec.ts` (blockers part). Each test imports its own small graph with `runImport` after `resetDb`. Cover:
   - **401** without a token;
   - **404** for a random UUID;
   - **400** for each blocker row of the contracts/api.md validation table (`depth` 0/11/2.5/abc, `FULFILLED_BY`, `Truck`, a non-UUID id), each asserting `details[0].path`;
@@ -184,7 +184,7 @@
   - **entity-type filter**: `entityTypes=Approval` keeps only paths containing an Approval;
   - **relationship-type filter**: `relationshipTypes=REQUIRES` drops a path that needs DEPENDS_ON;
   - **depth 1** on a 3-chain: one 1-hop path with `continuesBeyondDepth` and `truncation.depthLimit`.
-- [ ] T022 [US1] In `apps/api/test/authz-matrix.e2e-spec.ts`, add the probe `GET /entities/:id/blockers` → `/api/entities/${MISSING_ID}/blockers`, expected `AUTHENTICATED`.
+- [x] T022 [US1] In `apps/api/test/authz-matrix.e2e-spec.ts`, add the probe `GET /entities/:id/blockers` → `/api/entities/${MISSING_ID}/blockers`, expected `AUTHENTICATED`.
 
 ### Web (`apps/web/src/pages/entities/`)
 

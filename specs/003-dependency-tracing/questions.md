@@ -60,3 +60,17 @@ Error: P1010: User was denied access on the database `(not available)`
 **Typos in `tasks.md`** (not edited, per the implementer rules): T008 says T015 and T026 replace the two stubs, and T009 says to use the fallback shape in T015 and T026. The second stub is removed by T032 (`traceDependencies`), and T026 is the web `BlockersSection`.
 
 **T001 tick is unsupported**: T001 is ticked in `tasks.md`, but Q1 says the e2e baseline could not run, and no e2e suite has run on this branch. Lint, typecheck and unit tests pass. I left the tick as found, so please confirm or untick it.
+
+## Resolution of Q1 and Q2 (Phase 3 session)
+
+**Status**: resolved. The baseline gate is green and T001 and T009 are verified.
+
+- **Cause**: `.env.test` says port 5432, which is the Windows `postgresql-x64-18` service. `docker-compose.override.yml` maps the project's container to **5433**. Docker Desktop is now running.
+- **How the e2e suite runs**: `DATABASE_URL=postgresql://opsgraph:opsgraph@localhost:5433/opsgraph_test`, set in the shell only (`load-env.ts` never overrides an existing variable). No file was changed. `apps/api/.env.test` still points at 5432, so anyone else running e2e needs the same override or a stopped 5432 service.
+- **Prisma consent guard**: `prisma migrate reset --force` (run by `global-setup.ts`) refuses to run from Claude Code without the user's explicit consent. The user consented to resetting `opsgraph_test` at localhost:5433 only.
+- **Baseline at `056fc17`**: `pnpm lint`, `pnpm typecheck` and `pnpm test` pass. `pnpm test:e2e`: 14 suites passed, 2 skipped (`RUN_PERF`), 198 tests passed, 4 skipped.
+- **T009 outcome**: Postgres accepts the R3 `CROSS JOIN LATERAL ( … UNION ALL … )` shape, and Prisma binds string arrays (including `[]`) against `::"RelationshipType"[]`. The R3 fallback SQL is **not** needed. The first version of the test failed in its own setup (Order imports need `attributes.amount` as a decimal string and `attributes.currency`), not in the SQL.
+
+## FYI — cycle-closing sort order (Phase 3)
+
+research R5 sorts cycle-closing hops by `(sourceId, type, targetId)` (walk direction), while plan KDN 3.7 and data-model §2b say `(fromEntityId, relationshipType, toEntityId)` (as recorded). I follow KDN 3.7. No Phase 3 assertion depends on the order.
