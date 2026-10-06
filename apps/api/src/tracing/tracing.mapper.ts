@@ -17,7 +17,7 @@ import type { EntityStateEvidence } from './state-evidence.reader';
 
 export type EvidenceMap = ReadonlyMap<string, EntityStateEvidence>;
 
-function evidenceFor(evidenceMap: EvidenceMap, entityId: string): EntityStateEvidence {
+export function evidenceFor(evidenceMap: EvidenceMap, entityId: string): EntityStateEvidence {
   const evidence = evidenceMap.get(entityId);
   if (evidence === undefined) {
     throw new Error(`tracing invariant: no state evidence loaded for entity ${entityId}`);
