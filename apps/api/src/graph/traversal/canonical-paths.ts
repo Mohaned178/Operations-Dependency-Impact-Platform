@@ -74,12 +74,18 @@ export function selectCanonicalPaths(
 
   const thresholds: Confidence[] = ['HIGH', 'MEDIUM', 'LOW'];
   const assigned = new Map<string, InternalPath>();
+  let previousUsableCount = -1;
 
   for (const threshold of thresholds) {
     const thresholdRank = CONFIDENCE_RANK[threshold];
     const usable = edges.filter(
       (edge) => CONFIDENCE_RANK[edge.effectiveConfidence] >= thresholdRank,
     );
+    // No new edges at this threshold: the reachable set is unchanged and already assigned.
+    if (usable.length === previousUsableCount) {
+      continue;
+    }
+    previousUsableCount = usable.length;
     const usableBySource = new Map<string, TraversalEdge[]>();
     for (const edge of usable) {
       const outgoing = usableBySource.get(edge.sourceId);
@@ -146,7 +152,7 @@ export function selectCanonicalPaths(
         edges: label.edges,
         weakestConfidence: weakest,
         nonSourceHops: label.nonSource,
-        continuesBeyondDepth: continuesBeyond(label, edges, maxDepth),
+        continuesBeyondDepth: continuesBeyond(label, bySource, maxDepth),
         endsInCycle: false,
       };
       if (new Set(path.entityIds).size !== path.entityIds.length) {
@@ -161,7 +167,11 @@ export function selectCanonicalPaths(
   return { paths: assigned, cycleClosing };
 }
 
-function continuesBeyond(label: Label, allEdges: readonly TraversalEdge[], maxDepth: number): boolean {
+function continuesBeyond(
+  label: Label,
+  bySource: ReadonlyMap<string, readonly TraversalEdge[]>,
+  maxDepth: number,
+): boolean {
   if (label.edges.length !== maxDepth) {
     return false;
   }
@@ -170,12 +180,7 @@ function continuesBeyond(label: Label, allEdges: readonly TraversalEdge[], maxDe
     return false;
   }
   const onPath = new Set(label.entityIds);
-  for (const edge of allEdges) {
-    if (edge.sourceId === last && !onPath.has(edge.targetId)) {
-      return true;
-    }
-  }
-  return false;
+  return (bySource.get(last) ?? []).some((edge) => !onPath.has(edge.targetId));
 }
 
 /**
