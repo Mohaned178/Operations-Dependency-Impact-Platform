@@ -94,7 +94,9 @@ function commaList<T extends [string, ...string[]]>(item: z.ZodEnum<T>) {
         .filter((value) => value !== ''),
     )
     .pipe(z.array(item))
-    .transform((values) => item.options.filter((option) => values.includes(option)));
+    .transform((values) =>
+      item.options.filter((option): option is T[number] => values.includes(option)),
+    );
 }
 
 export const TraceDepthSchema = z.coerce
