@@ -1,0 +1,58 @@
+# Questions
+
+## Q1 — T001: e2e baseline cannot run, so the database is unreachable
+
+**Where**: `tasks.md` T001 (baseline gate), which also blocks every later e2e checkpoint, starting with T009.
+
+**Result so far** (branch `003-dependency-tracing`, no code changed):
+
+| Step | Result |
+|---|---|
+| `pnpm install --frozen-lockfile`, shared build, `prisma generate` | OK |
+| `pnpm lint` | pass |
+| `pnpm typecheck` | pass |
+| `pnpm test` | pass (shared 37, web 38, api 128 tests) |
+| `pnpm test:e2e` | **fails in globalSetup** |
+
+**Error** (`apps/api/test/global-setup.ts` runs `prisma migrate reset --force --skip-seed`):
+
+```text
+Datasource "db": PostgreSQL database "opsgraph_test", schema "public" at "localhost:5432"
+Error: P1010: User was denied access on the database `(not available)`
+```
+
+**Environment facts**:
+- `apps/api/.env.test` uses `postgresql://opsgraph:opsgraph@localhost:5432/opsgraph_test`.
+- `apps/api/.env` points at port 5433, so the dev database differs from the test one.
+- Something is listening on 5432, but it rejects the `opsgraph` user. It may be a different, locally installed Postgres instead of the project's container.
+- `docker compose ps` fails: `failed to connect to the docker API at npipe:////./pipe/dockerDesktopLinuxEngine`. Docker Desktop is not running.
+
+**Options**
+
+1. **Start Docker Desktop**, then `docker compose up -d db`. If the container conflicts on 5432 with the other Postgres, stop that service or remap the port.
+2. **Provide credentials** for the Postgres already on 5432, with a role `opsgraph` allowed to create and reset `opsgraph_test`.
+3. **Point `.env.test` at another database** that you confirm is disposable.
+
+`migrate reset --force` wipes the target database, so I will not choose or alter a database on my own.
+
+**Recommendation**: option 1.
+
+**Blocked**: ticking T001, and all e2e checkpoints from Phase 2 on. Pure unit work (T002–T008) is not blocked.
+
+## Q2 — T009: CTE smoke test is written but has not been run (same cause as Q1)
+
+**Where**: `tasks.md` T009, plus the Phase 2 checkpoint item `pnpm --filter api test:e2e -- graph-repository`.
+
+**Status**: the test is in `apps/api/test/graph-repository.e2e-spec.ts` (new `describe` at the end of the file). It imports the 3-node REQUIRES cycle, runs the exact R3 step-1 SQL and asserts 3 rows with depths A 0, B 1, C 2. **It has not been executed**, so T009 is **not ticked**.
+
+**Why**: the database is unreachable, as in Q1. Docker Desktop is still not running. The only server on 5432 is the Windows service `postgresql-x64-18`, which is not the project's container and rejects the `opsgraph` role. `prisma migrate reset --force` would wipe whatever it points at, so I did not touch it.
+
+```text
+$ pnpm test:e2e -- graph-repository
+Datasource "db": PostgreSQL database "opsgraph_test", schema "public" at "localhost:5432"
+Error: P1010: User was denied access on the database `(not available)`
+```
+
+**What is unverified**: whether Postgres accepts the `CROSS JOIN LATERAL ( ... UNION ALL ... )` shape, and whether Prisma's `$queryRaw` accepts a JS string array against `::"RelationshipType"[]` (including the empty array). If either fails, R3 says to switch to the fallback SQL and record it here. T015 and T026 depend on the outcome.
+
+**Needed from you**: one of the Q1 options (start Docker Desktop and `docker compose up -d db`, which is the recommendation), then run `pnpm --filter api test:e2e -- graph-repository`.
