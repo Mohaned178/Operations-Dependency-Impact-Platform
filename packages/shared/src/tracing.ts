@@ -68,6 +68,9 @@ export const TRACING_LIMITS = {
   maxDepth: 10,
   maxReachedEntities: 10_000,
   maxBlockingPaths: 100,
+  // Ranking caveat (research R6): when more than 1,000 blocking paths exist, the top 100 are the
+  // best of the first 1,000 found in deterministic DFS order, not of all paths. The result is
+  // still deterministic and is flagged with truncation.pathLimit.
   maxEnumeratedPaths: 1_000,
   maxCycleClosingHops: 100,
 } as const;

@@ -5,22 +5,44 @@ import {
 } from '@opsgraph/shared';
 import { walkTypes } from './walk-types';
 
+// Spec FR-002, written out literally so the table is asserted independently of the code.
+const FROM_DEPENDS_ON_TO: TraceableRelationshipType[] = [
+  'REQUIRES',
+  'DEPENDS_ON',
+  'FULFILLED_BY',
+  'SUPPLIED_BY',
+  'CONTAINS',
+];
+const TO_DEPENDS_ON_FROM: TraceableRelationshipType[] = [
+  'BLOCKS',
+  'PLACED',
+  'HAS',
+  'GOVERNS',
+  'DEFINES',
+  'GENERATES',
+];
+
 describe('walkTypes', () => {
-  const cases = TRACEABLE_RELATIONSHIP_TYPES.flatMap((type) =>
-    (['UPSTREAM', 'DOWNSTREAM'] as const).map((direction) => [type, direction] as const),
-  );
-
-  it.each(cases)('places %s for %s in the right list', (type, direction) => {
-    const dependentIsFrom = DEPENDENCY_DIRECTION[type] === 'FROM_DEPENDS_ON_TO';
-    const movesFromEnd = direction === 'UPSTREAM' ? dependentIsFrom : !dependentIsFrom;
-
-    const result = walkTypes(direction, [type]);
-
-    expect(result).toEqual(
-      movesFromEnd
-        ? { followFromTypes: [type], followToTypes: [] }
-        : { followFromTypes: [], followToTypes: [type] },
+  it('knows exactly the 11 types of spec FR-002', () => {
+    expect([...FROM_DEPENDS_ON_TO, ...TO_DEPENDS_ON_FROM].sort()).toEqual(
+      [...TRACEABLE_RELATIONSHIP_TYPES].sort(),
     );
+    for (const type of FROM_DEPENDS_ON_TO) {
+      expect(DEPENDENCY_DIRECTION[type]).toBe('FROM_DEPENDS_ON_TO');
+    }
+    for (const type of TO_DEPENDS_ON_FROM) {
+      expect(DEPENDENCY_DIRECTION[type]).toBe('TO_DEPENDS_ON_FROM');
+    }
+  });
+
+  it.each(FROM_DEPENDS_ON_TO)('%s: upstream follows from, downstream follows to', (type) => {
+    expect(walkTypes('UPSTREAM', [type])).toEqual({ followFromTypes: [type], followToTypes: [] });
+    expect(walkTypes('DOWNSTREAM', [type])).toEqual({ followFromTypes: [], followToTypes: [type] });
+  });
+
+  it.each(TO_DEPENDS_ON_FROM)('%s: upstream follows to, downstream follows from', (type) => {
+    expect(walkTypes('UPSTREAM', [type])).toEqual({ followFromTypes: [], followToTypes: [type] });
+    expect(walkTypes('DOWNSTREAM', [type])).toEqual({ followFromTypes: [type], followToTypes: [] });
   });
 
   it('splits the blocker types for an upstream walk', () => {
