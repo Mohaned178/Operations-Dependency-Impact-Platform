@@ -144,3 +144,9 @@ Deferred (not blocking, no code change):
 ## FYI — helpers used before Phase 4
 
 `ReachableSet.within`, `ReachableSet.beyondDepth` and the `blockersOnly: false` branch of `PrismaGraphRepository.reachableEntities` are not used by `traceBlockers`. They are the shared step-1 helper that T032 (`traceDependencies`) reuses, and the `traceDependencies` stub is still in place until then.
+
+## Review resolutions (branch review before PR)
+
+- **Quickstart step 1 vs T026 (inline name links)**: resolved in favour of the spec. FR-029 and User Story 1 require every entity named in an explanation to link to its Entity 360 page. `ExplanationSentence` links the start and hop entity names inside each sentence (longest name first, and a name shared by two different entities on the path is left unlinked). It is used by `BlockersSection` and `BlockerCallout`. The API contract is unchanged.
+- **`selectCanonicalPaths` cost**: `continuesBeyond` scanned every edge for each depth-limit path (O(reached × edges), about 570 ms of CPU for a 10k-leaf star). It now uses the per-source adjacency. A confidence threshold that adds no edges is skipped, because its reachable set is unchanged and already assigned. Same 10k star: about 70 ms. The brute-force property test (SC-007) still passes.
+- **Relationship-type checkboxes**: unchecking the last checked type produced an empty list, which means "all types", so every box flipped back on and the query widened. The last checked type is now disabled.
