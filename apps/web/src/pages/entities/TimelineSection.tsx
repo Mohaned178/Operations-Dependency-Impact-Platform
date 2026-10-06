@@ -32,6 +32,7 @@ function TimelineRow({ item }: { item: TimelineItemDto }) {
   return (
     <li className="rounded border bg-white p-3 text-sm">
       <p className="flex items-center gap-2">
+        <time dateTime={item.at}>{formatTimestamp(item.at)}</time>
         <span className="font-medium">{item.eventType}</span>
         <span className="text-slate-500">{item.role === 'SUBJECT' ? 'Subject' : 'Related'}</span>
       </p>
@@ -48,7 +49,7 @@ function TimelineRow({ item }: { item: TimelineItemDto }) {
         ))}
       </p>
       <p className="text-slate-500">
-        {item.sourceSystem} · {formatTimestamp(item.observedAt)}
+        {item.sourceSystem} · observed {formatTimestamp(item.observedAt)}
       </p>
     </li>
   );

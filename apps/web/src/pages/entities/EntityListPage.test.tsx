@@ -2,7 +2,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { EntityListItemDto } from '@opsgraph/shared';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router';
+import type { ReactNode } from 'react';
+import { Link, MemoryRouter, useLocation } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { EntityListPage } from './EntityListPage';
 
@@ -42,7 +43,12 @@ function listResponse(items: EntityListItemDto[], nextCursor: string | null = nu
   return Promise.resolve({ items, nextCursor });
 }
 
-function renderPage(initialEntry = '/entities') {
+function LocationDisplay() {
+  const location = useLocation();
+  return <output data-testid="location">{`${location.pathname}${location.search}`}</output>;
+}
+
+function renderPage(initialEntry = '/entities', extra: ReactNode = null) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
@@ -50,6 +56,8 @@ function renderPage(initialEntry = '/entities') {
   return render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={[initialEntry]}>
+        {extra}
+        <LocationDisplay />
         <EntityListPage />
       </MemoryRouter>
     </QueryClientProvider>,
@@ -135,6 +143,20 @@ describe('EntityListPage', () => {
       const paths = apiFetchMock.mock.calls.map((call) => call[0] as string);
       expect(paths.some((path) => path.includes('q=Acme'))).toBe(true);
     });
+  });
+
+  it('does not restore an old search after the URL is cleared from outside', async () => {
+    const user = userEvent.setup();
+    renderPage('/entities?q=Acme', <Link to="/entities">Entities</Link>);
+
+    await screen.findByRole('link', { name: 'Order #18492' });
+    await user.click(screen.getByRole('link', { name: 'Entities' }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Search')).toHaveValue('');
+    });
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    expect(screen.getByTestId('location')).toHaveTextContent(/^\/entities$/);
   });
 
   it('loads more rows with the next cursor', async () => {

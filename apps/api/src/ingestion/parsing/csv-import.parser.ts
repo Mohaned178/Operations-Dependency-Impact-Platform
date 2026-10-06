@@ -201,7 +201,6 @@ export function parseCsvImport(buffer: Uint8Array, kind: ImportKind): ParsedImpo
     records = parse(text, {
       bom: true,
       relax_column_count: true,
-      skip_empty_lines: true,
     }) as string[][];
   } catch (error) {
     const message =
@@ -236,7 +235,8 @@ export function parseCsvImport(buffer: Uint8Array, kind: ImportKind): ParsedImpo
 
   for (let index = 1; index < records.length; index += 1) {
     const record = records[index];
-    if (record === undefined) {
+    // Blank lines are skipped here, not by the parser, so they still count as spreadsheet rows.
+    if (record === undefined || (record.length === 1 && record[0] === '')) {
       continue;
     }
     const row = index + 1;

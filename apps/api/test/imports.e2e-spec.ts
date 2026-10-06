@@ -275,6 +275,25 @@ describe('Imports (e2e)', () => {
     expectInvariant(report);
   });
 
+  it('counts a CSV row that mixes both reference forms twice as one rejected row', async () => {
+    const id = '00000000-0000-4000-8000-000000000001';
+    const csv = lines(
+      'type,source_system,source_id,from_id,from_type,from_source_system,from_source_id,to_id,to_type,to_source_system,to_source_id,origin,confidence,basis,observed_at',
+      `REQUIRES,Demo,R-1,${id},Customer,Demo,C-1,${id},Order,Demo,O-1,SOURCE,HIGH,,${T3}`,
+    );
+
+    const response = await importFile(app, adminToken, csv, {
+      format: 'csv',
+      kind: 'relationships',
+    });
+    const report = toReport(response.body);
+
+    expect(report.outcome).toBe('REJECTED');
+    expect(report.rowErrors.map((error) => error.field)).toEqual(['from_id', 'to_id']);
+    expect(report.counts.relationships).toMatchObject({ received: 1, rejected: 1 });
+    expectInvariant(report);
+  });
+
   it('rejects a row that depends on a rejected entity row', async () => {
     const document = {
       entities: [

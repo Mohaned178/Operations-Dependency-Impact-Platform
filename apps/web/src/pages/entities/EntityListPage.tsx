@@ -5,7 +5,7 @@ import {
   OperationalStateSchema,
   SourceSystemListResponseSchema,
 } from '@opsgraph/shared';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { apiFetch } from '../../lib/api-client';
 import { formatTimestamp } from '../../lib/format';
@@ -37,12 +37,19 @@ export function EntityListPage() {
 
   const [search, setSearch] = useState(q);
   const debouncedSearch = useDebouncedValue(search, 300);
+  const previousDebouncedSearch = useRef(debouncedSearch);
 
   useEffect(() => {
     setSearch(q);
   }, [q]);
 
+  // Write to the URL only when the debounced input changes, so a stale value never
+  // overwrites a q that changed from outside (a link or navigation).
   useEffect(() => {
+    if (debouncedSearch === previousDebouncedSearch.current) {
+      return;
+    }
+    previousDebouncedSearch.current = debouncedSearch;
     if (debouncedSearch === q) {
       return;
     }

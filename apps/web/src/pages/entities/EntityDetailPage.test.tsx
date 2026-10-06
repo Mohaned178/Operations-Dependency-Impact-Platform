@@ -334,4 +334,11 @@ describe('EntityDetailPage', () => {
         .length,
     ).toBeGreaterThan(0);
   });
+
+  it('shows when a timeline event occurred, not only when it was observed', async () => {
+    const { container } = renderPage();
+
+    await screen.findByText('order.created');
+    expect(container.querySelector('time[datetime="2026-09-29T09:12:00.000Z"]')).not.toBeNull();
+  });
 });

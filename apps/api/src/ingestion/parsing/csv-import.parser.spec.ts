@@ -275,6 +275,7 @@ describe('parseCsvImport', () => {
     expect(parsed.fileErrors).toEqual([]);
     expect(parsed.rowErrors).toEqual([]);
     expect(parsed.rows).toHaveLength(1);
+    expect(parsed.rows[0]?.row).toBe(3);
   });
 
   it('reports a column-count mismatch as a row error but keeps the other rows', () => {

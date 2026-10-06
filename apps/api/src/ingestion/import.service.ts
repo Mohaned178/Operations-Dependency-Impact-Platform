@@ -95,7 +95,12 @@ export class ImportService {
     const receivedAt = new Date();
     const parsed = this.parse(input);
 
-    const totalRows = parsed.rows.length + parsed.rowErrors.length;
+    const totalRows =
+      parsed.rows.length +
+      (['entities', 'relationships', 'events'] as const).reduce(
+        (sum, kind) => sum + countRejectedRows(parsed.rowErrors, kind),
+        0,
+      );
     if (totalRows > IMPORT_MAX_ROWS) {
       await this.refuse('rows', IMPORT_MAX_ROWS, totalRows);
     }
@@ -293,7 +298,7 @@ export class ImportService {
     const build = (kind: ImportKind): ImportCounts => {
       const received =
         parsed.rows.filter((row) => row.kind === kind).length +
-        parsed.rowErrors.filter((error) => error.kind === kind).length;
+        countRejectedRows(parsed.rowErrors, kind);
       if (fileLevel) {
         return { received, created: 0, updated: 0, unchanged: 0, rejected: received };
       }
