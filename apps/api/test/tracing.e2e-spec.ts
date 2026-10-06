@@ -3,9 +3,11 @@ import type { Server } from 'node:http';
 import type { INestApplication } from '@nestjs/common';
 import {
   BlockersResponseSchema,
+  DependenciesResponseSchema,
   ErrorResponseSchema,
   type BlockersResponse,
   type Confidence,
+  type DependenciesResponse,
   type EntityType,
   type OperationalState,
   type RelationshipOrigin,
@@ -132,6 +134,12 @@ describe('Dependency tracing: blockers (e2e)', () => {
     const response = await get(`/api/entities/${id}/blockers${query}`);
     expect(response.status).toBe(200);
     return BlockersResponseSchema.parse(response.body);
+  }
+
+  async function dependenciesOf(id: string, query = ''): Promise<DependenciesResponse> {
+    const response = await get(`/api/entities/${id}/dependencies${query}`);
+    expect(response.status).toBe(200);
+    return DependenciesResponseSchema.parse(response.body);
   }
 
   function pathIds(response: BlockersResponse): string[][] {
@@ -383,6 +391,160 @@ describe('Dependency tracing: blockers (e2e)', () => {
       });
       expect(body.deepestBlockers[0]).toMatchObject({ continuesBeyondDepth: true });
       expect(body.directBlockers[0]).toMatchObject({ continuesBeyondDepth: false });
+    });
+  });
+
+  describe('dependencies authentication and lookup', () => {
+    it('answers 401 without a token', async () => {
+      await setup([]);
+      const response = await get(`/api/entities/${randomUUID()}/dependencies?direction=upstream`, false);
+      expect(response.status).toBe(401);
+      expect(ErrorResponseSchema.parse(response.body).error.code).toBe('UNAUTHENTICATED');
+    });
+
+    it('answers 404 for an unknown entity', async () => {
+      await setup([]);
+      const response = await get(`/api/entities/${randomUUID()}/dependencies?direction=upstream`);
+      expect(response.status).toBe(404);
+      expect(ErrorResponseSchema.parse(response.body).error).toMatchObject({
+        code: 'NOT_FOUND',
+        message: 'Entity not found',
+      });
+    });
+  });
+
+  describe('dependencies validation', () => {
+    const cases: Array<[string, string, string]> = [
+      ['missing direction', '', 'direction'],
+      ['sideways', '?direction=sideways', 'direction'],
+      [
+        'RELATES_TO at index 1',
+        '?direction=upstream&relationshipTypes=REQUIRES,RELATES_TO',
+        'relationshipTypes.1',
+      ],
+    ];
+
+    it.each(cases)('answers 400 for %s', async (_name, query, path) => {
+      await setup([]);
+      const response = await get(`/api/entities/${randomUUID()}/dependencies${query}`);
+      expect(response.status).toBe(400);
+      const error = ErrorResponseSchema.parse(response.body).error;
+      expect(error.code).toBe('VALIDATION_FAILED');
+      expect(error.details?.[0]?.path).toBe(path);
+    });
+
+    it('answers 400 for an invalid cursor', async () => {
+      const ids = await setup([{ id: 'A', state: 'PENDING' }]);
+      const response = await get(
+        `/api/entities/${ids['A'] ?? ''}/dependencies?direction=upstream&cursor=not-a-cursor`,
+      );
+      expect(response.status).toBe(400);
+      const error = ErrorResponseSchema.parse(response.body).error;
+      expect(error.code).toBe('VALIDATION_FAILED');
+      expect(error.details?.[0]?.path).toBe('cursor');
+    });
+  });
+
+  describe('dependencies graph shapes', () => {
+    it('ignores RELATES_TO relationships', async () => {
+      const ids = await setup(
+        [
+          { id: 'A', state: 'PENDING' },
+          { id: 'B', state: 'MISSING' },
+        ],
+        [{ type: 'RELATES_TO', from: 'A', to: 'B' }],
+      );
+      const body = await dependenciesOf(ids['A'] ?? '', '?direction=upstream&limit=200');
+      expect(body.totalReached).toBe(0);
+      expect(body.items).toEqual([]);
+    });
+
+    it('reaches both entities once on a 2-node cycle', async () => {
+      const ids = await setup(
+        [
+          { id: 'A', state: 'PENDING' },
+          { id: 'B', state: 'PENDING' },
+        ],
+        [
+          { type: 'REQUIRES', from: 'A', to: 'B' },
+          { type: 'REQUIRES', from: 'B', to: 'A' },
+        ],
+      );
+      const up = await dependenciesOf(ids['A'] ?? '', '?direction=upstream&limit=200');
+      expect(up.totalReached).toBe(1);
+      expect(up.items.map((item) => item.entity.id)).toEqual([ids['B']]);
+      expect(up.cycleClosingHopCount).toBeGreaterThanOrEqual(1);
+      const down = await dependenciesOf(ids['A'] ?? '', '?direction=downstream&limit=200');
+      expect(down.totalReached).toBe(1);
+      expect(down.items.map((item) => item.entity.id)).toEqual([ids['B']]);
+    });
+
+    it('is symmetric on A REQUIRES B', async () => {
+      const ids = await setup(
+        [
+          { id: 'A', state: 'PENDING' },
+          { id: 'B', state: 'MISSING' },
+        ],
+        [{ type: 'REQUIRES', from: 'A', to: 'B' }],
+      );
+      const up = await dependenciesOf(ids['A'] ?? '', '?direction=upstream&limit=200');
+      expect(up.items.map((item) => item.entity.id)).toEqual([ids['B']]);
+      const down = await dependenciesOf(ids['B'] ?? '', '?direction=downstream&limit=200');
+      expect(down.items.map((item) => item.entity.id)).toEqual([ids['A']]);
+    });
+
+    it('paginates a star of 5 dependencies in 3 pages', async () => {
+      const ids = await setup(
+        [
+          { id: 'C', state: 'PENDING' },
+          { id: 'L1', state: 'PENDING' },
+          { id: 'L2', state: 'PENDING' },
+          { id: 'L3', state: 'PENDING' },
+          { id: 'L4', state: 'PENDING' },
+          { id: 'L5', state: 'PENDING' },
+        ],
+        [
+          { type: 'REQUIRES', from: 'C', to: 'L1' },
+          { type: 'REQUIRES', from: 'C', to: 'L2' },
+          { type: 'REQUIRES', from: 'C', to: 'L3' },
+          { type: 'REQUIRES', from: 'C', to: 'L4' },
+          { type: 'REQUIRES', from: 'C', to: 'L5' },
+        ],
+      );
+      const center = ids['C'] ?? '';
+      const first = await dependenciesOf(center, '?direction=upstream&limit=2');
+      expect(first.items).toHaveLength(2);
+      expect(first.nextCursor).not.toBeNull();
+      const second = await dependenciesOf(
+        center,
+        `?direction=upstream&limit=2&cursor=${encodeURIComponent(first.nextCursor ?? '')}`,
+      );
+      expect(second.items).toHaveLength(2);
+      expect(second.nextCursor).not.toBeNull();
+      const third = await dependenciesOf(
+        center,
+        `?direction=upstream&limit=2&cursor=${encodeURIComponent(second.nextCursor ?? '')}`,
+      );
+      expect(third.items).toHaveLength(1);
+      expect(third.nextCursor).toBeNull();
+
+      const all = await dependenciesOf(center, '?direction=upstream&limit=200');
+      expect([...first.items, ...second.items, ...third.items]).toEqual(all.items);
+      expect(all.nextCursor).toBeNull();
+    });
+
+    it('reaches 10 entities at depth 10 on an 11-chain and flags the depth limit', async () => {
+      const nodes = Array.from({ length: 12 }, (_, i) => ({ id: `N${i}`, state: 'PENDING' as const }));
+      const edges = Array.from({ length: 11 }, (_, i) => ({
+        type: 'REQUIRES' as const,
+        from: `N${i}`,
+        to: `N${i + 1}`,
+      }));
+      const ids = await setup(nodes, edges);
+      const body = await dependenciesOf(ids['N0'] ?? '', '?direction=upstream&depth=10&limit=200');
+      expect(body.totalReached).toBe(10);
+      expect(body.truncation.depthLimit).toBe(true);
+      expect(body.truncation.pathLimit).toBe(false);
     });
   });
 });

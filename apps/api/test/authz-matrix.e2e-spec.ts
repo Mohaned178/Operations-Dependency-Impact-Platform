@@ -141,6 +141,12 @@ const PROBES: RouteProbe[] = [
     path: `/api/entities/${MISSING_ID}/blockers`,
     expected: AUTHENTICATED,
   },
+  {
+    name: 'GET /entities/:id/dependencies',
+    method: 'get',
+    path: `/api/entities/${MISSING_ID}/dependencies?direction=upstream`,
+    expected: AUTHENTICATED,
+  },
   { name: 'GET /source-systems', method: 'get', path: '/api/source-systems', expected: AUTHENTICATED },
 ];
 

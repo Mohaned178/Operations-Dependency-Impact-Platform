@@ -2,7 +2,10 @@ import type { Server } from 'node:http';
 import type { INestApplication } from '@nestjs/common';
 import {
   BlockersResponseSchema,
+  DependenciesResponseSchema,
+  TRACEABLE_RELATIONSHIP_TYPES,
   type BlockersResponse,
+  type DependenciesResponse,
   type EntityType,
 } from '@opsgraph/shared';
 import request from 'supertest';
@@ -10,15 +13,55 @@ import { SeedService } from '../src/ingestion/seed/seed.service';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { createTestApp, createUser, entityIdByKey, login, resetDb, TEST_PASSWORD } from './helpers';
 
-// Acceptance fixtures F1-F4 and the blocker half of F10 (contracts/api.md), asserted literally
-// against the seeded §39 scenario.
+// Acceptance fixtures F1-F10 (contracts/api.md), asserted literally against the seeded §39
+// scenario, plus SC-005 determinism and SC-006 provenance.
 describe('Dependency tracing on the seeded §39 scenario: blockers (e2e)', () => {
   let app: INestApplication;
   let prisma: PrismaService;
   let server: Server;
   let token: string;
 
-  const ids = {} as Record<'shp' | 'order' | 'pay' | 'apr' | 'br' | 'sla' | 'wh', string>;
+  const ids = {} as Record<
+    | 'shp'
+    | 'order'
+    | 'pay'
+    | 'apr'
+    | 'br'
+    | 'sla'
+    | 'wh'
+    | 'inv'
+    | 'acme'
+    | 'contract'
+    | 'product'
+    | 'northwind'
+    | 'contoso'
+    | 'sla4107'
+    | 'sla4215'
+    | 'sla4330'
+    | 'ctrl18530'
+    | 'ctrl18531'
+    | 'ctrl18532',
+    string
+  >;
+  const orderIds: string[] = [];
+  const otherOrderSourceIds = [
+    '18493',
+    '18494',
+    '18495',
+    '18496',
+    '18501',
+    '18502',
+    '18503',
+    '18504',
+    '18505',
+    '18511',
+    '18512',
+    '18513',
+    '18514',
+    '18521',
+    '18522',
+    '18523',
+  ];
 
   beforeAll(async () => {
     app = await createTestApp();
@@ -41,6 +84,22 @@ describe('Dependency tracing on the seeded §39 scenario: blockers (e2e)', () =>
     ids.br = await key('BudgetRequirement', 'FinanceApprovals', 'BR-18492');
     ids.sla = await key('SLA', 'ContractMgmt', 'SLA-3982-DEL');
     ids.wh = await key('Warehouse', 'WMS', 'WH-EAST-02');
+    ids.inv = await key('Invoice', 'ERP', 'INV-55120');
+    ids.acme = await key('Customer', 'CRM', 'CUST-1001');
+    ids.contract = await key('Contract', 'ContractMgmt', 'CON-3982');
+    ids.product = await key('Product', 'PIM', 'PRD-5521');
+    ids.northwind = await key('Supplier', 'PIM', 'SUP-310');
+    ids.contoso = await key('Supplier', 'PIM', 'SUP-322');
+    ids.sla4107 = await key('SLA', 'ContractMgmt', 'SLA-4107-DEL');
+    ids.sla4215 = await key('SLA', 'ContractMgmt', 'SLA-4215-DEL');
+    ids.sla4330 = await key('SLA', 'ContractMgmt', 'SLA-4330-DEL');
+    ids.ctrl18530 = await key('Order', 'OMS', '18530');
+    ids.ctrl18531 = await key('Order', 'OMS', '18531');
+    ids.ctrl18532 = await key('Order', 'OMS', '18532');
+    orderIds.length = 0;
+    for (const sourceId of otherOrderSourceIds) {
+      orderIds.push(await key('Order', 'OMS', sourceId));
+    }
   });
 
   afterAll(async () => {
@@ -53,6 +112,23 @@ describe('Dependency tracing on the seeded §39 scenario: blockers (e2e)', () =>
       .set('Authorization', `Bearer ${token}`);
     expect(response.status).toBe(200);
     return BlockersResponseSchema.parse(response.body);
+  }
+
+  async function dependenciesOf(id: string, query = ''): Promise<DependenciesResponse> {
+    const response = await request(server)
+      .get(`/api/entities/${id}/dependencies${query}`)
+      .set('Authorization', `Bearer ${token}`);
+    expect(response.status).toBe(200);
+    return DependenciesResponseSchema.parse(response.body);
+  }
+
+  function dependencyById(body: DependenciesResponse, id: string) {
+    const item = body.items.find((row) => row.entity.id === id);
+    expect(item).toBeDefined();
+    if (item === undefined) {
+      throw new Error(`expected entity ${id} in dependencies response`);
+    }
+    return item;
   }
 
   function entityIdsOf(path: BlockersResponse['paths'][number]): string[] {
@@ -269,6 +345,235 @@ describe('Dependency tracing on the seeded §39 scenario: blockers (e2e)', () =>
       expect(deep.truncation).toEqual(shallow.truncation);
       expect(deep.summary).toBe(shallow.summary);
     });
+  });
+
+  describe('F5: downstream of BR-18492 (default depth, no filters)', () => {
+    let body: DependenciesResponse;
+
+    beforeAll(async () => {
+      body = await dependenciesOf(ids.br, '?direction=downstream&limit=200');
+    });
+
+    it('reaches 25 entities and no depth limit', () => {
+      expect(body.query).toMatchObject({
+        entityId: ids.br,
+        kind: 'downstream',
+        depth: 6,
+        relationshipTypes: [...TRACEABLE_RELATIONSHIP_TYPES],
+        entityTypes: [],
+      });
+      expect(body.totalReached).toBe(25);
+      expect(body.truncation).toEqual({
+        depthLimit: false,
+        explorationLimit: false,
+        pathLimit: false,
+      });
+      expect(body.nextCursor).toBeNull();
+    });
+
+    it('has the expected distances', () => {
+      expect(dependencyById(body, ids.apr).distance).toBe(1);
+      expect(dependencyById(body, ids.pay).distance).toBe(2);
+      expect(dependencyById(body, ids.order).distance).toBe(3);
+      expect(dependencyById(body, ids.shp).distance).toBe(3);
+      expect(dependencyById(body, ids.inv).distance).toBe(4);
+      for (const id of orderIds) {
+        expect(dependencyById(body, id).distance).toBe(4);
+      }
+      for (const id of [ids.sla, ids.sla4107, ids.sla4215, ids.sla4330]) {
+        expect(dependencyById(body, id).distance).toBe(4);
+      }
+    });
+
+    it('does not reach the control orders', () => {
+      const reached = new Set(body.items.map((item) => item.entity.id));
+      expect(reached.has(ids.ctrl18530)).toBe(false);
+      expect(reached.has(ids.ctrl18531)).toBe(false);
+      expect(reached.has(ids.ctrl18532)).toBe(false);
+    });
+
+    it('prefers the 4-hop SOURCE/HIGH canonical path for SHP-77120', () => {
+      const shp = dependencyById(body, ids.shp);
+      expect(shp.path.length).toBe(4);
+      expect(shp.path.weakestConfidence).toBe('HIGH');
+      expect(shp.path.nonSourceHops).toBe(0);
+      expect(shp.path.hops.map((hop) => hop.entity.id)).toEqual([
+        ids.apr,
+        ids.pay,
+        ids.order,
+        ids.shp,
+      ]);
+      for (const hop of shp.path.hops) {
+        expect(hop.effectiveOrigin).toBe('SOURCE');
+        expect(hop.effectiveConfidence).toBe('HIGH');
+      }
+    });
+  });
+
+  describe('F6: downstream of BR-18492 with relationshipTypes=REQUIRES,DEPENDS_ON', () => {
+    it('drops INV-55120 and pushes SHP-77120 to distance 4', async () => {
+      const body = await dependenciesOf(
+        ids.br,
+        '?direction=downstream&relationshipTypes=REQUIRES,DEPENDS_ON&limit=200',
+      );
+      expect(body.query.relationshipTypes).toEqual(['REQUIRES', 'DEPENDS_ON']);
+      expect(body.totalReached).toBe(24);
+      expect(body.items.some((item) => item.entity.id === ids.inv)).toBe(false);
+      expect(dependencyById(body, ids.shp).distance).toBe(4);
+    });
+  });
+
+  describe('F7: downstream of BR-18492 with entityTypes=Order', () => {
+    it('returns only the 17 orders and keeps intermediates on the path', async () => {
+      const body = await dependenciesOf(
+        ids.br,
+        '?direction=downstream&entityTypes=Order&limit=200',
+      );
+      expect(body.totalReached).toBe(17);
+      for (const item of body.items) {
+        expect(item.entity.type).toBe('Order');
+      }
+      const target = orderIds[0];
+      if (target === undefined) {
+        throw new Error('expected an affected order id');
+      }
+      const order = dependencyById(body, target);
+      expect(order.path.length).toBe(5);
+      expect(order.path.hops.map((hop) => hop.entity.id)).toEqual([
+        ids.apr,
+        ids.pay,
+        ids.order,
+        ids.shp,
+        target,
+      ]);
+    });
+  });
+
+  describe('F8: upstream of Order #18492 (default depth)', () => {
+    it('reaches 9 entities with Contoso Metals weakest LOW', async () => {
+      const body = await dependenciesOf(ids.order, '?direction=upstream&limit=200');
+      expect(body.query).toMatchObject({
+        entityId: ids.order,
+        kind: 'upstream',
+        depth: 6,
+        entityTypes: [],
+      });
+      expect(body.totalReached).toBe(9);
+      const byId = new Map(body.items.map((item) => [item.entity.id, item]));
+      expect(byId.get(ids.acme)?.distance).toBe(1);
+      expect(byId.get(ids.contract)?.distance).toBe(1);
+      expect(byId.get(ids.product)?.distance).toBe(1);
+      expect(byId.get(ids.pay)?.distance).toBe(1);
+      expect(byId.get(ids.wh)?.distance).toBe(1);
+      expect(byId.get(ids.apr)?.distance).toBe(2);
+      expect(byId.get(ids.northwind)?.distance).toBe(2);
+      expect(byId.get(ids.contoso)?.distance).toBe(2);
+      expect(byId.get(ids.br)?.distance).toBe(3);
+
+      const contoso = dependencyById(body, ids.contoso);
+      const lastHop = contoso.path.hops.at(-1);
+      expect(lastHop?.relationshipType).toBe('SUPPLIED_BY');
+      expect(lastHop?.effectiveOrigin).toBe('INFERRED');
+      expect(lastHop?.effectiveConfidence).toBe('LOW');
+      expect(contoso.path.weakestConfidence).toBe('LOW');
+    });
+  });
+
+  describe('F9: upstream of Shipment SHP-77120 (default depth)', () => {
+    it('reaches 10 entities with PAY distance 1 but a 2-hop path', async () => {
+      const body = await dependenciesOf(ids.shp, '?direction=upstream&limit=200');
+      expect(body.totalReached).toBe(10);
+      const pay = dependencyById(body, ids.pay);
+      expect(pay.distance).toBe(1);
+      expect(pay.path.length).toBe(2);
+      expect(pay.path.hops.map((hop) => hop.entity.id)).toEqual([ids.order, ids.pay]);
+      for (const hop of pay.path.hops) {
+        expect(hop.effectiveOrigin).toBe('SOURCE');
+        expect(hop.effectiveConfidence).toBe('HIGH');
+      }
+      const br = dependencyById(body, ids.br);
+      expect(br.distance).toBe(3);
+      expect(br.path.length).toBe(4);
+    });
+  });
+
+  describe('F10: depth (dependencies half)', () => {
+    it('cuts downstream of BR-18492 at depth=2', async () => {
+      const body = await dependenciesOf(ids.br, '?direction=downstream&depth=2&limit=200');
+      expect(body.query.depth).toBe(2);
+      expect(body.totalReached).toBe(2);
+      expect(body.truncation.depthLimit).toBe(true);
+      expect(dependencyById(body, ids.apr).distance).toBe(1);
+      expect(dependencyById(body, ids.pay).distance).toBe(2);
+    });
+  });
+
+  describe('SC-005: determinism', () => {
+    it('returns identical bodies across 100 runs once computedAt is removed', async () => {
+      const calls = [
+        () => blockersOf(ids.shp),
+        () => blockersOf(ids.order),
+        () => dependenciesOf(ids.br, '?direction=downstream&limit=200'),
+        () => dependenciesOf(ids.order, '?direction=upstream&limit=200'),
+      ];
+      for (const call of calls) {
+        const first = await call();
+        const { computedAt, ...rest } = first;
+        void computedAt;
+        const baseline = JSON.stringify(rest);
+        for (let i = 1; i < 100; i += 1) {
+          const next = await call();
+          const { computedAt: nextComputedAt, ...nextRest } = next;
+          void nextComputedAt;
+          expect(JSON.stringify(nextRest)).toBe(baseline);
+        }
+      }
+    }, 120_000);
+  });
+
+  describe('SC-006: provenance', () => {
+    it('carries source evidence on every hop of every entity', async () => {
+      const entities = await prisma.entity.findMany({ select: { id: true } });
+      expect(entities.length).toBeGreaterThan(0);
+      for (const { id } of entities) {
+        const blockers = await blockersOf(id);
+        for (const path of blockers.paths) {
+          for (const hop of path.hops) {
+            expect(hop.effectiveOrigin).toBeDefined();
+            expect(hop.effectiveConfidence).toBeDefined();
+            expect(hop.assertions.length).toBeGreaterThan(0);
+            for (const assertion of hop.assertions) {
+              expect(assertion.sourceSystem.length).toBeGreaterThan(0);
+              expect(assertion.sourceId.length).toBeGreaterThan(0);
+              expect(assertion.observedAt.length).toBeGreaterThan(0);
+            }
+            if (hop.entity.state.observation !== null) {
+              expect(hop.entity.state.observation.sourceSystem.length).toBeGreaterThan(0);
+            }
+            if (hop.effectiveOrigin !== 'SOURCE') {
+              const sentence = path.explanation[path.hops.indexOf(hop)];
+              expect(sentence).toMatch(/inferred,|manually recorded,/);
+            }
+          }
+        }
+        const upstream = await dependenciesOf(id, '?direction=upstream&limit=200');
+        for (const item of upstream.items) {
+          for (const hop of item.path.hops) {
+            expect(hop.effectiveOrigin).toBeDefined();
+            expect(hop.effectiveConfidence).toBeDefined();
+            expect(hop.assertions.length).toBeGreaterThan(0);
+            for (const assertion of hop.assertions) {
+              expect(assertion.sourceSystem.length).toBeGreaterThan(0);
+              expect(assertion.sourceId.length).toBeGreaterThan(0);
+              expect(assertion.observedAt.length).toBeGreaterThan(0);
+            }
+            if (hop.entity.state.observation !== null) {
+              expect(hop.entity.state.observation.sourceSystem.length).toBeGreaterThan(0);
+            }
+          }
+        }
+      }
+    }, 120_000);
   });
 });
 
