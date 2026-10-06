@@ -12,6 +12,12 @@ import {
 
 /** Hand-built fixtures shaped like contracts/api.md F1 and F4, shared by the tracing UI tests. */
 
+/** Matches the list item holding a whole explanation sentence, whose names are split into links. */
+export function sentence(text: string) {
+  return (_content: string, element: Element | null): boolean =>
+    element?.tagName === 'LI' && element.textContent === text;
+}
+
 export const SHP_ID = '11111111-1111-4111-8111-111111111111';
 export const ORDER_ID = '22222222-2222-4222-8222-222222222222';
 export const PAY_ID = '33333333-3333-4333-8333-333333333333';

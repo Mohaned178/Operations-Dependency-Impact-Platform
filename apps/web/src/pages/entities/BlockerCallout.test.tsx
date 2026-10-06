@@ -4,7 +4,7 @@ import { MemoryRouter } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BlockerCallout } from './BlockerCallout';
 import { BlockersSection } from './BlockersSection';
-import { F1_BLOCKERS, F4_BLOCKERS, SHP_ID } from './tracing-test-data';
+import { F1_BLOCKERS, F4_BLOCKERS, SHP_ID, sentence } from './tracing-test-data';
 
 const { apiFetchMock } = vi.hoisted(() => ({ apiFetchMock: vi.fn() }));
 
@@ -43,8 +43,8 @@ describe('BlockerCallout', () => {
     renderWith(<BlockerCallout entityId={SHP_ID} />);
 
     expect(await screen.findByText(F1_BLOCKERS.summary)).toBeInTheDocument();
-    for (const sentence of F1_BLOCKERS.paths[0]?.explanation ?? []) {
-      expect(screen.getByText(sentence)).toBeInTheDocument();
+    for (const text of F1_BLOCKERS.paths[0]?.explanation ?? []) {
+      expect(screen.getByText(sentence(text))).toBeInTheDocument();
     }
     expect(screen.getByRole('link', { name: 'See all blocking paths' })).toHaveAttribute(
       'href',

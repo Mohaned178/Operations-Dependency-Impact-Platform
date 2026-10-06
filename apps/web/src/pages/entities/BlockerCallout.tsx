@@ -1,3 +1,4 @@
+import { ExplanationSentence, linkTargets } from './ExplanationSentence';
 import { useBlockers } from './useBlockers';
 
 export interface BlockerCalloutProps {
@@ -21,7 +22,12 @@ export function BlockerCallout({ entityId }: BlockerCalloutProps) {
       <p className="font-medium">{blockersQuery.data.summary}</p>
       <ul className="flex flex-col gap-1">
         {first.explanation.map((sentence) => (
-          <li key={sentence}>{sentence}</li>
+          <li key={sentence}>
+            <ExplanationSentence
+              sentence={sentence}
+              targets={linkTargets(blockersQuery.data.start, first)}
+            />
+          </li>
         ))}
       </ul>
       <a href="#blockers" className="self-start underline">

@@ -11,7 +11,7 @@ import { MemoryRouter, Route, Routes } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../../lib/api-client';
 import { EntityDetailPage } from './EntityDetailPage';
-import { F1_BLOCKERS } from './tracing-test-data';
+import { F1_BLOCKERS, sentence } from './tracing-test-data';
 
 const { apiFetchMock } = vi.hoisted(() => ({ apiFetchMock: vi.fn() }));
 
@@ -320,7 +320,7 @@ describe('EntityDetailPage', () => {
     expect(within(callout).getByText(F1_BLOCKERS.summary)).toBeInTheDocument();
     expect(
       within(callout).getByText(
-        'Order #18492 is blocked because it requires Payment PAY-88213, which is PENDING.',
+        sentence('Order #18492 is blocked because it requires Payment PAY-88213, which is PENDING.'),
       ),
     ).toBeInTheDocument();
     expect(callout.closest('header')).not.toBeNull();

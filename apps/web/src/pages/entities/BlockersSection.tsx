@@ -6,6 +6,7 @@ import {
   type Confidence,
 } from '@opsgraph/shared';
 import { Link } from 'react-router';
+import { ExplanationSentence, linkTargets } from './ExplanationSentence';
 import { OriginBadge } from './OriginBadge';
 import { PathView } from './PathView';
 import { StateBadge } from './StateBadge';
@@ -120,7 +121,9 @@ function BlockersContent({ data }: { data: BlockersResponse }) {
 
           <ol className="flex list-decimal flex-col gap-1 pl-5 text-sm">
             {path.explanation.map((sentence) => (
-              <li key={sentence}>{sentence}</li>
+              <li key={sentence}>
+                <ExplanationSentence sentence={sentence} targets={linkTargets(data.start, path)} />
+              </li>
             ))}
           </ol>
 
