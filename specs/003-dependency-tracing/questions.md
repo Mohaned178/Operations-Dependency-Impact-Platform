@@ -74,3 +74,19 @@ Error: P1010: User was denied access on the database `(not available)`
 ## FYI — cycle-closing sort order (Phase 3)
 
 research R5 sorts cycle-closing hops by `(sourceId, type, targetId)` (walk direction), while plan KDN 3.7 and data-model §2b say `(fromEntityId, relationshipType, toEntityId)` (as recorded). I follow KDN 3.7. No Phase 3 assertion depends on the order.
+
+## FYI — build at HEAD (Phase 3 session)
+
+`pnpm build` also passes at the Phase 3 head (only the existing Vite chunk-size warning, 509 kB).
+
+## FYI — quickstart step 1 vs T026 (needs a browser check)
+
+Quickstart step 1 says to click **Budget code for Order #18492** "in a sentence". T026 says to render the sentence text as plain text, with the hop links below it via `PathView`, and that is what is built. Entity names are links in the `PathView` hop rows, the Direct/Deepest blocker lists and nowhere else, so a name inside a sentence is not clickable. I did not invent inline linking. **Decision needed**: either accept T026 (and adjust the quickstart wording) or ask for inline name-linking in a follow-up task.
+
+## FYI — T018 flags on `directBlockers`
+
+T018 says each blocker takes "its `pathLength` and flags from its first path". For `directBlockers` I set `pathLength = 1`, `continuesBeyondDepth = false` and `inCycle = false`, as the `BlockerDtoSchema` comments in contracts/api.md say ("false for direct blockers"). Taking the first path's flags would set SHP-77120 to `continuesBeyondDepth: true` in F10 (`depth=3`), which contradicts the schema comment. `deepestBlockers` take their flags from the first path they appear in. `possible` means state UNKNOWN in both lists. `tracing.e2e-spec.ts` (depth 1) and `tracing-seed.e2e-spec.ts` (F10) assert this.
+
+## FYI — helpers used before Phase 4
+
+`ReachableSet.within`, `ReachableSet.beyondDepth` and the `blockersOnly: false` branch of `PrismaGraphRepository.reachableEntities` are not used by `traceBlockers`. They are the shared step-1 helper that T032 (`traceDependencies`) reuses, and the `traceDependencies` stub is still in place until then.
