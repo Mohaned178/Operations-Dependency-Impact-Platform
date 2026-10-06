@@ -2,6 +2,8 @@ import { useQuery } from '@tanstack/react-query';
 import { EntityDetailDtoSchema } from '@opsgraph/shared';
 import { Link, useParams } from 'react-router';
 import { ApiError, apiFetch } from '../../lib/api-client';
+import { BlockerCallout } from './BlockerCallout';
+import { BlockersSection } from './BlockersSection';
 import { CurrentStateSection } from './CurrentStateSection';
 import { IdentitySection } from './IdentitySection';
 import { RelationshipsSection } from './RelationshipsSection';
@@ -51,10 +53,12 @@ export function EntityDetailPage() {
         <div>
           <StateBadge state={entity.currentState} />
         </div>
+        <BlockerCallout entityId={entity.id} />
       </header>
 
       <IdentitySection entity={entity} />
       <CurrentStateSection entity={entity} />
+      <BlockersSection entityId={entity.id} />
       <RelationshipsSection entityId={entity.id} />
       <TimelineSection entityId={entity.id} />
       <SourceRecordsSection entityId={entity.id} />

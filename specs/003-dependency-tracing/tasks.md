@@ -188,14 +188,14 @@
 
 ### Web (`apps/web/src/pages/entities/`)
 
-- [ ] T023 [P] [US1] Create `useBlockers.ts`: `useBlockers(entityId: string)` returns `useQuery({ queryKey: ['entities', entityId, 'blockers'], queryFn: () => apiFetch(\`/entities/${entityId}/blockers\`, { schema: BlockersResponseSchema }), enabled: entityId !== '' })`.
-- [ ] T024 [P] [US1] Create `HopEvidence.tsx` (research R12). Props: `{ hop: HopDto }`. It shows:
+- [x] T023 [P] [US1] Create `useBlockers.ts`: `useBlockers(entityId: string)` returns `useQuery({ queryKey: ['entities', entityId, 'blockers'], queryFn: () => apiFetch(\`/entities/${entityId}/blockers\`, { schema: BlockersResponseSchema }), enabled: entityId !== '' })`.
+- [x] T024 [P] [US1] Create `HopEvidence.tsx` (research R12). Props: `{ hop: HopDto }`. It shows:
   - every assertion, as an `OriginBadge` plus basis plus `sourceSystem · sourceId · formatTimestamp(observedAt)`;
   - the state line, `State: <stateLabel> — reported by <system> at <time>`, or `No state observation`;
   - when `latestBySource` is non-empty, a `Sources disagree:` list (`<system>: <stateLabel>`).
 
   Create `HopEvidence.test.tsx` covering two assertions, the disagreement list, and a null observation.
-- [ ] T025 [P] [US1] Create `PathView.tsx`. Props: `{ start: TracedEntityDto; path: PathDto; direction: 'upstream' | 'downstream' }`. It renders an ordered list, one item per hop:
+- [x] T025 [P] [US1] Create `PathView.tsx`. Props: `{ start: TracedEntityDto; path: PathDto; direction: 'upstream' | 'downstream' }`. It renders an ordered list, one item per hop:
   - the relationship **as recorded**, `‹from name› TYPE ‹to name›`, with names resolved from the start entity and the hop entities by id;
   - the arrow `↑` for upstream or `↓` for downstream;
   - an `OriginBadge` with the effective origin and confidence;
@@ -204,7 +204,7 @@
   - a `<details><summary>Evidence</summary><HopEvidence/></details>`.
 
   Create `PathView.test.tsx`. A REVERSE BLOCKS hop must render `Payment PAY-88213 BLOCKS Shipment SHP-77120 (consolidated)`, and a MANUAL hop must show `Manual · MEDIUM`.
-- [ ] T026 [US1] Create `BlockersSection.tsx` (`<section id="blockers">`, heading `Blockers`), using `useBlockers`. It has these states:
+- [x] T026 [US1] Create `BlockersSection.tsx` (`<section id="blockers">`, heading `Blockers`), using `useBlockers`. It has these states:
   - **Loading** and **error**, each handled locally.
   - **No paths**: one `<p>` with the summary.
   - **Otherwise**:
@@ -218,8 +218,8 @@
 
   Create `BlockersSection.test.tsx`, mocking `apiFetch` as `EntityDetailPage.test.tsx` does. Cover the F1-shaped data (2 cards, the Manual badge on Path 2, the summary text), the empty F4 shape (a single line), and the error state.
   *Note: this task is not `[P]` only because it depends on T023–T025.*
-- [ ] T027 [US1] Create `BlockerCallout.tsx`, using `useBlockers`. It renders nothing while loading, on error, or when `paths.length === 0`. Otherwise it shows a highlighted box with the summary, the `paths[0].explanation` sentences, and `<a href="#blockers">See all blocking paths</a>`. Create `BlockerCallout.test.tsx` covering: rendered with paths, absent without paths, and that both components share one request (render both, assert `apiFetch` was called once for `/blockers`).
-- [ ] T028 [US1] Update `EntityDetailPage.tsx`:
+- [x] T027 [US1] Create `BlockerCallout.tsx`, using `useBlockers`. It renders nothing while loading, on error, or when `paths.length === 0`. Otherwise it shows a highlighted box with the summary, the `paths[0].explanation` sentences, and `<a href="#blockers">See all blocking paths</a>`. Create `BlockerCallout.test.tsx` covering: rendered with paths, absent without paths, and that both components share one request (render both, assert `apiFetch` was called once for `/blockers`).
+- [x] T028 [US1] Update `EntityDetailPage.tsx`:
   - render `<BlockerCallout entityId={entity.id} />` in the header, under the state badge;
   - render `<BlockersSection entityId={entity.id} />` between `CurrentStateSection` and `RelationshipsSection`.
 
