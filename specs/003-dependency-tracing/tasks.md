@@ -76,7 +76,7 @@
 ### Repository interface and SQL smoke test
 
 - [x] T008 In `apps/api/src/graph/graph.repository.ts`, add every type and the two method signatures from data-model.md §2a: `TraceDirection`, `GraphEntityRef`, `HopAssertion`, `TraversalHop`, `TraversalPath`, `CycleClosingHop`, `DependencyTraceQuery`, `ReachedEntity`, `DependencyTrace`, `BlockerTraceQuery`, `BlockerTrace`, `traceDependencies`, `traceBlockers`. Leave `findNeighbors` and `countNeighbors` untouched. In `prisma-graph.repository.ts`, add both methods with the body `throw new Error('not implemented')` **only temporarily**, so the code compiles. T015 and T026 replace them. No such stub may remain at the end of Phase 4.
-- [ ] T009 Extend `apps/api/test/graph-repository.e2e-spec.ts` with a **CTE smoke test** (research R3 "Risk to verify first").
+- [x] T009 Extend `apps/api/test/graph-repository.e2e-spec.ts` with a **CTE smoke test** (research R3 "Risk to verify first").
   - **Setup**: use `runImport` to import 3 Order entities, A, B and C, all PENDING, with A REQUIRES B, B REQUIRES C and C REQUIRES A (a 3-node cycle).
   - **Query**: from the test, run the exact step-1 SQL of research R3 through `prisma.$queryRaw`, with `followFromTypes = ['REQUIRES']`, `followToTypes = []` and `maxDepth + 1 = 7`.
   - **Assert**:

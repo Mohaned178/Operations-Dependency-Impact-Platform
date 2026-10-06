@@ -366,6 +366,7 @@ describe('Recursive CTE smoke test on a 3-node cycle (research R3)', () => {
       sourceId,
       displayName: `Order ${sourceId}`,
       state: 'PENDING',
+      attributes: { amount: '100.00', currency: 'USD' },
       observedAt: T1,
     });
     const requires = (from: string, to: string) => ({
