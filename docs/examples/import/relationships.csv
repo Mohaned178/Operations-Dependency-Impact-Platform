@@ -1,0 +1,3 @@
+type,source_system,source_id,from_type,from_source_system,from_source_id,to_type,to_source_system,to_source_id,origin,confidence,basis,observed_at
+PLACED,DemoCRM,REL-PLACED-2001,Customer,DemoCRM,CUST-2001,Order,DemoOMS,ORD-2001,SOURCE,HIGH,,2026-09-29T08:15:00Z
+REQUIRES,DemoPay,REL-REQUIRES-2001,Order,DemoOMS,ORD-2001,Payment,DemoPay,PAY-2001,INFERRED,MEDIUM,The payment is required before the order can be fulfilled,2026-09-29T08:20:00Z

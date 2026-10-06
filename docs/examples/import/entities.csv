@@ -1,0 +1,4 @@
+type,source_system,source_id,display_name,observed_at,state,source_status,attr.amount,attr.currency
+Customer,DemoCRM,CUST-2001,Northwind Traders,2026-09-29T08:00:00Z,ACTIVE,ACTIVE,,
+Order,DemoOMS,ORD-2001,Order #2001,2026-09-29T08:05:00Z,PENDING,OPEN,12480.00,USD
+Payment,DemoPay,PAY-2001,Payment for Order #2001,2026-09-29T08:10:00Z,PENDING,AUTHORIZED,12480.00,USD

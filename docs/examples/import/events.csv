@@ -1,0 +1,2 @@
+type,source_system,source_id,occurred_at,observed_at,subject_type,subject_source_system,subject_source_id,related,description
+order.created,DemoOMS,EVT-2001,2026-09-29T08:05:00Z,2026-09-29T08:06:00Z,Order,DemoOMS,ORD-2001,Customer|DemoCRM|CUST-2001,Order #2001 created

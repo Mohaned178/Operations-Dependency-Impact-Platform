@@ -1,0 +1,70 @@
+{
+  "entities": [
+    {
+      "type": "Customer",
+      "sourceSystem": "DemoCRM",
+      "sourceId": "CUST-2001-J",
+      "displayName": "Northwind Traders",
+      "observedAt": "2026-09-29T08:00:00Z",
+      "state": "ACTIVE",
+      "sourceStatus": "ACTIVE"
+    },
+    {
+      "type": "Order",
+      "sourceSystem": "DemoOMS",
+      "sourceId": "ORD-2001-J",
+      "displayName": "Order #2001",
+      "observedAt": "2026-09-29T08:05:00Z",
+      "state": "PENDING",
+      "sourceStatus": "OPEN",
+      "attributes": { "amount": "12480.00", "currency": "USD" }
+    },
+    {
+      "type": "Payment",
+      "sourceSystem": "DemoPay",
+      "sourceId": "PAY-2001-J",
+      "displayName": "Payment for Order #2001",
+      "observedAt": "2026-09-29T08:10:00Z",
+      "state": "PENDING",
+      "sourceStatus": "AUTHORIZED",
+      "attributes": { "amount": "12480.00", "currency": "USD" }
+    }
+  ],
+  "relationships": [
+    {
+      "type": "PLACED",
+      "sourceSystem": "DemoCRM",
+      "sourceId": "REL-PLACED-2001-J",
+      "from": { "entityType": "Customer", "sourceSystem": "DemoCRM", "sourceId": "CUST-2001-J" },
+      "to": { "entityType": "Order", "sourceSystem": "DemoOMS", "sourceId": "ORD-2001-J" },
+      "origin": "SOURCE",
+      "confidence": "HIGH",
+      "observedAt": "2026-09-29T08:15:00Z"
+    },
+    {
+      "type": "REQUIRES",
+      "sourceSystem": "DemoPay",
+      "sourceId": "REL-REQUIRES-2001-J",
+      "from": { "entityType": "Order", "sourceSystem": "DemoOMS", "sourceId": "ORD-2001-J" },
+      "to": { "entityType": "Payment", "sourceSystem": "DemoPay", "sourceId": "PAY-2001-J" },
+      "origin": "INFERRED",
+      "confidence": "MEDIUM",
+      "basis": "The payment is required before the order can be fulfilled",
+      "observedAt": "2026-09-29T08:20:00Z"
+    }
+  ],
+  "events": [
+    {
+      "type": "order.created",
+      "sourceSystem": "DemoOMS",
+      "sourceId": "EVT-2001-J",
+      "occurredAt": "2026-09-29T08:05:00Z",
+      "observedAt": "2026-09-29T08:06:00Z",
+      "subject": { "entityType": "Order", "sourceSystem": "DemoOMS", "sourceId": "ORD-2001-J" },
+      "related": [
+        { "entityType": "Customer", "sourceSystem": "DemoCRM", "sourceId": "CUST-2001-J" }
+      ],
+      "description": "Order #2001 created"
+    }
+  ]
+}
