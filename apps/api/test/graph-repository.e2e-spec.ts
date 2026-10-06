@@ -3,7 +3,7 @@ import type { INestApplication } from '@nestjs/common';
 import type { EntityType } from '@opsgraph/shared';
 import { GRAPH_REPOSITORY, type GraphRepository } from '../src/graph/graph.repository';
 import { PrismaService } from '../src/prisma/prisma.service';
-import { createTestApp, resetDb, runImport } from './helpers';
+import { createTestApp, entityIdByKey, resetDb, runImport } from './helpers';
 
 const T1 = '2026-09-14T08:00:00+00:00';
 
@@ -346,5 +346,93 @@ describe('GraphRepository (e2e)', () => {
     await expect(
       repository.findNeighbors({ entityId: hubId, direction: 'BOTH', cursor: 'not-a-cursor', limit: 3 }),
     ).rejects.toMatchObject({ status: 400 });
+  });
+});
+
+// Research R3 "Risk to verify first": the CROSS JOIN LATERAL ( ... UNION ALL ... ) shape inside the
+// recursive term. The SQL below is the exact step-1 query of R3, run on a 3-node cycle.
+describe('Recursive CTE smoke test on a 3-node cycle (research R3)', () => {
+  let app: INestApplication;
+  let prisma: PrismaService;
+
+  beforeAll(async () => {
+    app = await createTestApp();
+    prisma = app.get(PrismaService);
+    await resetDb(prisma);
+
+    const order = (sourceId: string) => ({
+      type: 'Order',
+      sourceSystem: 'OMS',
+      sourceId,
+      displayName: `Order ${sourceId}`,
+      state: 'PENDING',
+      attributes: { amount: '100.00', currency: 'USD' },
+      observedAt: T1,
+    });
+    const requires = (from: string, to: string) => ({
+      type: 'REQUIRES',
+      sourceSystem: 'OPSGRAPH',
+      sourceId: `rel-${from}-${to}`,
+      from: keyRef('Order', 'OMS', from),
+      to: keyRef('Order', 'OMS', to),
+      origin: 'SOURCE',
+      confidence: 'HIGH',
+      observedAt: T1,
+    });
+    const report = await runImport(app, {
+      format: 'json',
+      content: JSON.stringify({
+        entities: [order('A'), order('B'), order('C')],
+        relationships: [requires('A', 'B'), requires('B', 'C'), requires('C', 'A')],
+      }),
+    });
+    expect(report?.outcome).toBe('APPLIED');
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  it('terminates and returns each entity once, at its minimum depth', async () => {
+    const startId = await entityIdByKey(prisma, 'Order', 'OMS', 'A');
+    const followFromTypes = ['REQUIRES'];
+    const followToTypes: string[] = [];
+    const maxDepthPlusOne = 7;
+
+    const rows = await prisma.$queryRaw<Array<{ id: string; depth: number }>>`
+      WITH RECURSIVE walk(entity_id, depth) AS (
+        SELECT ${startId}::uuid, 0
+        UNION
+        SELECT step.next_id, w.depth + 1
+        FROM walk w
+        CROSS JOIN LATERAL (
+          SELECT r.to_entity_id AS next_id
+          FROM relationships r
+          WHERE r.from_entity_id = w.entity_id
+            AND r.type = ANY(${followFromTypes}::"RelationshipType"[])
+          UNION ALL
+          SELECT r.from_entity_id AS next_id
+          FROM relationships r
+          WHERE r.to_entity_id = w.entity_id
+            AND r.type = ANY(${followToTypes}::"RelationshipType"[])
+        ) step
+        WHERE w.depth < ${maxDepthPlusOne}
+      )
+      SELECT e.id::text AS id, m.depth AS depth
+      FROM (SELECT entity_id, min(depth)::int AS depth FROM walk GROUP BY entity_id) m
+      JOIN entities e ON e.id = m.entity_id`;
+
+    expect(rows).toHaveLength(3);
+
+    const depthByKey = new Map<string, number>();
+    for (const sourceId of ['A', 'B', 'C']) {
+      const id = await entityIdByKey(prisma, 'Order', 'OMS', sourceId);
+      const row = rows.find((candidate) => candidate.id === id);
+      if (row === undefined) {
+        throw new Error(`Entity ${sourceId} missing from the walk`);
+      }
+      depthByKey.set(sourceId, row.depth);
+    }
+    expect(Object.fromEntries(depthByKey)).toEqual({ A: 0, B: 1, C: 2 });
   });
 });

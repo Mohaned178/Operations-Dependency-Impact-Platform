@@ -4,6 +4,7 @@ import type { INestApplication, Type } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import type {
+  EntityType,
   ImportKind,
   ImportReport,
   Role,
@@ -175,4 +176,19 @@ export async function login(
   }
 
   return { accessToken: body.accessToken, cookie };
+}
+
+export async function entityIdByKey(
+  prisma: PrismaService,
+  entityType: EntityType,
+  sourceSystem: string,
+  sourceId: string,
+): Promise<string> {
+  const identifier = await prisma.entityIdentifier.findUnique({
+    where: { entityType_sourceSystem_sourceId: { entityType, sourceSystem, sourceId } },
+  });
+  if (identifier === null) {
+    throw new Error(`No entity identifier ${entityType}/${sourceSystem}/${sourceId}`);
+  }
+  return identifier.entityId;
 }

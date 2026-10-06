@@ -6,11 +6,12 @@ import type {
   StateHistoryResponse,
   TimelineResponse,
 } from '@opsgraph/shared';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../../lib/api-client';
 import { EntityDetailPage } from './EntityDetailPage';
+import { F1_BLOCKERS } from './tracing-test-data';
 
 const { apiFetchMock } = vi.hoisted(() => ({ apiFetchMock: vi.fn() }));
 
@@ -225,8 +226,46 @@ function mockHappyPath(): void {
     if (path.startsWith(`/entities/${ENTITY_ID}/source-records`)) {
       return Promise.resolve(SOURCE_RECORDS);
     }
+    if (path === `/entities/${ENTITY_ID}/blockers`) {
+      return Promise.resolve(F1_BLOCKERS);
+    }
+    if (path.startsWith(`/entities/${ENTITY_ID}/dependencies`)) {
+      return Promise.resolve({
+        query: {
+          entityId: ENTITY_ID,
+          kind: 'upstream',
+          depth: 6,
+          relationshipTypes: ['REQUIRES'],
+          entityTypes: [],
+        },
+        computedAt: '2026-10-06T09:00:00.000Z',
+        start: {
+          id: ENTITY_ID,
+          type: 'Order',
+          displayName: 'Order #18492',
+          currentState: 'BLOCKED',
+          state: { classification: 'UNSATISFIED', observation: null, latestBySource: [] },
+        },
+        truncation: { depthLimit: false, explorationLimit: false, pathLimit: false },
+        totalReached: 0,
+        items: [],
+        nextCursor: null,
+        cycleClosingHops: [],
+        cycleClosingHopCount: 0,
+      });
+    }
     return Promise.reject(new Error(`Unexpected path ${path}`));
   });
+}
+
+/** The Relationships section, so assertions do not match the same names in Blockers. */
+async function relationshipsSection(): Promise<HTMLElement> {
+  const heading = await screen.findByRole('heading', { name: 'Relationships' });
+  const section = heading.closest('section');
+  if (section === null) {
+    throw new Error('Relationships section not found');
+  }
+  return section;
 }
 
 function renderPage() {
@@ -259,17 +298,45 @@ describe('EntityDetailPage', () => {
     renderPage();
 
     expect(await screen.findByRole('heading', { name: 'Order #18492' })).toBeInTheDocument();
-    expect(screen.getByText('Order')).toBeInTheDocument();
+    expect(screen.getAllByText('Order').length).toBeGreaterThan(0);
 
     expect(await screen.findByText('12,480.00 USD')).toBeInTheDocument();
     expect(screen.getAllByText(/OMS · 18492/).length).toBeGreaterThan(0);
 
-    expect(await screen.findByText('Payment PAY-88213')).toBeInTheDocument();
+    expect(
+      await within(await relationshipsSection()).findByText('Payment PAY-88213'),
+    ).toBeInTheDocument();
 
     expect(await screen.findByText('order.created')).toBeInTheDocument();
     expect(screen.getByText('State change')).toBeInTheDocument();
 
     expect(await screen.findByText('Raw payload')).toBeInTheDocument();
+  });
+
+  it('shows the blocker callout in the header and the Blockers section between Current state and Relationships', async () => {
+    renderPage();
+
+    const callout = await screen.findByRole('note');
+    expect(within(callout).getByText(F1_BLOCKERS.summary)).toBeInTheDocument();
+    expect(
+      within(callout).getByText(
+        'Order #18492 is blocked because it requires Payment PAY-88213, which is PENDING.',
+      ),
+    ).toBeInTheDocument();
+    expect(callout.closest('header')).not.toBeNull();
+
+    const headings = (await screen.findAllByRole('heading', { level: 2 })).map(
+      (heading) => heading.textContent,
+    );
+    expect(headings).toEqual([
+      'Identity',
+      'Current state',
+      'Blockers',
+      'Dependencies',
+      'Relationships',
+      'Timeline',
+      'Source records',
+    ]);
   });
 
   it('shows one failing section without blanking the others', async () => {
@@ -285,6 +352,34 @@ describe('EntityDetailPage', () => {
       }
       if (path.startsWith(`/entities/${ENTITY_ID}/states`)) {
         return Promise.resolve(STATES);
+      }
+      if (path === `/entities/${ENTITY_ID}/blockers`) {
+        return Promise.resolve(F1_BLOCKERS);
+      }
+      if (path.startsWith(`/entities/${ENTITY_ID}/dependencies`)) {
+        return Promise.resolve({
+          query: {
+            entityId: ENTITY_ID,
+            kind: 'upstream',
+            depth: 6,
+            relationshipTypes: ['REQUIRES'],
+            entityTypes: [],
+          },
+          computedAt: '2026-10-06T09:00:00.000Z',
+          start: {
+            id: ENTITY_ID,
+            type: 'Order',
+            displayName: 'Order #18492',
+            currentState: 'BLOCKED',
+            state: { classification: 'UNSATISFIED', observation: null, latestBySource: [] },
+          },
+          truncation: { depthLimit: false, explorationLimit: false, pathLimit: false },
+          totalReached: 0,
+          items: [],
+          nextCursor: null,
+          cycleClosingHops: [],
+          cycleClosingHopCount: 0,
+        });
       }
       return Promise.resolve(SOURCE_RECORDS);
     });
@@ -308,9 +403,10 @@ describe('EntityDetailPage', () => {
   it('shows the origin and confidence badge on relationship rows', async () => {
     renderPage();
 
-    expect(await screen.findByText('Source · HIGH')).toBeInTheDocument();
-    expect(screen.getByText('Inferred · LOW')).toBeInTheDocument();
-    expect(screen.getByText('Inferred · LOW').textContent).not.toContain('Source');
+    const relationships = within(await relationshipsSection());
+    expect(await relationships.findByText('Source · HIGH')).toBeInTheDocument();
+    expect(relationships.getByText('Inferred · LOW')).toBeInTheDocument();
+    expect(relationships.getByText('Inferred · LOW').textContent).not.toContain('Source');
   });
 
   it('keeps the raw payload behind a details element', async () => {
@@ -324,10 +420,11 @@ describe('EntityDetailPage', () => {
   it('shows the source system and observation time on relationship and timeline rows', async () => {
     renderPage();
 
-    await screen.findByText('Payment PAY-88213');
+    await within(await relationshipsSection()).findByText('Payment PAY-88213');
     expect(
-      screen.getAllByText((content) => content.startsWith('OPSGRAPH · ') && content.includes('2026'))
-        .length,
+      screen.getAllByText(
+        (content) => content.startsWith('OPSGRAPH · ') && content.includes('2026'),
+      ).length,
     ).toBeGreaterThan(0);
     expect(
       screen.getAllByText((content) => content.startsWith('OMS · ') && content.includes('2026'))
