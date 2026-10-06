@@ -17,6 +17,7 @@ import type {
   BlockerTraceQuery,
   CycleClosingHop,
   DependencyTrace,
+  DependencyTraceQuery,
   GraphEntityRef,
   GraphRepository,
   NeighborPage,
@@ -25,6 +26,7 @@ import type {
   TraversalPath,
 } from './graph.repository';
 import { enumerateBlockingPaths } from './traversal/blocking-paths';
+import { selectCanonicalPaths } from './traversal/canonical-paths';
 import { compareCodeUnits } from './traversal/path-order';
 import { buildTraversalEdges } from './traversal/traversal-edges';
 import type { EdgeRow, InternalPath, TraversalEdge } from './traversal/types';
@@ -285,8 +287,49 @@ export class PrismaGraphRepository implements GraphRepository {
     return Number(rows[0]?.count ?? 0n);
   }
 
-  traceDependencies(): Promise<DependencyTrace | null> {
-    return Promise.reject(new Error('not implemented'));
+  async traceDependencies(query: DependencyTraceQuery): Promise<DependencyTrace | null> {
+    const { followFromTypes, followToTypes } = walkTypes(query.direction, query.relationshipTypes);
+    const reachable = await this.reachableEntities({
+      startId: query.startId,
+      maxDepth: query.maxDepth,
+      followFromTypes,
+      followToTypes,
+      blockersOnly: false,
+    });
+    if (reachable === null) {
+      return null;
+    }
+
+    const rows = await this.loadEdgeRows(reachable.entities.keys(), [
+      ...followFromTypes,
+      ...followToTypes,
+    ]);
+    const edges = buildTraversalEdges(rows, query.direction);
+    const selection = selectCanonicalPaths(reachable.start.id, edges, query.maxDepth);
+    const cycleClosing = toCycleClosingHops(selection.cycleClosing);
+
+    const reached = reachable.within.map((row) => {
+      const internal = selection.paths.get(row.entity.id);
+      if (internal === undefined) {
+        throw new Error(
+          `traversal invariant: no canonical path for reached entity ${row.entity.id}`,
+        );
+      }
+      return {
+        entity: row.entity,
+        distance: row.depth,
+        path: toTraversalPath(internal, reachable.entities),
+      };
+    });
+
+    return {
+      start: reachable.start,
+      reached,
+      depthLimitReached: reachable.beyondDepth,
+      explorationLimitReached: reachable.explorationLimitReached,
+      cycleClosingHops: cycleClosing.hops,
+      cycleClosingHopCount: cycleClosing.total,
+    };
   }
 
   async traceBlockers(query: BlockerTraceQuery): Promise<BlockerTrace | null> {
