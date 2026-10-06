@@ -144,10 +144,10 @@ All pass.
 
 ## Phase 7: Polish and cross-cutting
 
-- [ ] T051 `apps/api/test/perf-graph.e2e-spec.ts` per research R18 (skipped unless `RUN_PERF=1`). Run it locally and record the three timings in the PR description or `questions.md`.
-- [ ] T052 Cross-check against the spec: for every FR-001 to FR-049, confirm a test or implementation covers it. Write any gap into `questions.md`. Check that no file outside `ingestion` writes graph tables (`grep` for `prisma.entity.create`, `relationship.create` and similar), and that no SQL outside `prisma-graph.repository.ts` reads relationships for display.
-- [ ] T053 Walk the whole of `quickstart.md` by hand and tick off each step. Fix any step that doesn't behave as written, in the code or in the quickstart (the quickstart may only be edited to fix factual errors).
-- [ ] T054 Final gate: `pnpm lint && pnpm typecheck && pnpm test && pnpm test:e2e && pnpm build`. Confirm there are no `TODO`s, dead code, or unused dependencies (`csv-parse` and `@types/multer` must both be used).
+- [x] T051 `apps/api/test/perf-graph.e2e-spec.ts` per research R18 (skipped unless `RUN_PERF=1`). Run it locally and record the three timings in the PR description or `questions.md`.
+- [x] T052 Cross-check against the spec: for every FR-001 to FR-049, confirm a test or implementation covers it. Write any gap into `questions.md`. Check that no file outside `ingestion` writes graph tables (`grep` for `prisma.entity.create`, `relationship.create` and similar), and that no SQL outside `prisma-graph.repository.ts` reads relationships for display.
+- [x] T053 Walk the whole of `quickstart.md` by hand and tick off each step. Fix any step that doesn't behave as written, in the code or in the quickstart (the quickstart may only be edited to fix factual errors).
+- [x] T054 Final gate: `pnpm lint && pnpm typecheck && pnpm test && pnpm test:e2e && pnpm build`. Confirm there are no `TODO`s, dead code, or unused dependencies (`csv-parse` and `@types/multer` must both be used).
 
 ---
 

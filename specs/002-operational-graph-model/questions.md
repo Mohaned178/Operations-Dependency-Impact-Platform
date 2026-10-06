@@ -38,3 +38,18 @@ The same `RangeError` occurs in browsers, so the web tests cannot pass while the
 **Resolved**: the user chose option 2 (explicit component options). T038 now formats with
 `{ year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZoneName: 'short' }`.
 The rest of R17 is unchanged.
+
+---
+
+## T051 — Performance timings (`RUN_PERF=1 pnpm --filter api test:e2e -- perf-graph`)
+
+Run locally 2026-10-06 against the docker PostgreSQL. All budgets pass.
+
+| Check | Measured | Budget |
+|---|---|---|
+| SC-003 `GET /entities?type=Order` first page at 50k entities | 35 ms | 2,000 ms |
+| SC-003 `GET /entities/:hub` | 48 ms | 2,000 ms |
+| SC-003 `GET /entities/:hub/neighbors` | 28 ms | 2,000 ms |
+| SC-003 `GET /entities/:hub/timeline` (hub has 1,000 events) | 27 ms | 2,000 ms |
+| SC-008 `GET /entities/:hub/neighbors` over 1,000 relationships, two calls identical | 22 ms | 500 ms |
+| SC-004 10,000-row JSON import through `POST /api/imports` | 9,881 ms | 60,000 ms |
