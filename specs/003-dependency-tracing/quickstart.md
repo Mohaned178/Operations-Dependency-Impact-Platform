@@ -25,7 +25,7 @@ RUN_PERF=1 pnpm --filter api test:e2e -- perf-tracing   # SC-003 / SC-004; run l
    - At 1366×768 the callout is visible without scrolling (FR-028).
    - Click **See all blocking paths**. The Blockers section shows Path 1 (all `Source · HIGH`) and Path 2, whose first hop carries a `Manual · MEDIUM` badge and the analyst's basis in the sentence.
    - Expand **Evidence** on the Order #18492 hop. You see the DEPENDS_ON assertion (TMS, `DEPENDS_ON:SHP-77120:18492`, observed 29 Sep 2026 15:00 UTC), `State: Blocked — reported by OMS`, and **Sources disagree**: ERP Pending, OMS Blocked.
-   - Click **Budget code for Order #18492** in a sentence. Its Entity 360 page opens.
+   - Click **Budget code for Order #18492** in the path view (or Direct/Deepest blockers). Its Entity 360 page opens.
 2. **US1: Order and SLA.**
    - Open Order #18492. The callout's first sentence is `Order #18492 is blocked because it requires Payment PAY-88213, which is PENDING.`
    - Open **Acme Corp delivery SLA**. The first sentence mentions `(inferred, medium confidence: "SLA measures on-time delivery…")`.
@@ -54,7 +54,7 @@ Record the measured p95 values here after the first `RUN_PERF=1` run:
 
 | Measurement | Budget | Measured |
 |---|---|---|
-| Blockers, 6-hop chain, 50k entities / 150k relationships | < 1,000 ms | _tbd_ |
-| Downstream of chain-0 Budget requirement (g=6) | < 2,000 ms | _tbd_ |
-| Downstream of a hub warehouse (g=7) | < 2,000 ms | _tbd_ |
-| Upstream of chain-0 Shipment (g=0) | < 2,000 ms | _tbd_ |
+| Blockers, 6-hop chain, 50k entities / 150k relationships | < 1,000 ms | 25 ms |
+| Downstream of chain-0 Budget requirement (g=6) | < 2,000 ms | 24 ms |
+| Downstream of a hub warehouse (g=7) | < 2,000 ms | 147 ms |
+| Upstream of chain-0 Shipment (g=0) | < 2,000 ms | 25 ms |

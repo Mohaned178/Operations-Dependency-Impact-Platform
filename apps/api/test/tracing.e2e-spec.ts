@@ -547,4 +547,53 @@ describe('Dependency tracing: blockers (e2e)', () => {
       expect(body.truncation.pathLimit).toBe(false);
     });
   });
+
+  describe('read-only', () => {
+    it('tracing changes no data for any signed-in role (FR-023, FR-024)', async () => {
+      const ids = await setup(
+        [
+          { id: 'A', state: 'PENDING' },
+          { id: 'B', state: 'MISSING' },
+        ],
+        [{ type: 'REQUIRES', from: 'A', to: 'B' }],
+      );
+      const startId = ids['A'] ?? '';
+      const analystToken = token;
+      const manager = await createUser(prisma, { role: 'OPS_MANAGER' });
+      const managerToken = (await login(app, manager.email, TEST_PASSWORD)).accessToken;
+      const admin = await createUser(prisma, { role: 'ADMIN' });
+      const adminToken = (await login(app, admin.email, TEST_PASSWORD)).accessToken;
+
+      async function countTables(): Promise<[number, number, number, number]> {
+        const [audits, entities, relationships, observations] = await Promise.all([
+          prisma.auditEntry.count(),
+          prisma.entity.count(),
+          prisma.relationship.count(),
+          prisma.stateObservation.count(),
+        ]);
+        return [audits, entities, relationships, observations];
+      }
+
+      const before = await countTables();
+
+      for (const roleToken of [analystToken, managerToken, adminToken]) {
+        for (let i = 0; i < 5; i += 1) {
+          const blockers = await request(server)
+            .get(`/api/entities/${startId}/blockers`)
+            .set('Authorization', `Bearer ${roleToken}`);
+          expect(blockers.status).toBe(200);
+          const upstream = await request(server)
+            .get(`/api/entities/${startId}/dependencies?direction=upstream`)
+            .set('Authorization', `Bearer ${roleToken}`);
+          expect(upstream.status).toBe(200);
+          const downstream = await request(server)
+            .get(`/api/entities/${startId}/dependencies?direction=downstream`)
+            .set('Authorization', `Bearer ${roleToken}`);
+          expect(downstream.status).toBe(200);
+        }
+      }
+
+      expect(await countTables()).toEqual(before);
+    });
+  });
 });

@@ -29,6 +29,9 @@ export function DependenciesSection({ entityId }: DependenciesSectionProps) {
 
   const relChecked = (type: TraceableRelationshipType): boolean =>
     params.rel.length === 0 || params.rel.includes(type);
+  // An empty selection means "all types", so the last checked type cannot be unchecked.
+  const relLocked = (type: TraceableRelationshipType): boolean =>
+    params.rel.length === 1 && params.rel[0] === type;
 
   const update = (next: Parameters<typeof writeTracingParams>[1]) => {
     setSearchParams(writeTracingParams(searchParams, next), { replace: true });
@@ -112,7 +115,10 @@ export function DependenciesSection({ entityId }: DependenciesSectionProps) {
           onChange={(event) => update({ depth: Number(event.target.value) })}
           className="rounded border border-slate-300 px-2 py-1"
         >
-          {Array.from({ length: 10 }, (_, i) => i + 1).map((depth) => (
+          {Array.from(
+            { length: TRACING_LIMITS.maxDepth - TRACING_LIMITS.minDepth + 1 },
+            (_, i) => i + TRACING_LIMITS.minDepth,
+          ).map((depth) => (
             <option key={depth} value={depth}>
               {depth}
             </option>
@@ -125,7 +131,12 @@ export function DependenciesSection({ entityId }: DependenciesSectionProps) {
         <div className="flex flex-wrap gap-2 text-sm">
           {TRACEABLE_RELATIONSHIP_TYPES.map((type) => (
             <label key={type} className="flex items-center gap-1">
-              <input type="checkbox" checked={relChecked(type)} onChange={() => toggleRel(type)} />
+              <input
+                type="checkbox"
+                checked={relChecked(type)}
+                disabled={relLocked(type)}
+                onChange={() => toggleRel(type)}
+              />
               {type}
             </label>
           ))}

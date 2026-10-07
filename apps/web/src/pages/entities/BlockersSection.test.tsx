@@ -4,7 +4,7 @@ import { cleanup, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BlockersSection } from './BlockersSection';
-import { F1_BLOCKERS, F4_BLOCKERS, SHP_ID, tracedEntity } from './tracing-test-data';
+import { F1_BLOCKERS, F4_BLOCKERS, SHP_ID, sentence, tracedEntity } from './tracing-test-data';
 
 const { apiFetchMock } = vi.hoisted(() => ({ apiFetchMock: vi.fn() }));
 
@@ -54,7 +54,9 @@ describe('BlockersSection', () => {
     const first = within(card(1));
     expect(
       first.getByText(
-        'Shipment SHP-77120 (consolidated) is delayed because it depends on Order #18492, which is BLOCKED.',
+        sentence(
+          'Shipment SHP-77120 (consolidated) is delayed because it depends on Order #18492, which is BLOCKED.',
+        ),
       ),
     ).toBeInTheDocument();
     expect(first.queryByText('Manual · MEDIUM')).not.toBeInTheDocument();

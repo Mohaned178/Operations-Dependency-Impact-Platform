@@ -132,6 +132,16 @@ describe('DependenciesSection', () => {
     });
   });
 
+  it('keeps the last checked relationship type checked instead of widening to all types', async () => {
+    renderSection(`/entities/${SHP_ID}?rel=REQUIRES`);
+
+    await screen.findAllByText('Order #18492');
+    expect(screen.getByRole('checkbox', { name: 'REQUIRES' })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'REQUIRES' })).toBeDisabled();
+    expect(screen.getByRole('checkbox', { name: 'DEPENDS_ON' })).not.toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'DEPENDS_ON' })).toBeEnabled();
+  });
+
   it('reproduces downstream depth 3 with an Order filter from the URL', async () => {
     renderSection(`/entities/${SHP_ID}?dep=downstream&depth=3&types=Order`);
 

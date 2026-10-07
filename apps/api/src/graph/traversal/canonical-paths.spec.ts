@@ -160,6 +160,30 @@ describe('selectCanonicalPaths', () => {
     expect(first?.continuesBeyondDepth).toBe(false);
   });
 
+  it('does not flag a depth-limit path whose last entity only points back onto the path', () => {
+    const result = selectCanonicalPaths(
+      'A',
+      [edge('k1', 'A', 'B'), edge('k2', 'B', 'C'), edge('k3', 'C', 'B')],
+      2,
+    );
+    expect(result.paths.get('C')?.continuesBeyondDepth).toBe(false);
+  });
+
+  it('assigns MEDIUM and LOW paths when HIGH-only edges do not reach an entity', () => {
+    const result = selectCanonicalPaths(
+      'A',
+      [
+        edge('k1', 'A', 'B'),
+        edge('k2', 'B', 'C', { confidence: 'LOW' }),
+        edge('k3', 'A', 'D', { confidence: 'MEDIUM' }),
+      ],
+      6,
+    );
+    expect(result.paths.get('B')?.weakestConfidence).toBe('HIGH');
+    expect(result.paths.get('D')?.weakestConfidence).toBe('MEDIUM');
+    expect(result.paths.get('C')?.weakestConfidence).toBe('LOW');
+  });
+
   it('leaves an unreachable entity absent', () => {
     const result = selectCanonicalPaths('A', [edge('k1', 'A', 'B')], 6);
     expect(result.paths.has('B')).toBe(true);
