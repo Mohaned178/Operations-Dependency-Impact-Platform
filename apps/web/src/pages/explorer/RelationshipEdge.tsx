@@ -2,11 +2,15 @@ import {
   BaseEdge,
   EdgeLabelRenderer,
   getBezierPath,
+  Position,
   type EdgeProps,
 } from '@xyflow/react';
 import { memo } from 'react';
 import { edgeStyle } from './edge-style';
 import type { RelationshipFlowEdge } from './flow-types';
+
+/** Distance in px between parallel edges of the same node pair. */
+const PARALLEL_SPREAD = 14;
 
 export const RelationshipEdge = memo(function RelationshipEdge({
   id,
@@ -24,12 +28,19 @@ export const RelationshipEdge = memo(function RelationshipEdge({
     return null;
   }
   const visual = edgeStyle(data.edge, data.emphasis, selected === true);
+  // React Flow's bezier ignores curvature when the target lies ahead of the source, so parallel
+  // edges would be drawn on top of each other. Spread them sideways as well (spec edge case:
+  // parallel relationships are each drawn and separately selectable).
+  const spread = PARALLEL_SPREAD * data.parallelIndex;
+  const sameSide = sourcePosition === targetPosition;
+  const shiftX = sameSide ? (sourcePosition === Position.Right ? spread : -spread) : 0;
+  const shiftY = sameSide ? 0 : spread;
   const [path, labelX, labelY] = getBezierPath({
-    sourceX,
-    sourceY,
+    sourceX: sourceX + shiftX,
+    sourceY: sourceY + shiftY,
     sourcePosition,
-    targetX,
-    targetY,
+    targetX: targetX + shiftX,
+    targetY: targetY + shiftY,
     targetPosition,
     curvature: 0.25 + 0.2 * data.parallelIndex,
   });

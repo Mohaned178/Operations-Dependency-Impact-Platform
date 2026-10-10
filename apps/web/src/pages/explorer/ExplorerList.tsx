@@ -5,6 +5,7 @@ import { StateBadge } from '../entities/StateBadge';
 import type { EmphasisResult } from './emphasis';
 import type { Selection } from './flow-types';
 import { NodeChips } from './NodeChips';
+import { compareCodeUnits } from './text-order';
 
 export interface ExplorerListProps {
   response: NeighborhoodResponse;
@@ -63,13 +64,6 @@ function groupNodes(response: NeighborhoodResponse): Group[] {
   return groups.filter((group) => group.nodes.length > 0);
 }
 
-function compareText(a: string, b: string): number {
-  if (a < b) {
-    return -1;
-  }
-  return a > b ? 1 : 0;
-}
-
 export function ExplorerList({
   response,
   selection,
@@ -84,7 +78,7 @@ export function ExplorerList({
   const edges: GraphEdgeDto[] = [...response.edges].sort(
     (a, b) =>
       (indexOf.get(a.fromEntityId) ?? 0) - (indexOf.get(b.fromEntityId) ?? 0) ||
-      compareText(a.relationshipType, b.relationshipType) ||
+      compareCodeUnits(a.relationshipType, b.relationshipType) ||
       (indexOf.get(a.toEntityId) ?? 0) - (indexOf.get(b.toEntityId) ?? 0),
   );
 

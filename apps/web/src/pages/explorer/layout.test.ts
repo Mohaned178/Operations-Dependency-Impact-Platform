@@ -108,6 +108,30 @@ describe('layoutNeighborhood', () => {
     expect(y4).toBeLessThan(y5);
   });
 
+  it('puts a two-hop sibling (down then up) in layer 0 below the focus, in tree order', () => {
+    // Node 2 requires the focus, so it sits downstream (layer 1). Nodes 3 and 4 are things node 2
+    // requires, so from 2 they are one step upstream: 1 + (-1) = layer 0, next to the focus.
+    const result = layoutNeighborhood(
+      response(
+        [
+          node({ n: 1 }),
+          node({ n: 2, parent: 1, via: 1 }),
+          node({ n: 3, parent: 2, via: 2 }),
+          node({ n: 4, parent: 2, via: 3 }),
+        ],
+        [
+          edge({ k: 1, type: 'REQUIRES', from: 2, to: 1 }),
+          edge({ k: 2, type: 'REQUIRES', from: 2, to: 3 }),
+          edge({ k: 3, type: 'REQUIRES', from: 2, to: 4 }),
+        ],
+      ),
+    );
+    expect(result.layer.get(uuid(3))).toBe(0);
+    expect(result.layer.get(uuid(4))).toBe(0);
+    expect(result.center.get(uuid(3))).toEqual({ x: 0, y: ROW_GAP });
+    expect(result.center.get(uuid(4))).toEqual({ x: 0, y: 2 * ROW_GAP });
+  });
+
   it('is deterministic', () => {
     const again = layoutNeighborhood(smallResponse());
     expect([...again.layer]).toEqual([...layout.layer]);

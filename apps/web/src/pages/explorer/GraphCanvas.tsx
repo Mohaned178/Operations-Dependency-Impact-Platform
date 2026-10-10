@@ -85,7 +85,7 @@ export function GraphCanvas({
         maxZoom={2}
       >
         <Background variant={BackgroundVariant.Dots} gap={24} size={1} />
-        <Controls showInteractive={false} />
+        <Controls showInteractive={false} position="top-left" />
       </ReactFlow>
       <GraphLegend />
     </div>

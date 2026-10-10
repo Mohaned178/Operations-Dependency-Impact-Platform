@@ -41,6 +41,24 @@ describe('RelationshipEdge', () => {
     expect(screen.getByText('Inferred · LOW')).toBeInTheDocument();
   });
 
+  it('curves parallel edges between two same-layer nodes differently', () => {
+    // Same-layer edges leave and enter on the right, where the bezier curvature takes effect.
+    const r = response(
+      [node({ n: 1, name: 'A' }), node({ n: 2, parent: 1, via: 1, name: 'B' })],
+      [
+        edge({ k: 1, type: 'RELATES_TO', from: 1, to: 2 }),
+        edge({ k: 2, type: 'GOVERNS', from: 1, to: 2 }),
+      ],
+    );
+    const { nodes, edges } = flowFor(r);
+    renderFlow(nodes, edges);
+    const first = edgePath(uuid(1001)).getAttribute('d');
+    const second = edgePath(uuid(1002)).getAttribute('d');
+    expect(first).not.toBeNull();
+    expect(second).not.toBeNull();
+    expect(first).not.toBe(second);
+  });
+
   it('draws a MANUAL edge dotted with a label', () => {
     const { nodes, edges } = flowFor(twoNodeResponse('MANUAL', 'MEDIUM'));
     renderFlow(nodes, edges);

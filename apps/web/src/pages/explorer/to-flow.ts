@@ -11,19 +11,13 @@ import {
 } from './flow-types';
 import type { LayoutResult } from './layout';
 import { hasConflict, isConnectorOnly } from './NodeChips';
+import { compareCodeUnits } from './text-order';
 
 export interface ToFlowInput {
   response: NeighborhoodResponse;
   layout: LayoutResult;
   emphasis: EmphasisResult;
   selection: Selection;
-}
-
-function compareCodeUnits(a: string, b: string): number {
-  if (a < b) {
-    return -1;
-  }
-  return a > b ? 1 : 0;
 }
 
 /** 0 for the first edge between an unordered node pair (by key), 1 for the second, ... */

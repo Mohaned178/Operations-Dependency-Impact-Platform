@@ -93,7 +93,7 @@ function ExplorerView({ id, params, search }: ExplorerViewProps) {
   if (neighborhood.isPending) {
     return <p>Loading…</p>;
   }
-  if (neighborhood.isError || response === undefined || view === null) {
+  if (response === undefined || view === null) {
     if (neighborhood.error instanceof ApiError && neighborhood.error.status === 404) {
       return (
         <p>
@@ -120,8 +120,13 @@ function ExplorerView({ id, params, search }: ExplorerViewProps) {
           }}
           isUpdating={neighborhood.isPlaceholderData}
         />
+        {neighborhood.isError ? (
+          <p role="alert" className="text-sm text-red-700">
+            Could not refresh the view. Showing the last loaded data.
+          </p>
+        ) : null}
         <ExplorerToolbar params={params} />
-        <div className="relative min-h-[480px] flex-1 overflow-hidden rounded border bg-white">
+        <div className="relative h-[480px] overflow-hidden rounded border bg-white lg:h-auto lg:min-h-[480px] lg:flex-1">
           <ReactFlowProvider>
             <GraphCanvas
               nodes={view.flow.nodes}

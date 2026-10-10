@@ -229,10 +229,46 @@ describe('ExplorerPage', () => {
       await screen.findByRole('heading', { level: 1 });
       await userEvent.click(listButton(uuid(3)));
       await screen.findByLabelText('Details of Downstream');
+      await waitFor(() => {
+        expect(flowNode(uuid(3))).toHaveClass('selected');
+      });
 
       await userEvent.click(screen.getByRole('button', { name: 'Close' }));
       expect(screen.queryByLabelText('Details of Downstream')).not.toBeInTheDocument();
       expect(listButton(uuid(3))).toHaveAttribute('aria-pressed', 'false');
+      await waitFor(() => {
+        expect(document.querySelector('.react-flow__node.selected')).toBeNull();
+      });
+    });
+
+    it('selecting a relationship in the graph highlights its list row and opens the panel', async () => {
+      respond();
+      renderPage();
+      await screen.findByRole('heading', { level: 1 });
+      await waitFor(() => {
+        expect(document.querySelectorAll('.react-flow__edge')).toHaveLength(5);
+      });
+      const edgeEl = document.querySelector(`.react-flow__edge[data-id="${uuid(1001)}"]`);
+      expect(edgeEl).not.toBeNull();
+      fireEvent.click(edgeEl as Element);
+      expect(await screen.findByLabelText('Relationship details')).toBeInTheDocument();
+      expect(document.querySelector(`button[data-edge-key="${uuid(1001)}"]`)).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      );
+    });
+
+    it('draws every relationship in both views', async () => {
+      respond();
+      renderPage();
+      await screen.findByRole('heading', { level: 1 });
+      await waitFor(() => {
+        expect(document.querySelectorAll('.react-flow__edge')).toHaveLength(5);
+      });
+      for (const e of smallResponse().edges) {
+        expect(document.querySelector(`.react-flow__edge[data-id="${e.key}"]`)).not.toBeNull();
+        expect(document.querySelector(`button[data-edge-key="${e.key}"]`)).not.toBeNull();
+      }
     });
   });
 
@@ -244,6 +280,18 @@ describe('ExplorerPage', () => {
       expect(await screen.findByRole('status')).toHaveTextContent(
         'Showing 6 of 10 entities — 4 more. Refine filters, reduce the step limit, or choose a direction.',
       );
+    });
+
+    it('keeps the last loaded view and shows an alert when a refresh fails', async () => {
+      respond();
+      renderPage();
+      await screen.findByRole('heading', { level: 1 });
+      apiFetchMock.mockImplementation(() => Promise.reject(new ApiError(500, 'INTERNAL', 'boom')));
+
+      await userEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+      expect(await screen.findByRole('alert')).toHaveTextContent('Could not refresh the view');
+      expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument();
+      expect(listButton(uuid(2))).toBeInTheDocument();
     });
 
     it('changing Steps updates the URL and requests the new depth', async () => {
