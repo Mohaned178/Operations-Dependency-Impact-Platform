@@ -259,5 +259,29 @@ describe('Graph explorer: neighborhood (e2e)', () => {
       expect(edge?.assertions).toHaveLength(2);
       expect(edge?.assertions.map((a) => a.origin)).toEqual(['SOURCE', 'INFERRED']);
     });
+
+    it('G1: a hub with 500 neighbors shows 200 nodes and counts the rest', async () => {
+      const neighbors = Array.from({ length: 500 }, (_, i) => `n${i}`);
+      const children = ['c0', 'c1', 'c2', 'c3', 'c4'];
+      const ids = await setup(
+        [{ id: 'H' }, ...neighbors.map((n) => ({ id: n })), ...children.map((c) => ({ id: c }))],
+        [
+          ...neighbors.map((n) => ({ type: 'RELATES_TO' as const, from: 'H', to: n })),
+          ...children.map((c) => ({ type: 'RELATES_TO' as const, from: 'n0', to: c })),
+        ],
+      );
+      const hub = ids.H as string;
+
+      const base = await neighborhoodOf(hub, '?depth=1');
+      expect(base.nodes).toHaveLength(200);
+      expect(base.totals).toEqual({ visible: 200, omitted: 301, omittedIsLowerBound: false });
+
+      // n0 sorts first, so it is visible; its 5 children do not fit and only add to `omitted`.
+      const expanded = await neighborhoodOf(hub, `?depth=1&expand=${ids.n0 as string}`);
+      expect(expanded.nodes).toHaveLength(200);
+      expect(expanded.totals).toEqual({ visible: 200, omitted: 306, omittedIsLowerBound: false });
+      expect(expanded.ignoredExpansions).toEqual([]);
+      expect(expanded.nodes.find((n) => n.id === ids.n0)?.expanded).toBe(true);
+    }, 60_000);
   });
 });
