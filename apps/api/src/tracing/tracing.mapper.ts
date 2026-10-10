@@ -1,6 +1,7 @@
 import {
   STATE_CLASSIFICATION,
   type CycleClosingHopDto,
+  type GraphEdgeDto,
   type HopAssertionDto,
   type HopDto,
   type PathDto,
@@ -10,6 +11,7 @@ import type {
   CycleClosingHop,
   GraphEntityRef,
   HopAssertion,
+  RelationshipGroup,
   TraversalHop,
   TraversalPath,
 } from '../graph/graph.repository';
@@ -63,6 +65,18 @@ export function toHopDto(hop: TraversalHop, evidenceMap: EvidenceMap): HopDto {
     effectiveConfidence: hop.effectiveConfidence,
     assertions: hop.assertions.map(toAssertionDto),
     entity: toTracedEntityDto(hop.target, evidenceFor(evidenceMap, hop.target.id)),
+  };
+}
+
+export function toGraphEdgeDto(group: RelationshipGroup): GraphEdgeDto {
+  return {
+    key: group.key,
+    relationshipType: group.type,
+    fromEntityId: group.fromEntityId,
+    toEntityId: group.toEntityId,
+    effectiveOrigin: group.effectiveOrigin,
+    effectiveConfidence: group.effectiveConfidence,
+    assertions: group.assertions.map(toAssertionDto),
   };
 }
 

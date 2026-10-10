@@ -1,6 +1,7 @@
 export * from './audit';
 export * from './auth';
 export * from './common';
+export * from './explorer';
 export * from './graph';
 export * from './health';
 export * from './imports';

@@ -1,10 +1,15 @@
-import type { Confidence, RelationshipOrigin, TraceableRelationshipType } from '@opsgraph/shared';
+import type {
+  Confidence,
+  RelationshipOrigin,
+  RelationshipType,
+  TraceableRelationshipType,
+} from '@opsgraph/shared';
 import type { HopAssertion } from '../graph.repository';
 
 /** One relationship row from research R3 step 2, already parsed. */
-export interface EdgeRow {
+export interface EdgeRow<T extends RelationshipType = TraceableRelationshipType> {
   id: string;
-  type: TraceableRelationshipType;
+  type: T;
   fromEntityId: string;
   toEntityId: string;
   origin: RelationshipOrigin;
@@ -17,9 +22,9 @@ export interface EdgeRow {
 }
 
 /** One grouped hop candidate (research R4). */
-export interface TraversalEdge {
+export interface TraversalEdge<T extends RelationshipType = TraceableRelationshipType> {
   key: string;
-  type: TraceableRelationshipType;
+  type: T;
   fromEntityId: string;
   toEntityId: string;
   /** Walk start of this hop. */
@@ -34,10 +39,10 @@ export interface TraversalEdge {
 }
 
 /** Ids only; the repository converts it to a TraversalPath. */
-export interface InternalPath {
+export interface InternalPath<T extends RelationshipType = TraceableRelationshipType> {
   /** [startId, ..., last]; length = edges.length + 1. */
   entityIds: string[];
-  edges: TraversalEdge[];
+  edges: TraversalEdge<T>[];
   weakestConfidence: Confidence;
   nonSourceHops: number;
   continuesBeyondDepth: boolean;

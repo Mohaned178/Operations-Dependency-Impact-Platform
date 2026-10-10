@@ -49,4 +49,8 @@ RUN_PERF=1 pnpm --filter api test:e2e -- perf-explorer   # SC-003
 
 | Date | Machine | Default neighborhood p95 | Expansion p95 | 200-node interaction |
 |---|---|---|---|---|
-| _fill in after phase "Performance"_ | | | | |
+| 2026-10-10 | Windows 11 workstation, PostgreSQL 16 in Docker, 50,000 entities / ~150,000 relationships | 26 ms (20 entities incl. the highest-degree one; budget 2,000 ms) | 38 ms, i.e. +13 ms over the base call (budget +1,000 ms) | Chrome 155 (automated via Playwright, headed, 1600x900), 200 of 625 entities at Perf Warehouse 7: click to second paint 13–25 ms (Event Timing 16 ms); pan frames p95 8 ms; zoom frames p95 20–35 ms, worst single frame 95 ms on the first cold zoom. Under 100 ms (SC-004) |
+
+T053 (2026-10-11, dev seed, analyst@opsgraph.local, Chrome 155): steps 1–8 behaved as written. Step 2 header 35 entities / 86 relationships; with Highlight blockers it reads 36 / 88 because the Budget code is added. Step 7 gave 21 entities with APR-2291 and PAY-88213 as dashed Connector nodes; the copied URL reproduced the same view in a second session.
+
+Also logged, not asserted (research R13): `direction=all&depth=4` from the highest-degree entity: p95 311 ms, 200 entities shown, 5,320 left out, count exact (no lower bound).

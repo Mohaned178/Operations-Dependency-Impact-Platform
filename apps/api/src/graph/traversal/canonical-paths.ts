@@ -1,22 +1,22 @@
-import { CONFIDENCE_RANK, type Confidence } from '@opsgraph/shared';
+import { CONFIDENCE_RANK, type Confidence, type RelationshipType } from '@opsgraph/shared';
 import { compareIdSequences } from './path-order';
 import type { InternalPath, TraversalEdge } from './types';
 
-export interface CanonicalPathsResult {
+export interface CanonicalPathsResult<T extends RelationshipType> {
   /** Keyed by reached entity id; never contains startId. */
-  paths: Map<string, InternalPath>;
+  paths: Map<string, InternalPath<T>>;
   /** All, unsorted; the repository sorts and caps. */
-  cycleClosing: TraversalEdge[];
+  cycleClosing: TraversalEdge<T>[];
 }
 
-interface Label {
+interface Label<T extends RelationshipType> {
   nonSource: number;
   entityIds: string[];
   hopKeys: string[];
-  edges: TraversalEdge[];
+  edges: TraversalEdge<T>[];
 }
 
-function compareLabels(a: Label, b: Label): number {
+function compareLabels<T extends RelationshipType>(a: Label<T>, b: Label<T>): number {
   if (a.nonSource !== b.nonSource) {
     return Math.sign(a.nonSource - b.nonSource);
   }
@@ -28,7 +28,7 @@ function compareLabels(a: Label, b: Label): number {
 }
 
 /** The minimum over d also compares the hop count. */
-function compareAcrossDepths(a: Label, b: Label): number {
+function compareAcrossDepths<T extends RelationshipType>(a: Label<T>, b: Label<T>): number {
   if (a.nonSource !== b.nonSource) {
     return Math.sign(a.nonSource - b.nonSource);
   }
@@ -42,7 +42,7 @@ function compareAcrossDepths(a: Label, b: Label): number {
   return compareIdSequences(a.hopKeys, b.hopKeys);
 }
 
-function weakestOf(edges: readonly TraversalEdge[]): Confidence {
+function weakestOf<T extends RelationshipType>(edges: readonly TraversalEdge<T>[]): Confidence {
   let weakest: Confidence = 'HIGH';
   for (const edge of edges) {
     if (CONFIDENCE_RANK[edge.effectiveConfidence] < CONFIDENCE_RANK[weakest]) {
@@ -57,12 +57,12 @@ function weakestOf(edges: readonly TraversalEdge[]): Confidence {
  * (weakest-hop confidence first, then non-SOURCE count, then length, then ids).
  * Never re-enters the start entity. Throws on a repeated entity.
  */
-export function selectCanonicalPaths(
+export function selectCanonicalPaths<T extends RelationshipType>(
   startId: string,
-  edges: readonly TraversalEdge[],
+  edges: readonly TraversalEdge<T>[],
   maxDepth: number,
-): CanonicalPathsResult {
-  const bySource = new Map<string, TraversalEdge[]>();
+): CanonicalPathsResult<T> {
+  const bySource = new Map<string, TraversalEdge<T>[]>();
   for (const edge of edges) {
     const outgoing = bySource.get(edge.sourceId);
     if (outgoing === undefined) {
@@ -73,7 +73,7 @@ export function selectCanonicalPaths(
   }
 
   const thresholds: Confidence[] = ['HIGH', 'MEDIUM', 'LOW'];
-  const assigned = new Map<string, InternalPath>();
+  const assigned = new Map<string, InternalPath<T>>();
   let previousUsableCount = -1;
 
   for (const threshold of thresholds) {
@@ -86,7 +86,7 @@ export function selectCanonicalPaths(
       continue;
     }
     previousUsableCount = usable.length;
-    const usableBySource = new Map<string, TraversalEdge[]>();
+    const usableBySource = new Map<string, TraversalEdge<T>[]>();
     for (const edge of usable) {
       const outgoing = usableBySource.get(edge.sourceId);
       if (outgoing === undefined) {
@@ -96,12 +96,12 @@ export function selectCanonicalPaths(
       }
     }
 
-    const best: Array<Map<string, Label>> = [];
-    best[0] = new Map<string, Label>([
+    const best: Array<Map<string, Label<T>>> = [];
+    best[0] = new Map<string, Label<T>>([
       [startId, { nonSource: 0, entityIds: [startId], hopKeys: [], edges: [] }],
     ]);
     for (let d = 1; d <= maxDepth; d += 1) {
-      const current = new Map<string, Label>();
+      const current = new Map<string, Label<T>>();
       const previous = best[d - 1];
       if (previous !== undefined) {
         for (const [u, labelU] of previous) {
@@ -109,7 +109,7 @@ export function selectCanonicalPaths(
             if (edge.targetId === startId) {
               continue;
             }
-            const candidate: Label = {
+            const candidate: Label<T> = {
               nonSource: labelU.nonSource + (edge.nonSource ? 1 : 0),
               entityIds: [...labelU.entityIds, edge.targetId],
               hopKeys: [...labelU.hopKeys, edge.key],
@@ -125,7 +125,7 @@ export function selectCanonicalPaths(
       best[d] = current;
     }
 
-    const candidates = new Map<string, Label>();
+    const candidates = new Map<string, Label<T>>();
     for (let d = 1; d <= maxDepth; d += 1) {
       const layer = best[d];
       if (layer === undefined) {
@@ -147,7 +147,7 @@ export function selectCanonicalPaths(
         continue;
       }
       const weakest = weakestOf(label.edges);
-      const path: InternalPath = {
+      const path: InternalPath<T> = {
         entityIds: label.entityIds,
         edges: label.edges,
         weakestConfidence: weakest,
@@ -167,9 +167,9 @@ export function selectCanonicalPaths(
   return { paths: assigned, cycleClosing };
 }
 
-function continuesBeyond(
-  label: Label,
-  bySource: ReadonlyMap<string, readonly TraversalEdge[]>,
+function continuesBeyond<T extends RelationshipType>(
+  label: Label<T>,
+  bySource: ReadonlyMap<string, readonly TraversalEdge<T>[]>,
   maxDepth: number,
 ): boolean {
   if (label.edges.length !== maxDepth) {
@@ -187,13 +187,13 @@ function continuesBeyond(
  * Research R5 cycle-closing hops: u is the start or has a canonical path shorter
  * than maxDepth; v is the start or lies on u's canonical path.
  */
-function collectCycleClosing(
+function collectCycleClosing<T extends RelationshipType>(
   startId: string,
-  edges: readonly TraversalEdge[],
-  assigned: ReadonlyMap<string, InternalPath>,
+  edges: readonly TraversalEdge<T>[],
+  assigned: ReadonlyMap<string, InternalPath<T>>,
   maxDepth: number,
-): TraversalEdge[] {
-  const seen = new Map<string, TraversalEdge>();
+): TraversalEdge<T>[] {
+  const seen = new Map<string, TraversalEdge<T>>();
   for (const edge of edges) {
     const u = edge.sourceId;
     const v = edge.targetId;
