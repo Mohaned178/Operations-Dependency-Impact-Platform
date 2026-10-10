@@ -99,7 +99,7 @@
 
 ### Backend fixtures
 
-- [ ] T018 [US1] Create `apps/api/test/explorer-seed.e2e-spec.ts` (seeded, ADMIN login, look up ids by display name as `tracing-seed.e2e-spec.ts` does). Assert fixtures **N1**, **N3**, **N9** and **N10** of api §5 literally: node counts per distance, the named entities per distance, edge counts, the INFERRED/LOW and MANUAL/MEDIUM edges, the Order #18492 per-source states, reasons, every validation case.
+- [x] T018 [US1] Create `apps/api/test/explorer-seed.e2e-spec.ts` (seeded, ADMIN login, look up ids by display name as `tracing-seed.e2e-spec.ts` does). Assert fixtures **N1**, **N3**, **N9** and **N10** of api §5 literally: node counts per distance, the named entities per distance, edge counts, the INFERRED/LOW and MANUAL/MEDIUM edges, the Order #18492 per-source states, reasons, every validation case.
 
 ### Web pure modules (`apps/web/src/pages/explorer/`)
 
