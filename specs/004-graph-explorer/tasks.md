@@ -103,17 +103,17 @@
 
 ### Web pure modules (`apps/web/src/pages/explorer/`)
 
-- [ ] T019 [P] [US1] Create `explorer-params.ts` + `explorer-params.test.ts` (research R10, ui §15 step 1):
+- [x] T019 [P] [US1] Create `explorer-params.ts` + `explorer-params.test.ts` (research R10, ui §15 step 1):
   - `parseExplorerParams(sp: URLSearchParams): { ok: true; params: ExplorerUrlParams } | { ok: false; issues: string[] }` using `ExplorerUrlParamsSchema.safeParse` on `{ direction, depth, relationshipTypes, entityTypes, blockers }` (absent → `undefined`); issues formatted `` `${path}: ${message}` ``;
   - `writeExplorerParams(current, partial): URLSearchParams` that omits defaults (`direction=all`, `depth=2`, empty lists, `blockers=false`) and keeps unrelated params;
   - `toNeighborhoodQueryString(params, expand: string[]): string` with lists comma-joined and only when non-empty, `expand` in given order;
   - tests: round trip, defaults omitted, invalid values produce issues (never fallback), RELATES_TO with upstream is an issue.
-- [ ] T020 [P] [US1] Create `layout.ts` + `layout.test.ts` exactly per ui §4. Tests: `stepBetween` for every relationship type in both directions (RELATES_TO → 0); a small hand-built response where upstream nodes get negative layers, downstream positive, a sibling (shipment → other order) layer 0 below the focus; tree-order row sorting; column centering; focus at (0, 0); identical output on two runs.
-- [ ] T021 [P] [US1] Create `edge-style.ts` + `edge-style.test.ts` exactly per ui §6 table: every origin, confidence, emphasis and selected combination, RELATES_TO stroke and no marker, labels.
-- [ ] T022 [P] [US1] Create `emphasis.ts` + `emphasis.test.ts` implementing **all three** rules of ui §7 (blocker and focus-mode inputs are wired later, but the function is complete now). Tests: no blockers + no focus mode → all normal; blocker paths highlight/dim with the focus normal; `selectedPathIndex` restricts highlighting but not `blockerRole`; focus mode dims outside the selected node's closed neighborhood and restores dimmed neighbors to normal; focus mode ignored for an edge selection.
-- [ ] T023 [P] [US1] Create `describe-view.ts` + `describe-view.test.ts` exactly per ui §10, including singular/plural, filters text, both omitted messages and the empty message.
-- [ ] T024 [P] [US1] Create `flow-types.ts` exactly as ui §3 (types and the four constants; not the actions context yet).
-- [ ] T025 [US1] Create `to-flow.ts` + `to-flow.test.ts` per ui §5: node and edge objects field by field, handle rule for `<`, `>` and `=` layers, `parallelIndex` grouping by unordered pair sorted by key, `selected` from the selection, `ariaLabel`s, `markerEnd` from `edgeStyle`. Set `canExpand: false` for every node in this phase (expansion arrives in T043).
+- [x] T020 [P] [US1] Create `layout.ts` + `layout.test.ts` exactly per ui §4. Tests: `stepBetween` for every relationship type in both directions (RELATES_TO → 0); a small hand-built response where upstream nodes get negative layers, downstream positive, a sibling (shipment → other order) layer 0 below the focus; tree-order row sorting; column centering; focus at (0, 0); identical output on two runs.
+- [x] T021 [P] [US1] Create `edge-style.ts` + `edge-style.test.ts` exactly per ui §6 table: every origin, confidence, emphasis and selected combination, RELATES_TO stroke and no marker, labels.
+- [x] T022 [P] [US1] Create `emphasis.ts` + `emphasis.test.ts` implementing **all three** rules of ui §7 (blocker and focus-mode inputs are wired later, but the function is complete now). Tests: no blockers + no focus mode → all normal; blocker paths highlight/dim with the focus normal; `selectedPathIndex` restricts highlighting but not `blockerRole`; focus mode dims outside the selected node's closed neighborhood and restores dimmed neighbors to normal; focus mode ignored for an edge selection.
+- [x] T023 [P] [US1] Create `describe-view.ts` + `describe-view.test.ts` exactly per ui §10, including singular/plural, filters text, both omitted messages and the empty message.
+- [x] T024 [P] [US1] Create `flow-types.ts` exactly as ui §3 (types and the four constants; not the actions context yet).
+- [x] T025 [US1] Create `to-flow.ts` + `to-flow.test.ts` per ui §5: node and edge objects field by field, handle rule for `<`, `>` and `=` layers, `parallelIndex` grouping by unordered pair sorted by key, `selected` from the selection, `ariaLabel`s, `markerEnd` from `edgeStyle`. Set `canExpand: false` for every node in this phase (expansion arrives in T043).
 
 ### Web components
 
