@@ -90,6 +90,7 @@ function ExplorerView({ id, params, search }: ExplorerViewProps) {
   const [selectedPathIndex, setSelectedPathIndex] = useState<number | null>(null);
   const [centerOn, setCenterOn] = useState<{ id: string; nonce: number } | null>(null);
   const [lastGood, setLastGood] = useState<GoodView | null>(null);
+  const [restoredNotice, setRestoredNotice] = useState(false);
 
   const settled = neighborhood.data !== undefined && !neighborhood.isPlaceholderData;
   useEffect(() => {
@@ -104,6 +105,7 @@ function ExplorerView({ id, params, search }: ExplorerViewProps) {
   useEffect(() => {
     if (failedWithoutData && lastGood !== null) {
       setExpand(lastGood.expand);
+      setRestoredNotice(true);
     }
   }, [failedWithoutData, lastGood]);
 
@@ -149,6 +151,7 @@ function ExplorerView({ id, params, search }: ExplorerViewProps) {
       if (loading) {
         return;
       }
+      setRestoredNotice(false);
       setExpand((previous) => toggleExpansion(previous, entityId));
     },
     [loading],
@@ -162,25 +165,30 @@ function ExplorerView({ id, params, search }: ExplorerViewProps) {
     [navigate, search],
   );
 
-  const view = useMemo(() => {
-    if (response === undefined) {
-      return null;
-    }
-    const layout = layoutNeighborhood(response);
-    const emphasis = computeEmphasis({
-      response,
-      selection: activeSelection,
-      focusMode,
-      selectedPathIndex,
-    });
-    const flow = toFlow({ response, layout, emphasis, selection: activeSelection });
-    return { layout, emphasis, flow };
-  }, [response, activeSelection, selectedPathIndex, focusMode]);
+  // Layout depends only on the response, so selecting or focusing does not re-run it (ui.md §15.5).
+  const layout = useMemo(
+    () => (response === undefined ? null : layoutNeighborhood(response)),
+    [response],
+  );
+  const emphasis = useMemo(
+    () =>
+      response === undefined
+        ? null
+        : computeEmphasis({ response, selection: activeSelection, focusMode, selectedPathIndex }),
+    [response, activeSelection, focusMode, selectedPathIndex],
+  );
+  const flow = useMemo(
+    () =>
+      response === undefined || layout === null || emphasis === null
+        ? null
+        : toFlow({ response, layout, emphasis, selection: activeSelection }),
+    [response, layout, emphasis, activeSelection],
+  );
 
   if (neighborhood.isPending && response === undefined) {
     return <p>Loading…</p>;
   }
-  if (response === undefined || view === null) {
+  if (response === undefined || layout === null || emphasis === null || flow === null) {
     if (neighborhood.error instanceof ApiError && neighborhood.error.status === 404) {
       return (
         <p>
@@ -212,6 +220,11 @@ function ExplorerView({ id, params, search }: ExplorerViewProps) {
             Could not refresh the view. Showing the last loaded data.
           </p>
         ) : null}
+        {restoredNotice ? (
+          <p role="alert" className="text-sm text-red-700">
+            Could not expand or collapse that node, so the view was restored to its last state.
+          </p>
+        ) : null}
         {expansionLimitReached(expand) ? (
           <p role="status" className="text-sm text-amber-900">
             {`You have expanded the maximum of ${EXPLORER_LIMITS.maxExpansions} nodes. Collapse one to expand another.`}
@@ -221,8 +234,8 @@ function ExplorerView({ id, params, search }: ExplorerViewProps) {
           <ExplorerActionsContext.Provider value={actions}>
             <ReactFlowProvider>
               <GraphCanvas
-                nodes={view.flow.nodes}
-                edges={view.flow.edges}
+                nodes={flow.nodes}
+                edges={flow.edges}
                 onSelectNode={(nodeId) => {
                   setSelection({ kind: 'node', id: nodeId });
                 }}
@@ -233,7 +246,7 @@ function ExplorerView({ id, params, search }: ExplorerViewProps) {
                   setSelection(null);
                 }}
                 centerOn={centerOn}
-                centers={view.layout.center}
+                centers={layout.center}
               />
             </ReactFlowProvider>
           </ExplorerActionsContext.Provider>
@@ -259,7 +272,7 @@ function ExplorerView({ id, params, search }: ExplorerViewProps) {
         <ExplorerList
           response={response}
           selection={activeSelection}
-          emphasis={view.emphasis}
+          emphasis={emphasis}
           onSelectNode={selectFromList}
           onSelectEdge={(key) => {
             setSelection({ kind: 'edge', key });

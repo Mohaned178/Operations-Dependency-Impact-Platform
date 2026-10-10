@@ -91,6 +91,14 @@ function Blocks({ node, search }: { node: NeighborhoodNodeDto; search: string })
       {!satisfied && blocks.isSuccess && blocks.data.items.length === 0 ? (
         <p className="text-sm">Nothing depends on it through REQUIRES, DEPENDS_ON or BLOCKS.</p>
       ) : null}
+      {!satisfied && blocks.isSuccess && blocks.data.totalReached > blocks.data.items.length ? (
+        <p className="text-sm text-amber-900">
+          {`Showing ${blocks.data.items.length} of ${blocks.data.totalReached} dependents.`}{' '}
+          <Link to={`/entities/${node.id}`} className="underline">
+            See all on Entity 360
+          </Link>
+        </p>
+      ) : null}
       {!satisfied && blocks.isSuccess ? (
         <ul className="flex flex-col gap-1 text-sm">
           {blocks.data.items.map((item) => {

@@ -166,6 +166,29 @@ describe('Graph explorer: neighborhood (e2e)', () => {
     });
   });
 
+  describe('ids in any case', () => {
+    it('accepts an upper-case focus and expand id and answers with lower-case ids', async () => {
+      const ids = await setup(
+        [{ id: 'A' }, { id: 'B' }, { id: 'C' }],
+        [
+          { type: 'REQUIRES', from: 'A', to: 'B' },
+          { type: 'REQUIRES', from: 'B', to: 'C' },
+        ],
+      );
+      const a = (ids.A as string).toUpperCase();
+      const b = (ids.B as string).toUpperCase();
+      const body = await neighborhoodOf(a, `?depth=1&expand=${b}`);
+      expect(body.focusId).toBe(ids.A);
+      expect(body.nodes[0]?.id).toBe(ids.A);
+      expect(body.nodes.map((n) => n.id)).toEqual([ids.A, ids.B, ids.C]);
+      expect(body.nodes.find((n) => n.id === ids.B)?.expanded).toBe(true);
+      expect(body.ignoredExpansions).toEqual([]);
+
+      const response = await get(`/api/entities/${a}/neighborhood?expand=${a}`);
+      expect(response.status).toBe(400);
+    });
+  });
+
   describe('authentication, existence and validation', () => {
     it('answers 401 without a token', async () => {
       await setup([]);

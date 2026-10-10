@@ -242,6 +242,23 @@ describe('NodeDetailsPanel', () => {
     expect(scoped.getByText('Source · HIGH')).toBeInTheDocument();
   });
 
+  it('says when only the first dependents are listed', async () => {
+    respond(F1_BLOCKERS, { ...DEPENDENTS, totalReached: 300 });
+    renderPanel(shipmentNode());
+    const section = (await screen.findByRole('heading', { name: 'Blocks' })).parentElement;
+    expect(await within(section as HTMLElement).findByText(/Showing 2 of 300 dependents\./)).toBeInTheDocument();
+    expect(
+      within(section as HTMLElement).getByRole('link', { name: 'See all on Entity 360' }),
+    ).toHaveAttribute('href', `/entities/${SHP_ID}`);
+  });
+
+  it('shows no truncation notice when every dependent is listed', async () => {
+    respond();
+    renderPanel(shipmentNode());
+    await screen.findByRole('link', { name: ORDER.displayName });
+    expect(screen.queryByText(/dependents\./)).not.toBeInTheDocument();
+  });
+
   it('states that nothing depends on it when there are no dependents', async () => {
     respond(F1_BLOCKERS, { ...DEPENDENTS, items: [], totalReached: 0 });
     renderPanel(shipmentNode());

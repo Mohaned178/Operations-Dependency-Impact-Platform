@@ -70,3 +70,13 @@ Files are under `apps/web/src/pages/explorer/` (web), `apps/api/src` and `apps/a
 **Gaps left open:** SC-004 and the browser-only parts of FR-014 smoothness and SC-001 (manual, quickstart); FR-025 in-place selection from panel names (deferred, see above).
 
 **Live check of the quickstart API smoke (T053):** the built api was started against the dev database and queried over HTTP: Order #18492 returned `{"n":32,"e":60,"omitted":0}` (N1); `blockers=true` listed `Payment PAY-88213`, `Finance approval APR-2291`, `Budget code for Order #18492` (N2); Shipment SHP-77120 with blockers returned 36 nodes, 88 edges and 2 paths (N4); no token gave 401; `depth=5` gave 400 naming `depth`.
+
+## Code review of the branch (`/code-review high main`)
+
+Fixed: (1) upper-case UUIDs in the path or in `expand` are now lower-cased up front in `NeighborhoodService` (they caused a 500 from the step-10 invariant and silently ignored expansions); (2) the node panel's *Blocks* list says `Showing N of M dependents` with a link to Entity 360 when the 200-row page is partial, and takes its relationship types from `BLOCKER_RELATIONSHIP_TYPES`; (3) a failed expand/collapse that is rolled back now tells the user; (4) layout, emphasis and flow are separate memos (ui.md §15.5), so a selection change no longer re-runs the layout.
+
+Deliberately left as is, with the reason:
+- *Sequential expansion traces*: tasks.md rule 5 / plan KDN 5 require sequential, request-order tracing; measured cost of one expansion is +13 ms on 50k entities.
+- *Blocker paths can fill the 200 cap*: this is the priority order of FR-012 (focus, then blocking paths, then the neighborhood), and the omitted notice reports what was left out.
+- *Global jsdom shims in `test-setup.ts`*: ui.md §17 says to append them there.
+- *`loadEdgeRows` generic instead of `isTraceableRow` filters*, *evidence loaded twice for blocker hop entities*, *node `data` objects not referentially stable*, *`probeBeyondDepth` flag shape*: optimisations or style choices with no wrong result; revisit if the T051 browser check finds interaction lag at 200 nodes.

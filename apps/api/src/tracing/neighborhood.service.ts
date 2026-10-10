@@ -45,8 +45,16 @@ export class NeighborhoodService {
     private readonly evidence: StateEvidenceReader,
   ) {}
 
-  async neighborhood(id: string, query: NeighborhoodQuery): Promise<NeighborhoodResponse> {
+  async neighborhood(rawId: string, rawQuery: NeighborhoodQuery): Promise<NeighborhoodResponse> {
     const computedAt = new Date().toISOString();
+
+    // UUIDs are accepted in any case but the database returns them lower-case, so every
+    // comparison below (focus vs expand, node ids, parent edges) must use the lower-case form.
+    const id = rawId.toLowerCase();
+    const query: NeighborhoodQuery = {
+      ...rawQuery,
+      expand: [...new Set(rawQuery.expand.map((expandId) => expandId.toLowerCase()))],
+    };
 
     if (query.expand.includes(id)) {
       throw Errors.validation([

@@ -148,6 +148,33 @@ describe('NeighborhoodService', () => {
     expect(blockers).not.toHaveBeenCalled();
   });
 
+  it('treats ids case-insensitively: lower-cases the focus and the expand list', async () => {
+    const { service, traceNeighborhood, findRelationshipsAmong } = setup();
+    const a = ent('a');
+    traceNeighborhood.mockImplementation((q) =>
+      Promise.resolve(
+        q.startId === 'focus' ? trace(FOCUS, [reached(a, 'focus', 'ka')]) : trace(a, []),
+      ),
+    );
+    findRelationshipsAmong.mockResolvedValue([group('ka', 'REQUIRES', 'focus', 'a')]);
+    const response = await service.neighborhood('FOCUS', query({ expand: ['A', 'a'] }));
+    expect(traceNeighborhood.mock.calls.map(([q]) => q.startId)).toEqual(['focus', 'a']);
+    expect(response.focusId).toBe('focus');
+    expect(response.query.entityId).toBe('focus');
+    expect(response.query.expand).toEqual(['a']);
+    expect(response.nodes.find((n) => n.id === 'a')?.expanded).toBe(true);
+  });
+
+  it('rejects an upper-case spelling of the focus in expand', async () => {
+    const { service, traceNeighborhood } = setup();
+    const error = await service
+      .neighborhood('focus', query({ expand: ['FOCUS'] }))
+      .catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(AppError);
+    expect((error as AppError).code).toBe('VALIDATION_FAILED');
+    expect(traceNeighborhood).not.toHaveBeenCalled();
+  });
+
   it('defaults to the 12 relationship types for all and the 11 traceable ones for upstream', async () => {
     const all = setup();
     all.traceNeighborhood.mockResolvedValue(trace(FOCUS, []));

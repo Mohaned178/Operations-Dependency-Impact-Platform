@@ -592,6 +592,9 @@ describe('ExplorerPage', () => {
       expect(screen.getByRole('toolbar')).toBeInTheDocument();
       expect(await screen.findByRole('button', { name: 'Expand Upstream' })).toBeInTheDocument();
       expect(document.querySelectorAll('.react-flow__node')).toHaveLength(6);
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        'Could not expand or collapse that node, so the view was restored to its last state.',
+      );
     });
 
     it('keeps the toolbar mounted and its checklist open while new settings load', async () => {
