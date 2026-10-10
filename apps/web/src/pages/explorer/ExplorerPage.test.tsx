@@ -8,7 +8,7 @@ import { ApiError } from '../../lib/api-client';
 import { F1_BLOCKERS, N4_EDGE_KEYS, OFF_PATH_ID, RECORDS_STUB, n4Response } from './page-test-data';
 import { SHP_ID } from '../entities/tracing-test-data';
 import { ExplorerPage } from './ExplorerPage';
-import { smallResponse, uuid } from './test-fixtures';
+import { edge, node, response, smallResponse, uuid } from './test-fixtures';
 
 const { apiFetchMock } = vi.hoisted(() => ({ apiFetchMock: vi.fn() }));
 
@@ -417,13 +417,23 @@ describe('ExplorerPage', () => {
 
   describe('expand and collapse', () => {
     /** Answers neighborhood requests from the request itself: nodes in `expand` are marked expanded. */
-    function respondExpanding(options: { ignore?: string[]; hold?: Promise<void> } = {}) {
+    function respondExpanding(
+      options: {
+        ignore?: string[];
+        hold?: Promise<void>;
+        base?: () => NeighborhoodResponse;
+        failWhenExpanded?: boolean;
+      } = {},
+    ) {
       const ignore = options.ignore ?? [];
       let calls = 0;
       respond((path) => {
         calls += 1;
         const expand = new URLSearchParams(path.split('?')[1]).get('expand')?.split(',') ?? [];
-        const base = smallResponse();
+        if (options.failWhenExpanded === true && expand.length > 0) {
+          return Promise.reject(new ApiError(500, 'INTERNAL', 'boom'));
+        }
+        const base = (options.base ?? smallResponse)();
         const answer: NeighborhoodResponse = {
           ...base,
           nodes: base.nodes.map((n) => ({
@@ -538,6 +548,186 @@ describe('ExplorerPage', () => {
       });
       expect(expandParams(1)).toEqual([uuid(3)]);
     });
+  });
+
+  describe('robustness (review findings)', () => {
+    function respondExpanding(
+      options: { base?: () => NeighborhoodResponse; failWhenExpanded?: boolean } = {},
+    ) {
+      respond((path) => {
+        const expand = new URLSearchParams(path.split('?')[1]).get('expand')?.split(',') ?? [];
+        if (options.failWhenExpanded === true && expand.length > 0) {
+          return Promise.reject(new ApiError(500, 'INTERNAL', 'boom'));
+        }
+        const base = (options.base ?? smallResponse)();
+        return Promise.resolve({
+          ...base,
+          nodes: base.nodes.map((n) => ({ ...n, expanded: expand.includes(n.id) })),
+          query: { ...base.query, expand },
+        });
+      });
+    }
+
+    async function ready(nodeCount = 6) {
+      await screen.findByRole('heading', { level: 1 });
+      await waitFor(() => {
+        expect(document.querySelectorAll('.react-flow__node')).toHaveLength(nodeCount);
+      });
+    }
+
+    it('keeps the view and rolls the expansion back when an expand request fails', async () => {
+      respondExpanding({ failWhenExpanded: true });
+      renderPage();
+      await ready();
+      fireEvent.click(screen.getByRole('button', { name: 'Expand Upstream' }));
+
+      await waitFor(() => {
+        expect(neighborhoodCalls().length).toBeGreaterThanOrEqual(2);
+      });
+      // The graph, the summary and the toolbar are still there and nothing is stuck expanded.
+      await waitFor(() => {
+        expect(screen.queryByText('Unable to load the graph explorer.')).not.toBeInTheDocument();
+      });
+      expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument();
+      expect(screen.getByRole('toolbar')).toBeInTheDocument();
+      expect(await screen.findByRole('button', { name: 'Expand Upstream' })).toBeInTheDocument();
+      expect(document.querySelectorAll('.react-flow__node')).toHaveLength(6);
+    });
+
+    it('keeps the toolbar mounted and its checklist open while new settings load', async () => {
+      respondExpanding();
+      renderPage();
+      await ready();
+      const toolbar = screen.getByRole('toolbar');
+      await userEvent.click(screen.getByText(/^Entity types \(\d+\)$/));
+      await userEvent.click(screen.getByRole('checkbox', { name: 'Order' }));
+
+      expect(screen.getByTestId('location')).toHaveTextContent('entityTypes=Order');
+      await waitFor(() => {
+        expect(neighborhoodCalls()).toHaveLength(2);
+      });
+      expect(screen.getByRole('toolbar')).toBe(toolbar);
+      expect(screen.getByText(/^Entity types \(\d+\)$/).closest('details')).toHaveAttribute('open');
+    });
+
+    it('does not bring a selection back after its node left the view and returned', async () => {
+      const extra = () => {
+        const base = smallResponse();
+        return response(
+          [
+            ...base.nodes,
+            node({ n: 99, parent: 2, via: 99, name: 'Added by expansion', distance: null, reasons: ['EXPANSION'] }),
+          ],
+          [...base.edges, edge({ k: 99, type: 'REQUIRES', from: 2, to: 99 })],
+        );
+      };
+      // Node 99 is only present while node 2 is expanded.
+      respond((path) => {
+        const expand = new URLSearchParams(path.split('?')[1]).get('expand')?.split(',') ?? [];
+        const full = extra();
+        const keep = expand.includes(uuid(2));
+        return Promise.resolve({
+          ...full,
+          nodes: full.nodes
+            .filter((n) => keep || n.id !== uuid(99))
+            .map((n) => ({ ...n, expanded: expand.includes(n.id) })),
+          edges: full.edges.filter((e) => keep || e.key !== uuid(1099)),
+        });
+      });
+      renderPage();
+      await ready();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Expand Upstream' }));
+      await screen.findByRole('button', { name: 'Collapse Upstream' });
+      await userEvent.click(listButton(uuid(99)));
+      expect(listButton(uuid(99))).toHaveAttribute('aria-pressed', 'true');
+
+      fireEvent.click(screen.getByRole('button', { name: 'Collapse Upstream' }));
+      await screen.findByRole('button', { name: 'Expand Upstream' });
+      expect(document.querySelector(`button[data-entity-id="${uuid(99)}"]`)).toBeNull();
+      expect(screen.queryByLabelText('Details of Added by expansion')).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Expand Upstream' }));
+      await screen.findByRole('button', { name: 'Collapse Upstream' });
+      expect(listButton(uuid(99))).toHaveAttribute('aria-pressed', 'false');
+      expect(screen.queryByLabelText('Details of Added by expansion')).not.toBeInTheDocument();
+    });
+
+    it('collapses from the list for the selected row', async () => {
+      respondExpanding();
+      renderPage();
+      await ready();
+      await userEvent.click(listButton(uuid(3)));
+      await userEvent.click(screen.getByRole('button', { name: 'Expand' }));
+      const list = screen.getByRole('region', { name: 'Entities and relationships' });
+      await userEvent.click(await within(list).findByRole('button', { name: 'Collapse' }));
+
+      await waitFor(() => {
+        expect(neighborhoodCalls().length).toBeGreaterThanOrEqual(3);
+      });
+      const last = String(neighborhoodCalls().at(-1)?.[0]);
+      expect(new URLSearchParams(last.split('?')[1]).get('expand')).toBeNull();
+    });
+
+    it('starts the new focus without the previous expansions or focus mode', async () => {
+      respondExpanding();
+      renderPage();
+      await ready();
+      fireEvent.click(screen.getByRole('button', { name: 'Expand Upstream' }));
+      await screen.findByRole('button', { name: 'Collapse Upstream' });
+
+      await userEvent.click(listButton(uuid(3)));
+      await userEvent.click(screen.getByRole('button', { name: 'Focus mode on' }));
+      const list = screen.getByRole('region', { name: 'Entities and relationships' });
+      await userEvent.click(within(list).getByRole('button', { name: 'Explore from here' }));
+
+      await waitFor(() => {
+        expect(
+          neighborhoodCalls().some(([path]) =>
+            String(path).startsWith(`/entities/${uuid(3)}/neighborhood`),
+          ),
+        ).toBe(true);
+      });
+      const request = String(
+        neighborhoodCalls().find(([path]) =>
+          String(path).startsWith(`/entities/${uuid(3)}/neighborhood`),
+        )?.[0],
+      );
+      expect(new URLSearchParams(request.split('?')[1]).get('expand')).toBeNull();
+      await screen.findByRole('heading', { level: 1 });
+      expect(screen.queryByRole('button', { name: 'Focus mode off' })).not.toBeInTheDocument();
+    });
+
+    it('stops expanding after 50 nodes and says so', async () => {
+      const hub = () =>
+        response(
+          [
+            node({ n: 1, name: 'Hub' }),
+            ...Array.from({ length: 51 }, (_, i) =>
+              node({ n: i + 2, parent: 1, via: i + 2, name: `Dependent ${String(i + 2).padStart(2, '0')}` }),
+            ),
+          ],
+          Array.from({ length: 51 }, (_, i) => edge({ k: i + 2, type: 'REQUIRES', from: i + 2, to: 1 })),
+        );
+      respondExpanding({ base: hub });
+      renderPage();
+      await ready(52);
+
+      for (let n = 2; n <= 51; n += 1) {
+        const name = `Dependent ${String(n).padStart(2, '0')}`;
+        fireEvent.click(screen.getByRole('button', { name: `Expand ${name}` }));
+        await screen.findByRole('button', { name: `Collapse ${name}` });
+      }
+      expect(screen.getByRole('status')).toHaveTextContent(
+        'You have expanded the maximum of 50 nodes. Collapse one to expand another.',
+      );
+
+      const before = neighborhoodCalls().length;
+      fireEvent.click(screen.getByRole('button', { name: 'Expand Dependent 52' }));
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(neighborhoodCalls()).toHaveLength(before);
+      expect(screen.getByRole('button', { name: 'Expand Dependent 52' })).toBeInTheDocument();
+    }, 60_000);
   });
 
   describe('focus mode', () => {
@@ -719,5 +909,61 @@ describe('ExplorerPage', () => {
       expect(screen.getByRole('alert')).toHaveTextContent('depth:');
       expect(apiFetchMock).not.toHaveBeenCalled();
     });
+  });
+
+  describe('large neighborhoods (US4)', () => {
+    /** A hub with 199 direct dependents: exactly the 200-entity cap. */
+    function hubResponse(totals: NeighborhoodResponse['totals']): NeighborhoodResponse {
+      const nodes = [
+        node({ n: 1, name: 'Hub' }),
+        ...Array.from({ length: 199 }, (_, i) =>
+          node({ n: i + 2, parent: 1, via: i + 2, name: `Dependent ${String(i + 2).padStart(3, '0')}` }),
+        ),
+      ];
+      const edges = Array.from({ length: 199 }, (_, i) =>
+        edge({ k: i + 2, type: 'REQUIRES', from: i + 2, to: 1 }),
+      );
+      return response(nodes, edges, { totals });
+    }
+
+    it('says how many entities are left out, with the exact wording', async () => {
+      respond(hubResponse({ visible: 200, omitted: 4112, omittedIsLowerBound: false }));
+      renderPage();
+      expect(await screen.findByRole('status')).toHaveTextContent(
+        'Showing 200 of 4312 entities — 4112 more. Refine filters, reduce the step limit, or choose a direction.',
+      );
+    });
+
+    it('uses the lower-bound wording when counting stopped at the exploration limit', async () => {
+      respond(hubResponse({ visible: 200, omitted: 10000, omittedIsLowerBound: true }));
+      renderPage();
+      expect(await screen.findByRole('status')).toHaveTextContent(
+        'Showing 200 of more than 10200 entities — refine filters, reduce the step limit, or choose a direction.',
+      );
+    });
+
+    it('shows no notice when nothing is left out', async () => {
+      respond(hubResponse({ visible: 200, omitted: 0, omittedIsLowerBound: false }));
+      renderPage();
+      await screen.findByRole('heading', { level: 1 });
+      expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    });
+
+    it('draws all 200 entities and 199 relationships in both the graph and the list', async () => {
+      respond(hubResponse({ visible: 200, omitted: 4112, omittedIsLowerBound: false }));
+      renderPage();
+      await screen.findByRole('heading', { level: 1 });
+      await waitFor(() => {
+        expect(document.querySelectorAll('.react-flow__node')).toHaveLength(200);
+      });
+      expect(document.querySelectorAll('button[data-entity-id]')).toHaveLength(200);
+      expect(document.querySelectorAll('button[data-edge-key]')).toHaveLength(199);
+      await waitFor(() => {
+        expect(document.querySelectorAll('.react-flow__edge')).toHaveLength(199);
+      });
+      expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
+        '200 entities, 199 relationships',
+      );
+    }, 30_000);
   });
 });

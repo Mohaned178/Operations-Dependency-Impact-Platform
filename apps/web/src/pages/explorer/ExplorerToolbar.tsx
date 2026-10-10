@@ -8,6 +8,7 @@ import {
   type NeighborhoodDirection,
   type RelationshipType,
 } from '@opsgraph/shared';
+import { useRef } from 'react';
 import { useSearchParams } from 'react-router';
 import { writeExplorerParams } from './explorer-params';
 
@@ -64,6 +65,7 @@ function TypeChecklist<T extends string>({
         ))}
         <button
           type="button"
+          aria-label={`Clear ${title.toLowerCase()}`}
           onClick={() => {
             onChange([]);
           }}
@@ -79,6 +81,7 @@ function TypeChecklist<T extends string>({
 /** Contract ui.md §11: every control writes the URL (replace, defaults omitted). */
 export function ExplorerToolbar({ params }: ExplorerToolbarProps) {
   const [searchParams, setSearchParams] = useSearchParams();
+  const radios = useRef<Array<HTMLButtonElement | null>>([]);
 
   const update = (partial: Partial<ExplorerUrlParams>): void => {
     setSearchParams(writeExplorerParams(searchParams, partial), { replace: true });
@@ -99,6 +102,26 @@ export function ExplorerToolbar({ params }: ExplorerToolbarProps) {
     );
   };
 
+  // ARIA radio pattern: only the checked radio is a Tab stop; the arrow keys move and check.
+  const onRadioKeyDown = (event: React.KeyboardEvent, index: number): void => {
+    const step =
+      event.key === 'ArrowRight' || event.key === 'ArrowDown'
+        ? 1
+        : event.key === 'ArrowLeft' || event.key === 'ArrowUp'
+          ? -1
+          : 0;
+    if (step === 0) {
+      return;
+    }
+    event.preventDefault();
+    const next = (index + step + DIRECTIONS.length) % DIRECTIONS.length;
+    const target = DIRECTIONS[next];
+    if (target !== undefined) {
+      chooseDirection(target.value);
+      radios.current[next]?.focus();
+    }
+  };
+
   return (
     <div
       className="flex flex-wrap items-center gap-4 text-sm"
@@ -106,12 +129,19 @@ export function ExplorerToolbar({ params }: ExplorerToolbarProps) {
       aria-label="Explorer settings"
     >
       <div role="radiogroup" aria-label="Direction" className="flex overflow-hidden rounded border">
-        {DIRECTIONS.map(({ value, label }) => (
+        {DIRECTIONS.map(({ value, label }, index) => (
           <button
             key={value}
+            ref={(element) => {
+              radios.current[index] = element;
+            }}
             type="button"
             role="radio"
             aria-checked={params.direction === value}
+            tabIndex={params.direction === value ? 0 : -1}
+            onKeyDown={(event) => {
+              onRadioKeyDown(event, index);
+            }}
             onClick={() => {
               chooseDirection(value);
             }}

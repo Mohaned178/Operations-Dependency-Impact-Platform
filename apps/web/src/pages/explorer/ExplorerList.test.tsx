@@ -184,7 +184,7 @@ describe('ExplorerList actions on the selected row', () => {
   it('offers Expand, Focus mode on, Explore from here and Open Entity 360 for a non-focus row', () => {
     renderList(smallResponse(), { selection: { kind: 'node', id: uuid(2) } });
     expect(screen.getByRole('button', { name: 'Expand' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Focus mode on' })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('button', { name: 'Focus mode on' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Explore from here' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Open Entity 360' })).toBeInTheDocument();
   });
@@ -194,7 +194,7 @@ describe('ExplorerList actions on the selected row', () => {
     const r = { ...base, nodes: base.nodes.map((n) => (n.id === uuid(2) ? { ...n, expanded: true } : n)) };
     renderList(r, { selection: { kind: 'node', id: uuid(2) }, focusMode: true });
     expect(screen.getByRole('button', { name: 'Collapse' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Focus mode off' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Focus mode off' })).toBeInTheDocument();
   });
 
   it('hides Expand and Explore from here for the focus row but keeps Focus mode', () => {

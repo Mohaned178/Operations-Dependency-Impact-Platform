@@ -1,7 +1,7 @@
 import type { ExplorerUrlParams } from '@opsgraph/shared';
 import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter, useLocation } from 'react-router';
+import { MemoryRouter, useLocation, useNavigate } from 'react-router';
 import { afterEach, describe, expect, it } from 'vitest';
 import { ExplorerToolbar } from './ExplorerToolbar';
 
@@ -71,6 +71,57 @@ describe('ExplorerToolbar direction', () => {
   });
 });
 
+describe('ExplorerToolbar radiogroup keyboard', () => {
+  it('makes only the checked radio a Tab stop', () => {
+    renderToolbar('/graph/x?direction=upstream', { ...DEFAULTS, direction: 'upstream' });
+    expect(screen.getByRole('radio', { name: 'Upstream only' })).toHaveAttribute('tabindex', '0');
+    expect(screen.getByRole('radio', { name: 'All directions' })).toHaveAttribute('tabindex', '-1');
+    expect(screen.getByRole('radio', { name: 'Downstream only' })).toHaveAttribute('tabindex', '-1');
+  });
+
+  it('moves and checks the next radio with the arrow keys, wrapping around', async () => {
+    renderToolbar('/graph/x');
+    screen.getByRole('radio', { name: 'All directions' }).focus();
+    await userEvent.keyboard('{ArrowRight}');
+    expect(locationText()).toBe('/graph/x?direction=upstream');
+    expect(screen.getByRole('radio', { name: 'Upstream only' })).toHaveFocus();
+
+    await userEvent.keyboard('{ArrowLeft}{ArrowLeft}');
+    // upstream -> all (omitted from the URL) -> wraps to downstream
+    expect(locationText()).toBe('/graph/x?direction=downstream');
+    expect(screen.getByRole('radio', { name: 'Downstream only' })).toHaveFocus();
+  });
+});
+
+describe('ExplorerToolbar history', () => {
+  it('replaces the history entry, so Back leaves the explorer settings behind', async () => {
+    function Back() {
+      const navigate = useNavigate();
+      return (
+        <button
+          type="button"
+          onClick={() => {
+            void navigate(-1);
+          }}
+        >
+          Back
+        </button>
+      );
+    }
+    render(
+      <MemoryRouter initialEntries={['/start', '/graph/x']} initialIndex={1}>
+        <ExplorerToolbar params={DEFAULTS} />
+        <LocationProbe />
+        <Back />
+      </MemoryRouter>,
+    );
+    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Steps' }), '4');
+    expect(locationText()).toBe('/graph/x?depth=4');
+    await userEvent.click(screen.getByRole('button', { name: 'Back' }));
+    expect(locationText()).toBe('/start');
+  });
+});
+
 describe('ExplorerToolbar type filters', () => {
   async function open(title: RegExp) {
     await userEvent.click(screen.getByText(title));
@@ -108,7 +159,7 @@ describe('ExplorerToolbar type filters', () => {
     renderToolbar('/graph/x?entityTypes=Order,Shipment', { ...DEFAULTS, entityTypes: ['Order', 'Shipment'] });
     await open(/^Entity types/);
     const details = screen.getByText('Entity types (2)').closest('details') as HTMLElement;
-    await userEvent.click(within(details).getByRole('button', { name: 'Clear' }));
+    await userEvent.click(within(details).getByRole('button', { name: 'Clear entity types' }));
     expect(locationText()).toBe('/graph/x');
   });
 

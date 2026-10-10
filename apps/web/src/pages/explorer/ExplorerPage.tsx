@@ -1,4 +1,8 @@
-import type { ExplorerUrlParams, NeighborhoodResponse } from '@opsgraph/shared';
+import {
+  EXPLORER_LIMITS,
+  type ExplorerUrlParams,
+  type NeighborhoodResponse,
+} from '@opsgraph/shared';
 import { ReactFlowProvider } from '@xyflow/react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
@@ -18,7 +22,11 @@ import { NodeDetailsPanel } from './NodeDetailsPanel';
 import { toFlow } from './to-flow';
 import { useNeighborhood } from './useNeighborhood';
 
-/** Contract ui.md §15 step 1-2: validate the URL, then remount the view when it changes. */
+/**
+ * Contract ui.md §15 step 1-2: validate the URL, then remount the view when it changes. The
+ * toolbar sits outside the keyed view so it keeps its focus and open checklists while the new
+ * settings load.
+ */
 export function ExplorerPage() {
   const { id = '' } = useParams();
   const [searchParams] = useSearchParams();
@@ -44,12 +52,15 @@ export function ExplorerPage() {
 
   const canonicalSearch = writeExplorerParams(new URLSearchParams(), parsed.params).toString();
   return (
-    <ExplorerView
-      key={`${id}?${canonicalSearch}`}
-      id={id}
-      params={parsed.params}
-      search={canonicalSearch}
-    />
+    <div className="flex flex-col gap-3">
+      <ExplorerToolbar params={parsed.params} />
+      <ExplorerView
+        key={`${id}?${canonicalSearch}`}
+        id={id}
+        params={parsed.params}
+        search={canonicalSearch}
+      />
+    </div>
   );
 }
 
@@ -57,6 +68,20 @@ interface ExplorerViewProps {
   id: string;
   params: ExplorerUrlParams;
   search: string;
+}
+
+interface GoodView {
+  response: NeighborhoodResponse;
+  expand: string[];
+}
+
+function selectionIn(response: NeighborhoodResponse, selection: Selection): boolean {
+  if (selection === null) {
+    return false;
+  }
+  return selection.kind === 'node'
+    ? response.nodes.some((n) => n.id === selection.id)
+    : response.edges.some((e) => e.key === selection.key);
 }
 
 function ExplorerView({ id, params, search }: ExplorerViewProps) {
@@ -67,19 +92,42 @@ function ExplorerView({ id, params, search }: ExplorerViewProps) {
   const [focusModeOn, setFocusModeOn] = useState(false);
   const [selectedPathIndex, setSelectedPathIndex] = useState<number | null>(null);
   const [centerOn, setCenterOn] = useState<{ id: string; nonce: number } | null>(null);
+  const [lastGood, setLastGood] = useState<GoodView | null>(null);
 
-  const response = neighborhood.data;
+  const settled = neighborhood.data !== undefined && !neighborhood.isPlaceholderData;
+  useEffect(() => {
+    if (neighborhood.data !== undefined && settled) {
+      setLastGood({ response: neighborhood.data, expand });
+    }
+  }, [neighborhood.data, settled, expand]);
 
-  // A selection that is not in the current response counts as no selection (ui.md §15 step 7).
-  const activeSelection = useMemo<Selection>(() => {
-    if (response === undefined || selection === null) {
-      return null;
+  // A failed expand or collapse (a new query that has no data) rolls the expansions back to the
+  // last request that worked, instead of leaving the user on an error page.
+  const failedWithoutData = neighborhood.isError && neighborhood.data === undefined;
+  useEffect(() => {
+    if (failedWithoutData && lastGood !== null) {
+      setExpand(lastGood.expand);
     }
-    if (selection.kind === 'node') {
-      return response.nodes.some((n) => n.id === selection.id) ? selection : null;
+  }, [failedWithoutData, lastGood]);
+
+  const response = neighborhood.data ?? lastGood?.response;
+
+  // A selection that is not in the current response is dropped (data-model §4), so it cannot
+  // come back when the node reappears.
+  const stale =
+    response !== undefined &&
+    settled &&
+    selection !== null &&
+    !selectionIn(response, selection);
+  useEffect(() => {
+    if (stale) {
+      setSelection(null);
     }
-    return response.edges.some((e) => e.key === selection.key) ? selection : null;
-  }, [response, selection]);
+  }, [stale]);
+  const activeSelection = useMemo<Selection>(
+    () => (response !== undefined && selectionIn(response, selection) ? selection : null),
+    [response, selection],
+  );
 
   // Focus mode only applies to a selected node; it turns itself off otherwise (data-model §4).
   const focusMode = focusModeOn && activeSelection?.kind === 'node';
@@ -90,20 +138,31 @@ function ExplorerView({ id, params, search }: ExplorerViewProps) {
   }, [focusModeOn, activeSelection]);
 
   // Expansions the server could not apply (unknown, or not visible) are dropped from the state.
-  const ignored = neighborhood.isPlaceholderData ? undefined : response?.ignoredExpansions;
+  const ignored = settled ? response?.ignoredExpansions : undefined;
   useEffect(() => {
     if (ignored !== undefined && ignored.length > 0) {
       setExpand((previous) => previous.filter((expandedId) => !ignored.includes(expandedId)));
     }
   }, [ignored]);
 
-  const toggleExpand = useCallback((entityId: string): void => {
-    setExpand((previous) =>
-      previous.includes(entityId)
-        ? previous.filter((expandedId) => expandedId !== entityId)
-        : [...previous, entityId],
-    );
-  }, []);
+  // Toggling while a request is in flight would leave the labels out of step with the state.
+  const loading = neighborhood.isPlaceholderData;
+  const toggleExpand = useCallback(
+    (entityId: string): void => {
+      if (loading) {
+        return;
+      }
+      setExpand((previous) => {
+        if (previous.includes(entityId)) {
+          return previous.filter((expandedId) => expandedId !== entityId);
+        }
+        return previous.length >= EXPLORER_LIMITS.maxExpansions
+          ? previous
+          : [...previous, entityId];
+      });
+    },
+    [loading],
+  );
   const actions = useMemo(() => ({ toggleExpand }), [toggleExpand]);
 
   const exploreFrom = useCallback(
@@ -128,7 +187,7 @@ function ExplorerView({ id, params, search }: ExplorerViewProps) {
     return { layout, emphasis, flow };
   }, [response, activeSelection, selectedPathIndex, focusMode]);
 
-  if (neighborhood.isPending) {
+  if (neighborhood.isPending && response === undefined) {
     return <p>Loading…</p>;
   }
   if (response === undefined || view === null) {
@@ -148,7 +207,7 @@ function ExplorerView({ id, params, search }: ExplorerViewProps) {
   };
 
   return (
-    <div className="grid grid-cols-1 gap-4 lg:h-[calc(100vh-8rem)] lg:grid-cols-[1fr_380px]">
+    <div className="grid grid-cols-1 gap-4 lg:h-[calc(100vh-12rem)] lg:grid-cols-[1fr_380px]">
       <div className="flex min-h-0 flex-col gap-2">
         <ExplorerSummary
           response={response}
@@ -163,24 +222,28 @@ function ExplorerView({ id, params, search }: ExplorerViewProps) {
             Could not refresh the view. Showing the last loaded data.
           </p>
         ) : null}
-        <ExplorerToolbar params={params} />
+        {expand.length >= EXPLORER_LIMITS.maxExpansions ? (
+          <p role="status" className="text-sm text-amber-900">
+            {`You have expanded the maximum of ${EXPLORER_LIMITS.maxExpansions} nodes. Collapse one to expand another.`}
+          </p>
+        ) : null}
         <div className="relative h-[480px] overflow-hidden rounded border bg-white lg:h-auto lg:min-h-[480px] lg:flex-1">
           <ExplorerActionsContext.Provider value={actions}>
             <ReactFlowProvider>
               <GraphCanvas
-              nodes={view.flow.nodes}
-              edges={view.flow.edges}
-              onSelectNode={(nodeId) => {
-                setSelection({ kind: 'node', id: nodeId });
-              }}
-              onSelectEdge={(key) => {
-                setSelection({ kind: 'edge', key });
-              }}
-              onClearSelection={() => {
-                setSelection(null);
-              }}
-              centerOn={centerOn}
-              centers={view.layout.center}
+                nodes={view.flow.nodes}
+                edges={view.flow.edges}
+                onSelectNode={(nodeId) => {
+                  setSelection({ kind: 'node', id: nodeId });
+                }}
+                onSelectEdge={(key) => {
+                  setSelection({ kind: 'edge', key });
+                }}
+                onClearSelection={() => {
+                  setSelection(null);
+                }}
+                centerOn={centerOn}
+                centers={view.layout.center}
               />
             </ReactFlowProvider>
           </ExplorerActionsContext.Provider>

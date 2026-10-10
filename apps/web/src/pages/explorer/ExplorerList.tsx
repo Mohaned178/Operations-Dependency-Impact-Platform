@@ -144,7 +144,6 @@ export function ExplorerList({
                         )}
                         <button
                           type="button"
-                          aria-pressed={focusMode}
                           onClick={onToggleFocusMode}
                           className="rounded border px-2 py-0.5"
                         >
