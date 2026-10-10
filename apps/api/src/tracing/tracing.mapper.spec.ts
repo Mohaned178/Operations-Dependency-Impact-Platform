@@ -1,8 +1,14 @@
-import type { GraphEntityRef, TraversalHop, TraversalPath } from '../graph/graph.repository';
+import type {
+  GraphEntityRef,
+  RelationshipGroup,
+  TraversalHop,
+  TraversalPath,
+} from '../graph/graph.repository';
 import type { EntityStateEvidence } from './state-evidence.reader';
 import {
   collectEntityIds,
   toCycleClosingHopDto,
+  toGraphEdgeDto,
   toHopDto,
   toPathDto,
   toTracedEntityDto,
@@ -128,6 +134,51 @@ describe('toCycleClosingHopDto', () => {
       fromEntityId: 'a',
       toEntityId: 'b',
       relationshipIds: ['k', 'm'],
+    });
+  });
+});
+
+describe('toGraphEdgeDto', () => {
+  it('copies the group as recorded and serializes assertion times as ISO strings', () => {
+    const group: RelationshipGroup = {
+      key: 'k1',
+      type: 'BLOCKS',
+      fromEntityId: 'pay',
+      toEntityId: 'shp',
+      effectiveOrigin: 'MANUAL',
+      effectiveConfidence: 'MEDIUM',
+      assertions: [
+        {
+          relationshipId: 'k1',
+          origin: 'MANUAL',
+          confidence: 'MEDIUM',
+          basis: 'Analyst note',
+          sourceSystem: 'OPSGRAPH',
+          sourceId: 'manual-1',
+          observedAt: OBSERVED,
+          importId: 'import-1',
+        },
+      ],
+    };
+    expect(toGraphEdgeDto(group)).toEqual({
+      key: 'k1',
+      relationshipType: 'BLOCKS',
+      fromEntityId: 'pay',
+      toEntityId: 'shp',
+      effectiveOrigin: 'MANUAL',
+      effectiveConfidence: 'MEDIUM',
+      assertions: [
+        {
+          relationshipId: 'k1',
+          origin: 'MANUAL',
+          confidence: 'MEDIUM',
+          basis: 'Analyst note',
+          sourceSystem: 'OPSGRAPH',
+          sourceId: 'manual-1',
+          observedAt: '2026-09-29T11:40:00.000Z',
+          importId: 'import-1',
+        },
+      ],
     });
   });
 });
