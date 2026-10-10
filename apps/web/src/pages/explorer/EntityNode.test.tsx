@@ -1,5 +1,5 @@
-import { cleanup, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { cleanup, fireEvent, screen } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { EntityFlowNode } from './flow-types';
 import { flowFor, renderFlow } from './flow-test-utils';
 import { blockersStub, edge, node, response, smallResponse, uuid } from './test-fixtures';
@@ -22,9 +22,37 @@ function card(name: string): HTMLElement {
   return el;
 }
 
-function render(nodes: EntityFlowNode[]) {
-  renderFlow(nodes);
+function render(nodes: EntityFlowNode[], toggleExpand: (id: string) => void = () => undefined) {
+  renderFlow(nodes, [], { toggleExpand });
 }
+
+describe('EntityNode expand button', () => {
+  it('is offered on a non-focus node and not on the focus', () => {
+    render(flowFor(smallResponse()).nodes);
+    expect(screen.getByRole('button', { name: 'Expand Upstream' })).toHaveTextContent('+');
+    expect(screen.queryByRole('button', { name: /Focus$/ })).not.toBeInTheDocument();
+    expect(screen.getAllByRole('button')).toHaveLength(smallResponse().nodes.length - 1);
+  });
+
+  it('offers Collapse with a minus sign on an expanded node', () => {
+    const base = smallResponse();
+    const r = {
+      ...base,
+      nodes: base.nodes.map((n) => (n.id === uuid(2) ? { ...n, expanded: true } : n)),
+    };
+    render(flowFor(r).nodes);
+    expect(screen.getByRole('button', { name: 'Collapse Upstream' })).toHaveTextContent('−');
+    expect(screen.getByRole('button', { name: 'Expand Downstream' })).toHaveTextContent('+');
+  });
+
+  it('asks the page to toggle that node when clicked', () => {
+    const toggleExpand = vi.fn();
+    render(flowFor(smallResponse()).nodes, toggleExpand);
+    fireEvent.click(screen.getByRole('button', { name: 'Expand Downstream' }));
+    expect(toggleExpand).toHaveBeenCalledTimes(1);
+    expect(toggleExpand).toHaveBeenCalledWith(uuid(3));
+  });
+});
 
 describe('EntityNode', () => {
   it('marks the focus with its label, border and ring', () => {

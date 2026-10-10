@@ -1,11 +1,12 @@
 import type { ExplorerUrlParams, NeighborhoodResponse } from '@opsgraph/shared';
 import { ReactFlowProvider } from '@xyflow/react';
-import { useMemo, useState } from 'react';
-import { Link, useParams, useSearchParams } from 'react-router';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { ApiError } from '../../lib/api-client';
 import { BlockerHighlightPanel } from './BlockerHighlightPanel';
 import { computeEmphasis } from './emphasis';
 import { EdgeDetailsPanel } from './EdgeDetailsPanel';
+import { ExplorerActionsContext } from './explorer-actions';
 import { ExplorerList } from './ExplorerList';
 import { parseExplorerParams, writeExplorerParams } from './explorer-params';
 import { ExplorerSummary } from './ExplorerSummary';
@@ -59,8 +60,11 @@ interface ExplorerViewProps {
 }
 
 function ExplorerView({ id, params, search }: ExplorerViewProps) {
-  const neighborhood = useNeighborhood(id, params, []);
+  const navigate = useNavigate();
+  const [expand, setExpand] = useState<string[]>([]);
+  const neighborhood = useNeighborhood(id, params, expand);
   const [selection, setSelection] = useState<Selection>(null);
+  const [focusModeOn, setFocusModeOn] = useState(false);
   const [selectedPathIndex, setSelectedPathIndex] = useState<number | null>(null);
   const [centerOn, setCenterOn] = useState<{ id: string; nonce: number } | null>(null);
 
@@ -77,6 +81,38 @@ function ExplorerView({ id, params, search }: ExplorerViewProps) {
     return response.edges.some((e) => e.key === selection.key) ? selection : null;
   }, [response, selection]);
 
+  // Focus mode only applies to a selected node; it turns itself off otherwise (data-model §4).
+  const focusMode = focusModeOn && activeSelection?.kind === 'node';
+  useEffect(() => {
+    if (focusModeOn && activeSelection?.kind !== 'node') {
+      setFocusModeOn(false);
+    }
+  }, [focusModeOn, activeSelection]);
+
+  // Expansions the server could not apply (unknown, or not visible) are dropped from the state.
+  const ignored = neighborhood.isPlaceholderData ? undefined : response?.ignoredExpansions;
+  useEffect(() => {
+    if (ignored !== undefined && ignored.length > 0) {
+      setExpand((previous) => previous.filter((expandedId) => !ignored.includes(expandedId)));
+    }
+  }, [ignored]);
+
+  const toggleExpand = useCallback((entityId: string): void => {
+    setExpand((previous) =>
+      previous.includes(entityId)
+        ? previous.filter((expandedId) => expandedId !== entityId)
+        : [...previous, entityId],
+    );
+  }, []);
+  const actions = useMemo(() => ({ toggleExpand }), [toggleExpand]);
+
+  const exploreFrom = useCallback(
+    (entityId: string): void => {
+      void navigate(search === '' ? `/graph/${entityId}` : `/graph/${entityId}?${search}`);
+    },
+    [navigate, search],
+  );
+
   const view = useMemo(() => {
     if (response === undefined) {
       return null;
@@ -85,12 +121,12 @@ function ExplorerView({ id, params, search }: ExplorerViewProps) {
     const emphasis = computeEmphasis({
       response,
       selection: activeSelection,
-      focusMode: false,
+      focusMode,
       selectedPathIndex,
     });
     const flow = toFlow({ response, layout, emphasis, selection: activeSelection });
     return { layout, emphasis, flow };
-  }, [response, activeSelection, selectedPathIndex]);
+  }, [response, activeSelection, selectedPathIndex, focusMode]);
 
   if (neighborhood.isPending) {
     return <p>Loading…</p>;
@@ -129,8 +165,9 @@ function ExplorerView({ id, params, search }: ExplorerViewProps) {
         ) : null}
         <ExplorerToolbar params={params} />
         <div className="relative h-[480px] overflow-hidden rounded border bg-white lg:h-auto lg:min-h-[480px] lg:flex-1">
-          <ReactFlowProvider>
-            <GraphCanvas
+          <ExplorerActionsContext.Provider value={actions}>
+            <ReactFlowProvider>
+              <GraphCanvas
               nodes={view.flow.nodes}
               edges={view.flow.edges}
               onSelectNode={(nodeId) => {
@@ -144,12 +181,14 @@ function ExplorerView({ id, params, search }: ExplorerViewProps) {
               }}
               centerOn={centerOn}
               centers={view.layout.center}
-            />
-          </ReactFlowProvider>
+              />
+            </ReactFlowProvider>
+          </ExplorerActionsContext.Provider>
           <SidePanel
             response={response}
             selection={activeSelection}
             search={search}
+            onExploreFrom={exploreFrom}
             onClose={() => {
               setSelection(null);
             }}
@@ -172,6 +211,12 @@ function ExplorerView({ id, params, search }: ExplorerViewProps) {
           onSelectEdge={(key) => {
             setSelection({ kind: 'edge', key });
           }}
+          onToggleExpand={toggleExpand}
+          onToggleFocusMode={() => {
+            setFocusModeOn((previous) => !previous);
+          }}
+          focusMode={focusMode}
+          onExploreFrom={exploreFrom}
         />
       </div>
     </div>
@@ -182,17 +227,25 @@ interface SidePanelProps {
   response: NeighborhoodResponse;
   selection: Selection;
   search: string;
+  onExploreFrom: (id: string) => void;
   onClose: () => void;
 }
 
-function SidePanel({ response, selection, search, onClose }: SidePanelProps) {
+function SidePanel({ response, selection, search, onExploreFrom, onClose }: SidePanelProps) {
   if (selection === null) {
     return null;
   }
   if (selection.kind === 'node') {
     const node = response.nodes.find((n) => n.id === selection.id);
     return node === undefined ? null : (
-      <NodeDetailsPanel key={node.id} node={node} search={search} onClose={onClose} />
+      <NodeDetailsPanel
+        key={node.id}
+        node={node}
+        search={search}
+        isFocus={node.id === response.focusId}
+        onExploreFrom={onExploreFrom}
+        onClose={onClose}
+      />
     );
   }
   const edge = response.edges.find((e) => e.key === selection.key);

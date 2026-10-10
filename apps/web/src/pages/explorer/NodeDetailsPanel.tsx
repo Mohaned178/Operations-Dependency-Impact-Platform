@@ -41,6 +41,9 @@ export interface NodeDetailsPanelProps {
   node: NeighborhoodNodeDto;
   /** Canonical explorer settings, for the Explore links. */
   search: string;
+  /** The focus entity cannot be explored from: it is already the centre. */
+  isFocus: boolean;
+  onExploreFrom: (id: string) => void;
   onClose: () => void;
 }
 
@@ -141,7 +144,13 @@ function Evidence({ node }: { node: NeighborhoodNodeDto }) {
 }
 
 /** Contract ui.md §14: what a selected entity is, what blocks it, what it blocks, and its evidence. */
-export function NodeDetailsPanel({ node, search, onClose }: NodeDetailsPanelProps) {
+export function NodeDetailsPanel({
+  node,
+  search,
+  isFocus,
+  onExploreFrom,
+  onClose,
+}: NodeDetailsPanelProps) {
   const observation = node.state.observation;
   return (
     <aside className={PANEL_CLASS} aria-label={`Details of ${node.displayName}`}>
@@ -189,6 +198,17 @@ export function NodeDetailsPanel({ node, search, onClose }: NodeDetailsPanelProp
           <Link to={`/entities/${node.id}`} className="underline">
             Open Entity 360
           </Link>
+          {isFocus ? null : (
+            <button
+              type="button"
+              onClick={() => {
+                onExploreFrom(node.id);
+              }}
+              className="rounded border px-2 py-0.5"
+            >
+              Explore from here
+            </button>
+          )}
         </div>
       </div>
     </aside>

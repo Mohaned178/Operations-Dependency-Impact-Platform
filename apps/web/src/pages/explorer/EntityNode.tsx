@@ -1,6 +1,7 @@
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 import { memo } from 'react';
 import { StateBadge } from '../entities/StateBadge';
+import { useExplorerActions } from './explorer-actions';
 import type { EntityFlowNode } from './flow-types';
 import { NodeChips } from './NodeChips';
 
@@ -37,6 +38,23 @@ function nodeClass(input: {
   return parts.join(' ');
 }
 
+function ExpandButton({ id, name, expanded }: { id: string; name: string; expanded: boolean }) {
+  const { toggleExpand } = useExplorerActions();
+  return (
+    <button
+      type="button"
+      className="nodrag nopan absolute bottom-1 right-1 h-5 w-5 rounded border border-slate-300 bg-white text-xs leading-none"
+      aria-label={`${expanded ? 'Collapse' : 'Expand'} ${name}`}
+      onClick={(event) => {
+        event.stopPropagation();
+        toggleExpand(id);
+      }}
+    >
+      {expanded ? '−' : '+'}
+    </button>
+  );
+}
+
 export const EntityNode = memo(function EntityNode({ data, selected }: NodeProps<EntityFlowNode>) {
   const { entity, isFocus, isConnector, emphasis } = data;
   return (
@@ -54,6 +72,9 @@ export const EntityNode = memo(function EntityNode({ data, selected }: NodeProps
         <StateBadge state={entity.currentState} />
         <NodeChips node={entity} blockerRole={data.blockerRole} />
       </div>
+      {data.canExpand ? (
+        <ExpandButton id={entity.id} name={entity.displayName} expanded={entity.expanded} />
+      ) : null}
     </div>
   );
 });

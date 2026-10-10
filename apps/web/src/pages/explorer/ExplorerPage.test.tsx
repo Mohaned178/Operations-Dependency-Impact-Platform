@@ -1,8 +1,8 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import type { NeighborhoodResponse } from '@opsgraph/shared';
+import { NeighborhoodDirectionSchema, type NeighborhoodResponse } from '@opsgraph/shared';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter, Route, Routes, useLocation } from 'react-router';
+import { MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../../lib/api-client';
 import { F1_BLOCKERS, N4_EDGE_KEYS, OFF_PATH_ID, RECORDS_STUB, n4Response } from './page-test-data';
@@ -30,13 +30,28 @@ vi.mock('../../lib/api-client', async (importOriginal) => {
 
 function LocationProbe() {
   const location = useLocation();
-  return <p data-testid="location">{`${location.pathname}${location.search}`}</p>;
+  const navigate = useNavigate();
+  return (
+    <>
+      <p data-testid="location">{`${location.pathname}${location.search}`}</p>
+      <button
+        type="button"
+        onClick={() => {
+          void navigate(-1);
+        }}
+      >
+        Go back
+      </button>
+    </>
+  );
 }
 
-function respond(neighborhood: NeighborhoodResponse = smallResponse()) {
+function respond(
+  neighborhood: NeighborhoodResponse | ((path: string) => Promise<NeighborhoodResponse>) = smallResponse(),
+) {
   apiFetchMock.mockImplementation((path: string) => {
     if (path.includes('/neighborhood')) {
-      return Promise.resolve(neighborhood);
+      return typeof neighborhood === 'function' ? neighborhood(path) : Promise.resolve(neighborhood);
     }
     if (path.includes('/blockers')) {
       return Promise.resolve({ ...F1_BLOCKERS, directBlockers: [], deepestBlockers: [], paths: [] });
@@ -397,6 +412,312 @@ describe('ExplorerPage', () => {
       renderPage();
       await screen.findByRole('heading', { level: 1 });
       expect(screen.queryByRole('region', { name: 'Blockers' })).not.toBeInTheDocument();
+    });
+  });
+
+  describe('expand and collapse', () => {
+    /** Answers neighborhood requests from the request itself: nodes in `expand` are marked expanded. */
+    function respondExpanding(options: { ignore?: string[]; hold?: Promise<void> } = {}) {
+      const ignore = options.ignore ?? [];
+      let calls = 0;
+      respond((path) => {
+        calls += 1;
+        const expand = new URLSearchParams(path.split('?')[1]).get('expand')?.split(',') ?? [];
+        const base = smallResponse();
+        const answer: NeighborhoodResponse = {
+          ...base,
+          nodes: base.nodes.map((n) => ({
+            ...n,
+            expanded: expand.includes(n.id) && !ignore.includes(n.id),
+          })),
+          query: { ...base.query, expand },
+          ignoredExpansions: expand.filter((e) => ignore.includes(e)),
+        };
+        return calls > 1 && options.hold !== undefined
+          ? options.hold.then(() => answer)
+          : Promise.resolve(answer);
+      });
+    }
+
+    const expandParams = (index: number): string[] => {
+      const path = String(neighborhoodCalls()[index]?.[0]);
+      return new URLSearchParams(path.split('?')[1]).get('expand')?.split(',') ?? [];
+    };
+
+    async function ready() {
+      await screen.findByRole('heading', { level: 1 });
+      await waitFor(() => {
+        expect(document.querySelectorAll('.react-flow__node')).toHaveLength(6);
+      });
+    }
+
+    it('expanding a node requests expand=<id> without selecting the node', async () => {
+      respondExpanding();
+      renderPage();
+      await ready();
+      fireEvent.click(screen.getByRole('button', { name: 'Expand Upstream' }));
+
+      await waitFor(() => {
+        expect(neighborhoodCalls()).toHaveLength(2);
+      });
+      expect(expandParams(0)).toEqual([]);
+      expect(expandParams(1)).toEqual([uuid(2)]);
+      expect(screen.queryByLabelText('Details of Upstream')).not.toBeInTheDocument();
+    });
+
+    it('sends expansions in the order they were made, and collapse removes one', async () => {
+      respondExpanding();
+      renderPage();
+      await ready();
+      fireEvent.click(screen.getByRole('button', { name: 'Expand Downstream' }));
+      await screen.findByRole('button', { name: 'Collapse Downstream' });
+      fireEvent.click(screen.getByRole('button', { name: 'Expand Upstream' }));
+      await screen.findByRole('button', { name: 'Collapse Upstream' });
+      expect(expandParams(neighborhoodCalls().length - 1)).toEqual([uuid(3), uuid(2)]);
+
+      fireEvent.click(screen.getByRole('button', { name: 'Collapse Downstream' }));
+      await screen.findByRole('button', { name: 'Expand Downstream' });
+      expect(expandParams(neighborhoodCalls().length - 1)).toEqual([uuid(2)]);
+    });
+
+    it('drops expansions the server ignored from its state', async () => {
+      respondExpanding({ ignore: [uuid(2)] });
+      renderPage();
+      await ready();
+      fireEvent.click(screen.getByRole('button', { name: 'Expand Upstream' }));
+
+      await waitFor(() => {
+        expect(neighborhoodCalls()).toHaveLength(3);
+      });
+      expect(expandParams(1)).toEqual([uuid(2)]);
+      expect(expandParams(2)).toEqual([]);
+      expect(screen.getByRole('button', { name: 'Expand Upstream' })).toBeInTheDocument();
+    });
+
+    it('resets expansions when a setting changes', async () => {
+      respondExpanding();
+      renderPage();
+      await ready();
+      fireEvent.click(screen.getByRole('button', { name: 'Expand Upstream' }));
+      await screen.findByRole('button', { name: 'Collapse Upstream' });
+
+      await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Steps' }), '3');
+      await waitFor(() => {
+        expect(String(neighborhoodCalls().at(-1)?.[0])).toContain('depth=3');
+      });
+      expect(expandParams(neighborhoodCalls().length - 1)).toEqual([]);
+    });
+
+    it('shows Updating… while the previous graph stays on screen', async () => {
+      let release: () => void = () => undefined;
+      const hold = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      respondExpanding({ hold });
+      renderPage();
+      await ready();
+      fireEvent.click(screen.getByRole('button', { name: 'Expand Upstream' }));
+
+      expect(await screen.findByText(/Updating…/)).toBeInTheDocument();
+      expect(document.querySelectorAll('.react-flow__node')).toHaveLength(6);
+
+      release();
+      await waitFor(() => {
+        expect(screen.queryByText(/Updating…/)).not.toBeInTheDocument();
+      });
+    });
+
+    it('expands from the list for the selected row', async () => {
+      respondExpanding();
+      renderPage();
+      await ready();
+      await userEvent.click(listButton(uuid(3)));
+      await userEvent.click(screen.getByRole('button', { name: 'Expand' }));
+      await waitFor(() => {
+        expect(neighborhoodCalls()).toHaveLength(2);
+      });
+      expect(expandParams(1)).toEqual([uuid(3)]);
+    });
+  });
+
+  describe('focus mode', () => {
+    async function ready() {
+      respond();
+      renderPage();
+      await screen.findByRole('heading', { level: 1 });
+      await waitFor(() => {
+        expect(document.querySelectorAll('.react-flow__node')).toHaveLength(6);
+      });
+    }
+    const card = (id: string) => flowNode(id).firstElementChild?.className ?? '';
+
+    it('dims everything outside the selected node and its neighbors but keeps it rendered', async () => {
+      await ready();
+      await userEvent.click(listButton(uuid(3)));
+      await userEvent.click(screen.getByRole('button', { name: 'Focus mode on' }));
+
+      await waitFor(() => {
+        expect(card(uuid(2))).toContain('opacity-20');
+      });
+      // Node 3 is joined to the focus (1) and to 6.
+      for (const kept of [3, 1, 6]) {
+        expect(card(uuid(kept))).not.toContain('opacity-20');
+      }
+      for (const dimmed of [2, 4, 5]) {
+        expect(card(uuid(dimmed))).toContain('opacity-20');
+        expect(flowNode(uuid(dimmed))).toBeInTheDocument();
+      }
+      expect(screen.getByRole('button', { name: 'Focus mode off' })).toBeInTheDocument();
+
+      await userEvent.click(screen.getByRole('button', { name: 'Focus mode off' }));
+      await waitFor(() => {
+        expect(card(uuid(2))).not.toContain('opacity-20');
+      });
+    });
+
+    it('turns itself off when the selection is cleared', async () => {
+      await ready();
+      await userEvent.click(listButton(uuid(3)));
+      await userEvent.click(screen.getByRole('button', { name: 'Focus mode on' }));
+      await waitFor(() => {
+        expect(card(uuid(2))).toContain('opacity-20');
+      });
+
+      await userEvent.click(screen.getByRole('button', { name: 'Close' }));
+      await waitFor(() => {
+        expect(card(uuid(2))).not.toContain('opacity-20');
+      });
+      await userEvent.click(listButton(uuid(3)));
+      expect(screen.getByRole('button', { name: 'Focus mode on' })).toBeInTheDocument();
+      expect(card(uuid(2))).not.toContain('opacity-20');
+    });
+
+    it('turns itself off when a relationship is selected', async () => {
+      await ready();
+      await userEvent.click(listButton(uuid(3)));
+      await userEvent.click(screen.getByRole('button', { name: 'Focus mode on' }));
+      await waitFor(() => {
+        expect(card(uuid(2))).toContain('opacity-20');
+      });
+      await userEvent.click(
+        document.querySelector(`button[data-edge-key="${uuid(1001)}"]`) as HTMLElement,
+      );
+      await waitFor(() => {
+        expect(card(uuid(2))).not.toContain('opacity-20');
+      });
+    });
+  });
+
+  describe('Explore from here', () => {
+    async function ready(url?: string) {
+      respond();
+      renderPage(url);
+      await screen.findByRole('heading', { level: 1 });
+      await waitFor(() => {
+        expect(document.querySelectorAll('.react-flow__node')).toHaveLength(6);
+      });
+    }
+
+    it('re-centers from the list with the same settings, and Back returns to the previous focus', async () => {
+      await ready(`/graph/${uuid(1)}?depth=3&blockers=true`);
+      await userEvent.click(listButton(uuid(3)));
+      const list = screen.getByRole('region', { name: 'Entities and relationships' });
+      await userEvent.click(within(list).getByRole('button', { name: 'Explore from here' }));
+
+      expect(screen.getByTestId('location')).toHaveTextContent(
+        `/graph/${uuid(3)}?depth=3&blockers=true`,
+      );
+      await waitFor(() => {
+        expect(
+          neighborhoodCalls().some(([path]) =>
+            String(path).startsWith(`/entities/${uuid(3)}/neighborhood?direction=all&depth=3`),
+          ),
+        ).toBe(true);
+      });
+      expect(String(neighborhoodCalls().at(-1)?.[0])).toContain('blockers=true');
+
+      await userEvent.click(screen.getByRole('button', { name: 'Go back' }));
+      expect(screen.getByTestId('location')).toHaveTextContent(
+        `/graph/${uuid(1)}?depth=3&blockers=true`,
+      );
+    });
+
+    it('re-centers from the entity panel', async () => {
+      await ready();
+      await userEvent.click(listButton(uuid(2)));
+      const panel = await screen.findByLabelText('Details of Upstream');
+      await userEvent.click(within(panel).getByRole('button', { name: 'Explore from here' }));
+      expect(screen.getByTestId('location')).toHaveTextContent(`/graph/${uuid(2)}`);
+    });
+
+    it('offers no Explore from here for the focus entity', async () => {
+      await ready();
+      await userEvent.click(listButton(uuid(1)));
+      const panel = await screen.findByLabelText('Details of Focus');
+      expect(within(panel).queryByRole('button', { name: 'Explore from here' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Explore from here' })).not.toBeInTheDocument();
+    });
+  });
+
+  describe('shareable state (FR-003)', () => {
+    it('requests exactly the settings in the URL and shows them in the toolbar and summary', async () => {
+      // Answer like the API: echo the requested direction and depth in the response query.
+      respond((path) => {
+        const requested = new URLSearchParams(path.split('?')[1]);
+        const base = smallResponse();
+        return Promise.resolve({
+          ...base,
+          query: {
+            ...base.query,
+            direction: NeighborhoodDirectionSchema.parse(requested.get('direction')),
+            depth: Number(requested.get('depth')),
+          },
+        });
+      });
+      renderPage(
+        `/graph/${uuid(1)}?direction=downstream&depth=4&entityTypes=Order,Shipment&blockers=true`,
+      );
+      await screen.findByRole('heading', { level: 1 });
+
+      const path = String(neighborhoodCalls()[0]?.[0]);
+      expect(path.startsWith(`/entities/${uuid(1)}/neighborhood?`)).toBe(true);
+      const query = new URLSearchParams(path.split('?')[1]);
+      expect(Object.fromEntries(query)).toEqual({
+        direction: 'downstream',
+        depth: '4',
+        entityTypes: 'Order,Shipment',
+        blockers: 'true',
+      });
+
+      expect(screen.getByRole('radio', { name: 'Downstream only' })).toHaveAttribute('aria-checked', 'true');
+      expect(screen.getByRole('combobox', { name: 'Steps' })).toHaveValue('4');
+      expect(screen.getByRole('checkbox', { name: 'Highlight blockers' })).toBeChecked();
+      expect(screen.getByText('Entity types (2)')).toBeInTheDocument();
+      expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
+        'downstream only, 4 steps',
+      );
+      expect(screen.getByText('Entity types: Order, Shipment')).toBeInTheDocument();
+    });
+
+    it('reproduces the same request when the link is opened again', async () => {
+      respond();
+      const url = `/graph/${uuid(1)}?relationshipTypes=REQUIRES&depth=3`;
+      renderPage(url);
+      await screen.findByRole('heading', { level: 1 });
+      const first = String(neighborhoodCalls()[0]?.[0]);
+      cleanup();
+      apiFetchMock.mockClear();
+      respond();
+      renderPage(url);
+      await screen.findByRole('heading', { level: 1 });
+      expect(String(neighborhoodCalls()[0]?.[0])).toBe(first);
+    });
+
+    it('rejects an invalid link without any API request', () => {
+      respond();
+      renderPage(`/graph/${uuid(1)}?depth=9`);
+      expect(screen.getByRole('alert')).toHaveTextContent('depth:');
+      expect(apiFetchMock).not.toHaveBeenCalled();
     });
   });
 });

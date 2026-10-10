@@ -17,6 +17,10 @@ function renderList(
     selection?: Selection;
     onSelectNode?: (id: string, from: 'list') => void;
     onSelectEdge?: (key: string, from: 'list') => void;
+    onToggleExpand?: (id: string) => void;
+    onToggleFocusMode?: () => void;
+    focusMode?: boolean;
+    onExploreFrom?: (id: string) => void;
   } = {},
 ) {
   const selection = options.selection ?? null;
@@ -28,6 +32,10 @@ function renderList(
         emphasis={computeEmphasis({ response: r, selection, focusMode: false, selectedPathIndex: null })}
         onSelectNode={options.onSelectNode ?? vi.fn()}
         onSelectEdge={options.onSelectEdge ?? vi.fn()}
+        onToggleExpand={options.onToggleExpand ?? vi.fn()}
+        onToggleFocusMode={options.onToggleFocusMode ?? vi.fn()}
+        focusMode={options.focusMode ?? false}
+        onExploreFrom={options.onExploreFrom ?? vi.fn()}
       />
     </MemoryRouter>,
   );
@@ -169,6 +177,54 @@ describe('ExplorerList selection and keyboard', () => {
     edgeButton.focus();
     await user.keyboard('{Enter}');
     expect(onSelectEdge).toHaveBeenCalledWith(uuid(1001), 'list');
+  });
+});
+
+describe('ExplorerList actions on the selected row', () => {
+  it('offers Expand, Focus mode on, Explore from here and Open Entity 360 for a non-focus row', () => {
+    renderList(smallResponse(), { selection: { kind: 'node', id: uuid(2) } });
+    expect(screen.getByRole('button', { name: 'Expand' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Focus mode on' })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('button', { name: 'Explore from here' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Open Entity 360' })).toBeInTheDocument();
+  });
+
+  it('offers Collapse for an expanded node and Focus mode off while focus mode is on', () => {
+    const base = smallResponse();
+    const r = { ...base, nodes: base.nodes.map((n) => (n.id === uuid(2) ? { ...n, expanded: true } : n)) };
+    renderList(r, { selection: { kind: 'node', id: uuid(2) }, focusMode: true });
+    expect(screen.getByRole('button', { name: 'Collapse' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Focus mode off' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('hides Expand and Explore from here for the focus row but keeps Focus mode', () => {
+    renderList(smallResponse(), { selection: { kind: 'node', id: uuid(1) } });
+    expect(screen.queryByRole('button', { name: 'Expand' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Explore from here' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Focus mode on' })).toBeInTheDocument();
+  });
+
+  it('calls the matching handler with the selected node', async () => {
+    const onToggleExpand = vi.fn();
+    const onToggleFocusMode = vi.fn();
+    const onExploreFrom = vi.fn();
+    renderList(smallResponse(), {
+      selection: { kind: 'node', id: uuid(3) },
+      onToggleExpand,
+      onToggleFocusMode,
+      onExploreFrom,
+    });
+    await userEvent.click(screen.getByRole('button', { name: 'Expand' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Focus mode on' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Explore from here' }));
+    expect(onToggleExpand).toHaveBeenCalledWith(uuid(3));
+    expect(onToggleFocusMode).toHaveBeenCalledTimes(1);
+    expect(onExploreFrom).toHaveBeenCalledWith(uuid(3));
+  });
+
+  it('shows no actions on unselected rows', () => {
+    renderList(smallResponse(), { selection: null });
+    expect(screen.queryByRole('button', { name: 'Expand' })).not.toBeInTheDocument();
   });
 });
 

@@ -41,6 +41,7 @@ describe('toFlow nodes', () => {
       canExpand: false,
     });
     expect(nodes[1]?.data.isFocus).toBe(false);
+    expect(nodes[1]?.data.canExpand).toBe(true);
   });
 
   it('labels nodes for assistive technology', () => {

@@ -136,12 +136,22 @@ function respond(blockers: BlockersResponse = F1_BLOCKERS, dependents = DEPENDEN
   });
 }
 
-function renderPanel(target: NeighborhoodNodeDto, onClose = vi.fn()) {
+function renderPanel(
+  target: NeighborhoodNodeDto,
+  onClose = vi.fn(),
+  options: { isFocus?: boolean; onExploreFrom?: (id: string) => void } = {},
+) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter>
-        <NodeDetailsPanel node={target} search="depth=3" onClose={onClose} />
+        <NodeDetailsPanel
+          node={target}
+          search="depth=3"
+          isFocus={options.isFocus ?? false}
+          onExploreFrom={options.onExploreFrom ?? vi.fn()}
+          onClose={onClose}
+        />
       </MemoryRouter>
     </QueryClientProvider>,
   );
@@ -269,6 +279,22 @@ describe('NodeDetailsPanel', () => {
       'href',
       `/entities/${SHP_ID}`,
     );
+  });
+
+  it('offers Explore from here for a non-focus node and calls back with its id', async () => {
+    respond();
+    const onExploreFrom = vi.fn();
+    renderPanel(shipmentNode(), vi.fn(), { onExploreFrom });
+    await userEvent.click(screen.getByRole('button', { name: 'Explore from here' }));
+    expect(onExploreFrom).toHaveBeenCalledWith(SHP_ID);
+    await screen.findByText('See all on Entity 360');
+  });
+
+  it('hides Explore from here for the focus entity', async () => {
+    respond();
+    renderPanel(shipmentNode(), vi.fn(), { isFocus: true });
+    expect(screen.queryByRole('button', { name: 'Explore from here' })).not.toBeInTheDocument();
+    await screen.findByText('See all on Entity 360');
   });
 
   it('closes on request', async () => {

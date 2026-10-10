@@ -13,6 +13,10 @@ export interface ExplorerListProps {
   emphasis: EmphasisResult;
   onSelectNode: (id: string, from: 'list') => void;
   onSelectEdge: (key: string, from: 'list') => void;
+  onToggleExpand: (id: string) => void;
+  onToggleFocusMode: () => void;
+  focusMode: boolean;
+  onExploreFrom: (id: string) => void;
 }
 
 const REASON_TEXT: Record<NodeReason, string | null> = {
@@ -70,6 +74,10 @@ export function ExplorerList({
   emphasis,
   onSelectNode,
   onSelectEdge,
+  onToggleExpand,
+  onToggleFocusMode,
+  focusMode,
+  onExploreFrom,
 }: ExplorerListProps) {
   const nodesById = new Map(response.nodes.map((n) => [n.id, n]));
   const indexOf = new Map(response.nodes.map((n, i) => [n.id, i]));
@@ -122,7 +130,37 @@ export function ExplorerList({
                       </span>
                     </button>
                     {selected ? (
-                      <div className="mt-1 flex flex-wrap gap-2 pl-3 text-sm">
+                      <div className="mt-1 flex flex-wrap items-center gap-2 pl-3 text-sm">
+                        {node.id === response.focusId ? null : (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              onToggleExpand(node.id);
+                            }}
+                            className="rounded border px-2 py-0.5"
+                          >
+                            {node.expanded ? 'Collapse' : 'Expand'}
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          aria-pressed={focusMode}
+                          onClick={onToggleFocusMode}
+                          className="rounded border px-2 py-0.5"
+                        >
+                          {focusMode ? 'Focus mode off' : 'Focus mode on'}
+                        </button>
+                        {node.id === response.focusId ? null : (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              onExploreFrom(node.id);
+                            }}
+                            className="rounded border px-2 py-0.5"
+                          >
+                            Explore from here
+                          </button>
+                        )}
                         <Link to={`/entities/${node.id}`} className="underline">
                           Open Entity 360
                         </Link>

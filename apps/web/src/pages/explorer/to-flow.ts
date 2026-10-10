@@ -78,7 +78,7 @@ export function toFlow(input: ToFlowInput): {
         hasConflict: hasConflict(entity),
         emphasis: emphasis.nodes.get(entity.id) ?? 'normal',
         blockerRole: emphasis.blockerRole.get(entity.id) ?? 'none',
-        canExpand: false,
+        canExpand: entity.id !== response.focusId,
       },
       selected: selection?.kind === 'node' && selection.id === entity.id,
       draggable: false,

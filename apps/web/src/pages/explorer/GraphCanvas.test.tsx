@@ -1,6 +1,7 @@
 import { ReactFlowProvider } from '@xyflow/react';
 import { cleanup, render } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { ExplorerActionsContext } from './explorer-actions';
 import { flowFor } from './flow-test-utils';
 import { GraphCanvas } from './GraphCanvas';
 import { layoutNeighborhood } from './layout';
@@ -29,18 +30,17 @@ function renderCanvas(centerOn: { id: string; nonce: number } | null) {
     onClearSelection: vi.fn(),
     centers,
   };
-  const view = render(
-    <ReactFlowProvider>
-      <GraphCanvas {...props} centerOn={centerOn} />
-    </ReactFlowProvider>,
+  const tree = (next: { id: string; nonce: number } | null) => (
+    <ExplorerActionsContext.Provider value={{ toggleExpand: vi.fn() }}>
+      <ReactFlowProvider>
+        <GraphCanvas {...props} centerOn={next} />
+      </ReactFlowProvider>
+    </ExplorerActionsContext.Provider>
   );
+  const view = render(tree(centerOn));
   return {
     rerenderWith: (next: { id: string; nonce: number } | null) => {
-      view.rerender(
-        <ReactFlowProvider>
-          <GraphCanvas {...props} centerOn={next} />
-        </ReactFlowProvider>,
-      );
+      view.rerender(tree(next));
     },
   };
 }
