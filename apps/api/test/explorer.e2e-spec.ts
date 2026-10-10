@@ -150,6 +150,22 @@ describe('Graph explorer: neighborhood (e2e)', () => {
     });
   });
 
+  describe('read-only (FR-031)', () => {
+    it('writes no audit entries and changes no data', async () => {
+      const ids = await setup([{ id: 'A' }, { id: 'B' }], [{ type: 'REQUIRES', from: 'A', to: 'B' }]);
+      const counts = async () => ({
+        audit: await prisma.auditEntry.count(),
+        entities: await prisma.entity.count(),
+        relationships: await prisma.relationship.count(),
+        observations: await prisma.stateObservation.count(),
+      });
+      const before = await counts();
+      await neighborhoodOf(ids.A as string, '?blockers=true&expand=' + (ids.B as string));
+      await neighborhoodOf(ids.B as string, '?direction=upstream');
+      expect(await counts()).toEqual(before);
+    });
+  });
+
   describe('authentication, existence and validation', () => {
     it('answers 401 without a token', async () => {
       await setup([]);

@@ -180,14 +180,14 @@
 
 ## Phase 7: Polish and cross-cutting
 
-- [ ] T052 Cross-check against the spec: for every FR-001 to FR-034 and SC-001 to SC-008, name the test or code that covers it in `specs/004-graph-explorer/questions.md` under "Coverage", and list any gap. Run and confirm:
+- [x] T052 Cross-check against the spec: for every FR-001 to FR-034 and SC-001 to SC-008, name the test or code that covers it in `specs/004-graph-explorer/questions.md` under "Coverage", and list any gap. Run and confirm:
   - `grep -rn "WITH RECURSIVE" apps/` → only `prisma-graph.repository.ts` and the existing smoke test;
   - `grep -rn "localeCompare" apps/api/src apps/web/src/pages/explorer` → nothing new;
   - `grep -rnE "dagre|elkjs|d3-" apps/web/package.json` → nothing;
   - `grep -rn "nodeTypes\s*=" apps/web/src` → only the module-level constant in `GraphCanvas.tsx`;
   - no risk, impact or history controls in `pages/explorer/` (FR-032).
 - [ ] T053 Walk the whole of `quickstart.md` by hand and tick each step. Fix behavior that doesn't match, in the code. Edit the quickstart only to correct factual errors.
-- [ ] T054 Final gate: `pnpm lint && pnpm typecheck && pnpm test && pnpm test:e2e && pnpm build`. Confirm: no `TODO`s, dead code or stubs; `git diff main -- '**/package.json'` shows only `@xyflow/react` in `apps/web`; every question in `questions.md` is resolved or explicitly deferred.
+- [x] T054 Final gate: `pnpm lint && pnpm typecheck && pnpm test && pnpm test:e2e && pnpm build`. Confirm: no `TODO`s, dead code or stubs; `git diff main -- '**/package.json'` shows only `@xyflow/react` in `apps/web`; every question in `questions.md` is resolved or explicitly deferred.
 
 ---
 

@@ -1,8 +1,4 @@
-import {
-  EXPLORER_LIMITS,
-  type ExplorerUrlParams,
-  type NeighborhoodResponse,
-} from '@opsgraph/shared';
+import { EXPLORER_LIMITS, type ExplorerUrlParams, type NeighborhoodResponse } from '@opsgraph/shared';
 import { ReactFlowProvider } from '@xyflow/react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
@@ -11,6 +7,7 @@ import { BlockerHighlightPanel } from './BlockerHighlightPanel';
 import { computeEmphasis } from './emphasis';
 import { EdgeDetailsPanel } from './EdgeDetailsPanel';
 import { ExplorerActionsContext } from './explorer-actions';
+import { expansionLimitReached, toggleExpansion } from './expansion';
 import { ExplorerList } from './ExplorerList';
 import { parseExplorerParams, writeExplorerParams } from './explorer-params';
 import { ExplorerSummary } from './ExplorerSummary';
@@ -152,14 +149,7 @@ function ExplorerView({ id, params, search }: ExplorerViewProps) {
       if (loading) {
         return;
       }
-      setExpand((previous) => {
-        if (previous.includes(entityId)) {
-          return previous.filter((expandedId) => expandedId !== entityId);
-        }
-        return previous.length >= EXPLORER_LIMITS.maxExpansions
-          ? previous
-          : [...previous, entityId];
-      });
+      setExpand((previous) => toggleExpansion(previous, entityId));
     },
     [loading],
   );
@@ -222,7 +212,7 @@ function ExplorerView({ id, params, search }: ExplorerViewProps) {
             Could not refresh the view. Showing the last loaded data.
           </p>
         ) : null}
-        {expand.length >= EXPLORER_LIMITS.maxExpansions ? (
+        {expansionLimitReached(expand) ? (
           <p role="status" className="text-sm text-amber-900">
             {`You have expanded the maximum of ${EXPLORER_LIMITS.maxExpansions} nodes. Collapse one to expand another.`}
           </p>

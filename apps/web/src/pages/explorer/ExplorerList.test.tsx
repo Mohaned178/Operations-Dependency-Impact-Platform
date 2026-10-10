@@ -1,7 +1,7 @@
 import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
-import type { NeighborhoodResponse } from '@opsgraph/shared';
+import { RelationshipTypeSchema, type NeighborhoodResponse } from '@opsgraph/shared';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { computeEmphasis } from './emphasis';
 import { ExplorerList } from './ExplorerList';
@@ -255,4 +255,79 @@ describe('graph and list agree (SC-005)', () => {
       cleanup();
     }
   });
+});
+describe('graph and list agree on generated graphs (SC-005)', () => {
+  function mulberry32(seed: number): () => number {
+    let state = seed >>> 0;
+    return () => {
+      state = (state + 0x6d2b79f5) >>> 0;
+      let t = state;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  const TYPES = RelationshipTypeSchema.options;
+  const ORIGINS = ['SOURCE', 'INFERRED', 'MANUAL'] as const;
+  const CONFIDENCES = ['HIGH', 'MEDIUM', 'LOW'] as const;
+
+  /** A coherent tree plus random extra edges, so cycles and parallel edges occur. */
+  function generated(rand: () => number): NeighborhoodResponse {
+    const count = 2 + Math.floor(rand() * 39);
+    const pick = <T,>(list: readonly T[]): T => list[Math.floor(rand() * list.length)] as T;
+    const nodes = [node({ n: 1, name: 'Focus' })];
+    const edges = [];
+    for (let n = 2; n <= count; n += 1) {
+      const parent = 1 + Math.floor(rand() * (n - 1));
+      nodes.push(node({ n, parent, via: n, name: `Entity ${n}` }));
+      edges.push(
+        edge({
+          k: n,
+          type: pick(TYPES),
+          from: parent,
+          to: n,
+          origin: pick(ORIGINS),
+          confidence: pick(CONFIDENCES),
+        }),
+      );
+    }
+    const extra = Math.floor(rand() * 12);
+    for (let i = 0; i < extra; i += 1) {
+      edges.push(
+        edge({
+          k: 1000 + i,
+          type: pick(TYPES),
+          from: 1 + Math.floor(rand() * count),
+          to: 1 + Math.floor(rand() * count),
+          origin: pick(ORIGINS),
+          confidence: pick(CONFIDENCES),
+        }),
+      );
+    }
+    return response(nodes, edges);
+  }
+
+  it('lists exactly the node ids and edge keys that the canvas draws, over 150 random graphs', () => {
+    const rand = mulberry32(0x5c0005);
+    for (let i = 0; i < 150; i += 1) {
+      const r = generated(rand);
+      renderList(r);
+      const listNodes = Array.from(document.querySelectorAll('[data-entity-id]')).map((e) =>
+        e.getAttribute('data-entity-id'),
+      );
+      const listEdges = Array.from(document.querySelectorAll('[data-edge-key]')).map((e) =>
+        e.getAttribute('data-edge-key'),
+      );
+      const flow = flowFor(r);
+      expect([...listNodes].sort()).toEqual(flow.nodes.map((n) => n.id).sort());
+      expect([...listEdges].sort()).toEqual(flow.edges.map((e) => e.id).sort());
+      // Every relationship row states its origin and confidence as text (SC-006).
+      for (const e of r.edges) {
+        const row = document.querySelector(`[data-edge-key="${e.key}"]`);
+        expect(row?.textContent).toContain(`${e.effectiveConfidence}`);
+      }
+      cleanup();
+    }
+  }, 30_000);
 });

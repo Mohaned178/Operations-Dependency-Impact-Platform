@@ -77,3 +77,30 @@ describe('GraphCanvas centerOn', () => {
     expect(setCenter).not.toHaveBeenCalled();
   });
 });
+describe('GraphCanvas controls (FR-014)', () => {
+  afterEach(cleanup);
+
+  it('offers zoom in, zoom out and fit view, and no interactivity lock', () => {
+    const { container } = render(
+      <ExplorerActionsContext.Provider value={{ toggleExpand: vi.fn() }}>
+        <ReactFlowProvider>
+          <GraphCanvas
+            nodes={flow.nodes}
+            edges={flow.edges}
+            onSelectNode={vi.fn()}
+            onSelectEdge={vi.fn()}
+            onClearSelection={vi.fn()}
+            centerOn={null}
+            centers={centers}
+          />
+        </ReactFlowProvider>
+      </ExplorerActionsContext.Provider>,
+    );
+    const controls = container.querySelector('.react-flow__controls');
+    expect(controls).not.toBeNull();
+    const labels = Array.from(controls?.querySelectorAll('button') ?? []).map((b) =>
+      b.getAttribute('aria-label'),
+    );
+    expect(labels).toEqual(['Zoom In', 'Zoom Out', 'Fit View']);
+  });
+});

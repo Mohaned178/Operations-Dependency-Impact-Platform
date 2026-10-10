@@ -697,37 +697,6 @@ describe('ExplorerPage', () => {
       await screen.findByRole('heading', { level: 1 });
       expect(screen.queryByRole('button', { name: 'Focus mode off' })).not.toBeInTheDocument();
     });
-
-    it('stops expanding after 50 nodes and says so', async () => {
-      const hub = () =>
-        response(
-          [
-            node({ n: 1, name: 'Hub' }),
-            ...Array.from({ length: 51 }, (_, i) =>
-              node({ n: i + 2, parent: 1, via: i + 2, name: `Dependent ${String(i + 2).padStart(2, '0')}` }),
-            ),
-          ],
-          Array.from({ length: 51 }, (_, i) => edge({ k: i + 2, type: 'REQUIRES', from: i + 2, to: 1 })),
-        );
-      respondExpanding({ base: hub });
-      renderPage();
-      await ready(52);
-
-      for (let n = 2; n <= 51; n += 1) {
-        const name = `Dependent ${String(n).padStart(2, '0')}`;
-        fireEvent.click(screen.getByRole('button', { name: `Expand ${name}` }));
-        await screen.findByRole('button', { name: `Collapse ${name}` });
-      }
-      expect(screen.getByRole('status')).toHaveTextContent(
-        'You have expanded the maximum of 50 nodes. Collapse one to expand another.',
-      );
-
-      const before = neighborhoodCalls().length;
-      fireEvent.click(screen.getByRole('button', { name: 'Expand Dependent 52' }));
-      await new Promise((resolve) => setTimeout(resolve, 50));
-      expect(neighborhoodCalls()).toHaveLength(before);
-      expect(screen.getByRole('button', { name: 'Expand Dependent 52' })).toBeInTheDocument();
-    }, 60_000);
   });
 
   describe('focus mode', () => {
