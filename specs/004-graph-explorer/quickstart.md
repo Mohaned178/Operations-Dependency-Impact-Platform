@@ -49,4 +49,6 @@ RUN_PERF=1 pnpm --filter api test:e2e -- perf-explorer   # SC-003
 
 | Date | Machine | Default neighborhood p95 | Expansion p95 | 200-node interaction |
 |---|---|---|---|---|
-| _fill in after phase "Performance"_ | | | | |
+| 2026-10-10 | Windows 11 workstation, PostgreSQL 16 in Docker, 50,000 entities / ~150,000 relationships | 26 ms (20 entities incl. the highest-degree one; budget 2,000 ms) | 38 ms, i.e. +13 ms over the base call (budget +1,000 ms) | not yet measured (T051) |
+
+Also logged, not asserted (research R13): `direction=all&depth=4` from the highest-degree entity: p95 311 ms, 200 entities shown, 5,320 left out, count exact (no lower bound).
