@@ -9,7 +9,12 @@ import type {
   RelationshipType,
   TraceableRelationshipType,
 } from '@opsgraph/shared';
-import { RelationshipTypeSchema, SATISFIED_STATES, TRACING_LIMITS } from '@opsgraph/shared';
+import {
+  RelationshipTypeSchema,
+  SATISFIED_STATES,
+  TRACEABLE_RELATIONSHIP_TYPES,
+  TRACING_LIMITS,
+} from '@opsgraph/shared';
 import { decodeCursor, encodeCursor } from '../common/pagination/cursor';
 import { PrismaService } from '../prisma/prisma.service';
 import type {
@@ -23,10 +28,15 @@ import type {
   NeighborPage,
   NeighborQuery,
   NeighborRow,
+  NeighborhoodReached,
+  NeighborhoodTrace,
+  NeighborhoodTraceQuery,
+  RelationshipGroup,
   TraversalPath,
 } from './graph.repository';
 import { enumerateBlockingPaths } from './traversal/blocking-paths';
 import { selectCanonicalPaths } from './traversal/canonical-paths';
+import { buildUndirectedTraversalEdges, groupEdgeRows } from './traversal/edge-groups';
 import { compareCodeUnits } from './traversal/path-order';
 import { buildTraversalEdges } from './traversal/traversal-edges';
 import type { EdgeRow, InternalPath, TraversalEdge } from './traversal/types';
@@ -67,7 +77,7 @@ interface RawReachedRow {
 
 interface RawEdgeRow {
   id: string;
-  type: TraceableRelationshipType;
+  type: RelationshipType;
   from_entity_id: string;
   to_entity_id: string;
   origin: RelationshipOrigin;
@@ -104,7 +114,15 @@ function compareReached(a: ReachedEntityRow, b: ReachedEntityRow): number {
   );
 }
 
-function toEdgeRow(row: RawEdgeRow): EdgeRow {
+function isTraceableType(type: RelationshipType): type is TraceableRelationshipType {
+  return (TRACEABLE_RELATIONSHIP_TYPES as readonly RelationshipType[]).includes(type);
+}
+
+function isTraceableRow(row: EdgeRow<RelationshipType>): row is EdgeRow<TraceableRelationshipType> {
+  return isTraceableType(row.type);
+}
+
+function toEdgeRow(row: RawEdgeRow): EdgeRow<RelationshipType> {
   return {
     id: row.id,
     type: row.type,
@@ -295,6 +313,7 @@ export class PrismaGraphRepository implements GraphRepository {
       followFromTypes,
       followToTypes,
       blockersOnly: false,
+      probeBeyondDepth: true,
     });
     if (reachable === null) {
       return null;
@@ -304,7 +323,7 @@ export class PrismaGraphRepository implements GraphRepository {
       ...followFromTypes,
       ...followToTypes,
     ]);
-    const edges = buildTraversalEdges(rows, query.direction);
+    const edges = buildTraversalEdges(rows.filter(isTraceableRow), query.direction);
     const selection = selectCanonicalPaths(reachable.start.id, edges, query.maxDepth);
     const cycleClosing = toCycleClosingHops(selection.cycleClosing);
 
@@ -340,6 +359,7 @@ export class PrismaGraphRepository implements GraphRepository {
       followFromTypes,
       followToTypes,
       blockersOnly: true,
+      probeBeyondDepth: true,
     });
     if (reachable === null) {
       return null;
@@ -349,7 +369,7 @@ export class PrismaGraphRepository implements GraphRepository {
       ...followFromTypes,
       ...followToTypes,
     ]);
-    const edges = buildTraversalEdges(rows, 'UPSTREAM');
+    const edges = buildTraversalEdges(rows.filter(isTraceableRow), 'UPSTREAM');
     const enumeration = enumerateBlockingPaths(
       reachable.start.id,
       edges,
@@ -368,6 +388,82 @@ export class PrismaGraphRepository implements GraphRepository {
     };
   }
 
+  async traceNeighborhood(query: NeighborhoodTraceQuery): Promise<NeighborhoodTrace | null> {
+    let followFromTypes: readonly RelationshipType[];
+    let followToTypes: readonly RelationshipType[];
+    if (query.walk === 'ALL') {
+      followFromTypes = query.relationshipTypes;
+      followToTypes = query.relationshipTypes;
+    } else {
+      const traceable = query.relationshipTypes.filter(isTraceableType);
+      if (traceable.length !== query.relationshipTypes.length) {
+        throw new Error(`traversal invariant: RELATES_TO cannot be walked ${query.walk}`);
+      }
+      ({ followFromTypes, followToTypes } = walkTypes(query.walk, traceable));
+    }
+
+    const reachable = await this.reachableEntities({
+      startId: query.startId,
+      maxDepth: query.maxDepth,
+      followFromTypes,
+      followToTypes,
+      blockersOnly: false,
+      probeBeyondDepth: false,
+    });
+    if (reachable === null) {
+      return null;
+    }
+
+    const rows = await this.loadEdgeRows(reachable.entities.keys(), [
+      ...new Set([...followFromTypes, ...followToTypes]),
+    ]);
+    const paths: ReadonlyMap<string, InternalPath<RelationshipType>> =
+      query.walk === 'ALL'
+        ? selectCanonicalPaths(
+            reachable.start.id,
+            buildUndirectedTraversalEdges(groupEdgeRows(rows)),
+            query.maxDepth,
+          ).paths
+        : selectCanonicalPaths(
+            reachable.start.id,
+            buildTraversalEdges(rows.filter(isTraceableRow), query.walk),
+            query.maxDepth,
+          ).paths;
+
+    const reached = reachable.within.map((row): NeighborhoodReached => {
+      const path = paths.get(row.entity.id);
+      if (path === undefined) {
+        throw new Error(
+          `traversal invariant: no canonical path for reached entity ${row.entity.id}`,
+        );
+      }
+      return {
+        entity: row.entity,
+        distance: row.depth,
+        pathEntityIds: path.entityIds,
+        pathEdgeKeys: path.edges.map((edge) => edge.key),
+        weakestConfidence: path.weakestConfidence,
+        nonSourceHops: path.nonSourceHops,
+      };
+    });
+
+    return {
+      start: reachable.start,
+      reached,
+      explorationLimitReached: reachable.explorationLimitReached,
+    };
+  }
+
+  async findRelationshipsAmong(
+    entityIds: readonly string[],
+    types: readonly RelationshipType[],
+  ): Promise<RelationshipGroup[]> {
+    if (entityIds.length === 0 || types.length === 0) {
+      return [];
+    }
+    return groupEdgeRows(await this.loadEdgeRows(entityIds, types));
+  }
+
   /**
    * Research R3 step 1: the entities reachable within maxDepth + 1 hops, each at its minimum
    * depth. Returns null when the start entity does not exist. Blocker walks only pass through
@@ -376,14 +472,17 @@ export class PrismaGraphRepository implements GraphRepository {
   private async reachableEntities(options: {
     startId: string;
     maxDepth: number;
-    followFromTypes: readonly TraceableRelationshipType[];
-    followToTypes: readonly TraceableRelationshipType[];
+    followFromTypes: readonly RelationshipType[];
+    followToTypes: readonly RelationshipType[];
     blockersOnly: boolean;
+    /** Also walk one hop past maxDepth, so callers can tell whether a chain continues. */
+    probeBeyondDepth: boolean;
   }): Promise<ReachableSet | null> {
     const followFromTypes = [...options.followFromTypes];
     const followToTypes = [...options.followToTypes];
     const satisfiedStates = [...SATISFIED_STATES];
     const maxDepthPlusOne = options.maxDepth + 1;
+    const sqlDepthBound = options.probeBeyondDepth ? maxDepthPlusOne : options.maxDepth;
     const blockerJoin = options.blockersOnly
       ? Prisma.sql`JOIN entities n ON n.id = step.next_id`
       : Prisma.empty;
@@ -409,7 +508,7 @@ export class PrismaGraphRepository implements GraphRepository {
             AND r.type = ANY(${followToTypes}::"RelationshipType"[])
         ) step
         ${blockerJoin}
-        WHERE w.depth < ${maxDepthPlusOne}
+        WHERE w.depth < ${sqlDepthBound}
           ${blockerFilter}
       )
       SELECT e.id::text AS id, e.type::text AS type, e.display_name AS display_name,
@@ -454,8 +553,8 @@ export class PrismaGraphRepository implements GraphRepository {
   /** Research R3 step 2: every relationship assertion among the given entities. */
   private async loadEdgeRows(
     entityIds: Iterable<string>,
-    allowedTypes: readonly TraceableRelationshipType[],
-  ): Promise<EdgeRow[]> {
+    allowedTypes: readonly RelationshipType[],
+  ): Promise<EdgeRow<RelationshipType>[]> {
     const ids = [...entityIds];
     const types = [...allowedTypes];
     const rows = await this.prisma.$queryRaw<RawEdgeRow[]>`
