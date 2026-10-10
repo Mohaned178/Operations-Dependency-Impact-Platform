@@ -5,7 +5,8 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../../lib/api-client';
-import { F1_BLOCKERS, RECORDS_STUB } from './page-test-data';
+import { F1_BLOCKERS, N4_EDGE_KEYS, OFF_PATH_ID, RECORDS_STUB, n4Response } from './page-test-data';
+import { SHP_ID } from '../entities/tracing-test-data';
 import { ExplorerPage } from './ExplorerPage';
 import { smallResponse, uuid } from './test-fixtures';
 
@@ -304,6 +305,98 @@ describe('ExplorerPage', () => {
         expect(neighborhoodCalls()).toHaveLength(2);
       });
       expect(String(neighborhoodCalls()[1]?.[0])).toContain('depth=3');
+    });
+  });
+
+  describe('blocker highlighting (N4 shape)', () => {
+    const n4Url = `/graph/${SHP_ID}?blockers=true`;
+
+    function edgeStroke(key: string): CSSStyleDeclaration {
+      const el = document.querySelector<SVGElement>(
+        `[data-testid="rf__edge-${key}"] path.react-flow__edge-path`,
+      );
+      if (el === null) {
+        throw new Error(`no edge ${key}`);
+      }
+      return el.style;
+    }
+
+    async function renderN4() {
+      respond(n4Response());
+      renderPage(n4Url);
+      await screen.findByRole('heading', { level: 1 });
+      await waitFor(() => {
+        expect(document.querySelectorAll('.react-flow__node')).toHaveLength(6);
+      });
+    }
+
+    it('requests blockers=true and shows the feature 003 summary above the list', async () => {
+      await renderN4();
+      expect(String(neighborhoodCalls()[0]?.[0])).toContain('blockers=true');
+      const panel = screen.getByRole('region', { name: 'Blockers' });
+      expect(within(panel).getByText(F1_BLOCKERS.summary)).toBeInTheDocument();
+      expect(
+        panel.compareDocumentPosition(screen.getByRole('region', { name: 'Entities and relationships' })) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    });
+
+    it('marks the Budget code as the deepest blocker and the direct blockers in graph and list', async () => {
+      await renderN4();
+      const budget = flowNode(F1_BLOCKERS.deepestBlockers[0]?.entity.id ?? '');
+      expect(within(budget).getByText('Deepest blocker')).toBeInTheDocument();
+      expect(
+        within(listButton(F1_BLOCKERS.deepestBlockers[0]?.entity.id ?? '')).getByText('Deepest blocker'),
+      ).toBeInTheDocument();
+      for (const direct of F1_BLOCKERS.directBlockers) {
+        expect(within(flowNode(direct.entity.id)).getByText('Direct blocker')).toBeInTheDocument();
+      }
+    });
+
+    it('dims entities and relationships that are on no blocking path', async () => {
+      await renderN4();
+      expect(flowNode(OFF_PATH_ID).firstElementChild?.className).toContain('opacity-20');
+      expect(flowNode(SHP_ID).firstElementChild?.className).not.toContain('opacity-20');
+      expect(flowNode(F1_BLOCKERS.directBlockers[0]?.entity.id ?? '').firstElementChild?.className).toContain(
+        'border-red-600',
+      );
+      expect(edgeStroke(N4_EDGE_KEYS.toOrder()).stroke).toBe('#dc2626');
+      expect(edgeStroke(N4_EDGE_KEYS.manual()).stroke).toBe('#dc2626');
+    });
+
+    it('lists the entity added by the blocking path under its own group', async () => {
+      await renderN4();
+      const heading = screen.getByRole('heading', { name: 'Added by blocking path (1)' });
+      const group = heading.parentElement as HTMLElement;
+      expect(within(group).getByText('Budget code for Order #18492')).toBeInTheDocument();
+    });
+
+    it('selecting Path 2 highlights only that path and Show all paths restores both', async () => {
+      await renderN4();
+      await userEvent.click(screen.getByRole('button', { name: 'Path 2' }));
+
+      await waitFor(() => {
+        expect(edgeStroke(N4_EDGE_KEYS.toOrder()).opacity).toBe('0.15');
+      });
+      expect(edgeStroke(N4_EDGE_KEYS.toPayment()).opacity).toBe('0.15');
+      for (const key of [N4_EDGE_KEYS.manual(), N4_EDGE_KEYS.toApproval(), N4_EDGE_KEYS.toBudget()]) {
+        expect(edgeStroke(key).stroke).toBe('#dc2626');
+      }
+      // The blocker roles still come from all paths.
+      const budgetId = F1_BLOCKERS.deepestBlockers[0]?.entity.id ?? '';
+      expect(within(flowNode(budgetId)).getByText('Deepest blocker')).toBeInTheDocument();
+
+      await userEvent.click(screen.getByRole('button', { name: 'Show all paths' }));
+      await waitFor(() => {
+        expect(edgeStroke(N4_EDGE_KEYS.toOrder()).stroke).toBe('#dc2626');
+      });
+    });
+
+    it('shows no blockers panel when highlighting is off', async () => {
+      respond();
+      renderPage();
+      await screen.findByRole('heading', { level: 1 });
+      expect(screen.queryByRole('region', { name: 'Blockers' })).not.toBeInTheDocument();
     });
   });
 });

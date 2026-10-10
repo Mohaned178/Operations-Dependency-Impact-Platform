@@ -3,6 +3,7 @@ import { ReactFlowProvider } from '@xyflow/react';
 import { useMemo, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router';
 import { ApiError } from '../../lib/api-client';
+import { BlockerHighlightPanel } from './BlockerHighlightPanel';
 import { computeEmphasis } from './emphasis';
 import { EdgeDetailsPanel } from './EdgeDetailsPanel';
 import { ExplorerList } from './ExplorerList';
@@ -60,6 +61,7 @@ interface ExplorerViewProps {
 function ExplorerView({ id, params, search }: ExplorerViewProps) {
   const neighborhood = useNeighborhood(id, params, []);
   const [selection, setSelection] = useState<Selection>(null);
+  const [selectedPathIndex, setSelectedPathIndex] = useState<number | null>(null);
   const [centerOn, setCenterOn] = useState<{ id: string; nonce: number } | null>(null);
 
   const response = neighborhood.data;
@@ -84,11 +86,11 @@ function ExplorerView({ id, params, search }: ExplorerViewProps) {
       response,
       selection: activeSelection,
       focusMode: false,
-      selectedPathIndex: null,
+      selectedPathIndex,
     });
     const flow = toFlow({ response, layout, emphasis, selection: activeSelection });
     return { layout, emphasis, flow };
-  }, [response, activeSelection]);
+  }, [response, activeSelection, selectedPathIndex]);
 
   if (neighborhood.isPending) {
     return <p>Loading…</p>;
@@ -154,7 +156,14 @@ function ExplorerView({ id, params, search }: ExplorerViewProps) {
           />
         </div>
       </div>
-      <div className="min-h-0 overflow-y-auto">
+      <div className="flex min-h-0 flex-col gap-4 overflow-y-auto">
+        {response.blockers === null ? null : (
+          <BlockerHighlightPanel
+            blockers={response.blockers}
+            selectedPathIndex={selectedPathIndex}
+            onSelectPath={setSelectedPathIndex}
+          />
+        )}
         <ExplorerList
           response={response}
           selection={activeSelection}

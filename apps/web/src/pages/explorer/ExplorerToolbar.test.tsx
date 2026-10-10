@@ -31,6 +31,27 @@ function renderToolbar(url: string, params: ExplorerUrlParams = DEFAULTS) {
 
 const locationText = () => screen.getByTestId('location').textContent;
 
+describe('ExplorerToolbar Highlight blockers', () => {
+  it('is unchecked by default and reflects the current setting', () => {
+    renderToolbar('/graph/x');
+    expect(screen.getByRole('checkbox', { name: 'Highlight blockers' })).not.toBeChecked();
+    cleanup();
+    renderToolbar('/graph/x?blockers=true', { ...DEFAULTS, blockers: true });
+    expect(screen.getByRole('checkbox', { name: 'Highlight blockers' })).toBeChecked();
+  });
+
+  it('writes blockers=true when checked and removes the param when unchecked', async () => {
+    renderToolbar('/graph/x?depth=3');
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Highlight blockers' }));
+    expect(locationText()).toBe('/graph/x?depth=3&blockers=true');
+    cleanup();
+
+    renderToolbar('/graph/x?blockers=true&depth=3', { ...DEFAULTS, depth: 3, blockers: true });
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Highlight blockers' }));
+    expect(locationText()).toBe('/graph/x?depth=3');
+  });
+});
+
 describe('ExplorerToolbar steps', () => {
   it('offers 1 to 4 steps and shows the current value', () => {
     renderToolbar('/graph/x');

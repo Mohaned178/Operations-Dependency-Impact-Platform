@@ -37,6 +37,16 @@ export function ExplorerToolbar({ params }: ExplorerToolbarProps) {
           ))}
         </select>
       </label>
+      <label className="flex items-center gap-2">
+        <input
+          type="checkbox"
+          checked={params.blockers}
+          onChange={(event) => {
+            update({ blockers: event.target.checked });
+          }}
+        />
+        Highlight blockers
+      </label>
     </div>
   );
 }
