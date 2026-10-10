@@ -58,7 +58,7 @@
   - widen `reachableEntities` and `loadEdgeRows` type parameters to `readonly RelationshipType[]`; add the `probeBeyondDepth` option exactly as api §4; `traceDependencies` and `traceBlockers` pass `true`;
   - implement `traceNeighborhood` following api §4 steps 1–7 exactly (assert no RELATES_TO for UPSTREAM/DOWNSTREAM; throw otherwise);
   - implement `findRelationshipsAmong` per api §4 (empty input → `[]` without a query).
-- [ ] T011 Extend `apps/api/test/graph-repository.e2e-spec.ts` (seeded scenario):
+- [x] T011 Extend `apps/api/test/graph-repository.e2e-spec.ts` (seeded scenario):
   - `traceNeighborhood` UPSTREAM/DOWNSTREAM at depths 1–4 from Order #18492 and the Budget code: reached ids and distances equal `traceDependencies` with the same direction, depth and types;
   - `ALL` depth 2 from Order #18492: 31 reached (fixture N1 minus focus), each `pathEntityIds[0]` is the start, `pathEdgeKeys.length === pathEntityIds.length - 1`;
   - nonexistent start → `null`;
