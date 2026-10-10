@@ -172,7 +172,7 @@
 - [x] T048 [US4] Extend `apps/api/test/explorer.e2e-spec.ts` with fixture **G1** (hub with 500 neighbors → 200 nodes, `omitted` 301, `omittedIsLowerBound` false) and an expansion request on it whose results do not fit (still 200 nodes, `omitted` grows).
 - [x] T049 [US4] Extend `ExplorerPage.test.tsx` with a 200-node response with `omitted: 4112`: the `role="status"` message reads exactly `Showing 200 of 4312 entities — 4112 more. Refine filters, reduce the step limit, or choose a direction.`; with `omittedIsLowerBound: true` it uses the lower-bound wording of ui §10; graph and list both contain 200 entities.
 - [x] T050 [US4] Create `apps/api/test/perf-explorer.e2e-spec.ts`, wrapped in `describePerf` like `perf-tracing.e2e-spec.ts` and reusing its dataset builder (50,000 entities, 150,000 relationships). Measure, with 1 warm-up and 20 timed runs each: default neighborhood for 20 entities including the highest-degree one, p95 < 2,000 ms; the same plus one `expand`, p95 < 1,000 ms over the base call's time; `all&depth=4` from the highest-degree entity, logged only (research R13). Run `RUN_PERF=1 pnpm --filter api test:e2e -- perf-explorer` and write the p95s into the quickstart.md timings table. If a budget is missed, stop and report the numbers in `questions.md`; do not add caching or change algorithms.
-- [ ] T051 [US4] Manual SC-004 check (quickstart step 9) on the perf dataset at 200 nodes; record browser, machine and observations in the quickstart.md table. If interaction is not under 100 ms, record it in `questions.md` with a Performance-panel screenshot description.
+- [x] T051 [US4] Manual SC-004 check (quickstart step 9) on the perf dataset at 200 nodes; record browser, machine and observations in the quickstart.md table. If interaction is not under 100 ms, record it in `questions.md` with a Performance-panel screenshot description.
 
 **Checkpoint**: standard gate green; perf numbers recorded.
 
@@ -186,7 +186,7 @@
   - `grep -rnE "dagre|elkjs|d3-" apps/web/package.json` → nothing;
   - `grep -rn "nodeTypes\s*=" apps/web/src` → only the module-level constant in `GraphCanvas.tsx`;
   - no risk, impact or history controls in `pages/explorer/` (FR-032).
-- [ ] T053 Walk the whole of `quickstart.md` by hand and tick each step. Fix behavior that doesn't match, in the code. Edit the quickstart only to correct factual errors.
+- [x] T053 Walk the whole of `quickstart.md` by hand and tick each step. Fix behavior that doesn't match, in the code. Edit the quickstart only to correct factual errors.
 - [x] T054 Final gate: `pnpm lint && pnpm typecheck && pnpm test && pnpm test:e2e && pnpm build`. Confirm: no `TODO`s, dead code or stubs; `git diff main -- '**/package.json'` shows only `@xyflow/react` in `apps/web`; every question in `questions.md` is resolved or explicitly deferred.
 
 ---
