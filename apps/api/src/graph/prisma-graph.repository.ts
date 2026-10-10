@@ -465,8 +465,8 @@ export class PrismaGraphRepository implements GraphRepository {
   }
 
   /**
-   * Research R3 step 1: the entities reachable within maxDepth + 1 hops, each at its minimum
-   * depth. Returns null when the start entity does not exist. Blocker walks only pass through
+   * Research R3 step 1: the entities reachable within maxDepth hops (maxDepth + 1 when
+   * probeBeyondDepth is set), each at its minimum depth. Returns null when the start entity does not exist. Blocker walks only pass through
    * entities whose state is not satisfied. This is the only traversal SQL in the code base.
    */
   private async reachableEntities(options: {

@@ -120,7 +120,11 @@ export function composeNeighborhood(input: ComposeInput): ComposeOutput {
       if (entity === undefined || edgeKey === undefined) {
         throw new Error(`explorer invariant: blocker hop ${entityId} has no entity or edge`);
       }
-      add(entity, 'BLOCKING_PATH', i === 0 ? focus.id : (path.entityIds[i - 1] ?? focus.id), edgeKey);
+      const parentId = i === 0 ? focus.id : path.entityIds[i - 1];
+      if (parentId === undefined) {
+        throw new Error(`explorer invariant: blocker hop ${entityId} has no parent`);
+      }
+      add(entity, 'BLOCKING_PATH', parentId, edgeKey);
     });
   }
 

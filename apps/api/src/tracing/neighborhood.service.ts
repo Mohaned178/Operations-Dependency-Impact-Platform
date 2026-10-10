@@ -139,7 +139,7 @@ export class NeighborhoodService {
       expanded: node.expanded,
     }));
 
-    this.assertParentEdges(nodes, edges);
+    this.assertParentEdges(nodes, edges, id);
 
     return {
       query: {
@@ -169,15 +169,17 @@ export class NeighborhoodService {
   private assertParentEdges(
     nodes: readonly NeighborhoodNodeDto[],
     edges: ReadonlyArray<{ key: string; fromEntityId: string; toEntityId: string }>,
+    focusId: string,
   ): void {
     const byKey = new Map(edges.map((edge) => [edge.key, edge]));
     for (const node of nodes) {
-      if (node.parentId === null) {
+      if (node.id === focusId) {
         continue;
       }
       const edge = node.viaEdgeKey === null ? undefined : byKey.get(node.viaEdgeKey);
       const connects =
         edge !== undefined &&
+        node.parentId !== null &&
         ((edge.fromEntityId === node.parentId && edge.toEntityId === node.id) ||
           (edge.fromEntityId === node.id && edge.toEntityId === node.parentId));
       if (!connects) {

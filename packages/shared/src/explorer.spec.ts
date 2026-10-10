@@ -43,7 +43,7 @@ function response(nodes: unknown[]) {
     focusId: uuid(1),
     nodes,
     edges: [],
-    totals: { visible: nodes.length, omitted: 0, omittedIsLowerBound: false },
+    totals: { visible: Math.max(nodes.length, 1), omitted: 0, omittedIsLowerBound: false },
     ignoredExpansions: [],
     blockers: null,
   };
