@@ -20,7 +20,7 @@
 
 ## Phase 1: Setup
 
-- [ ] T001 On branch `004-graph-explorer`, confirm the baseline is green before any change: `docker compose up -d db`, then the standard gate plus `pnpm build`. If anything fails, stop and record it in `specs/004-graph-explorer/questions.md`. Do not fix feature 003 code here.
+- [x] T001 On branch `004-graph-explorer`, confirm the baseline is green before any change: `docker compose up -d db`, then the standard gate plus `pnpm build`. If anything fails, stop and record it in `specs/004-graph-explorer/questions.md`. Do not fix feature 003 code here.
 - [x] T002 Add the dependency: `pnpm --filter web add @xyflow/react@^12.12.0`. Append the jsdom shims of ui §17 to `apps/web/src/test-setup.ts` exactly as written. Run `pnpm --filter web test` and `pnpm --filter web typecheck`: both must still pass.
 
 **Checkpoint**: standard gate green; `git diff main -- '**/package.json'` shows only `@xyflow/react` added to `apps/web/package.json`.
@@ -86,7 +86,7 @@
   - expansions traced sequentially in request order with `maxDepth 1`;
   - edge filtering: a group of a type outside `types` is kept only when its key is a blocker hop key;
   - the step-10 invariant throws when a `viaEdgeKey` is missing from the kept edges.
-- [ ] T017 Create `apps/api/test/explorer.e2e-spec.ts` following `tracing.e2e-spec.ts` conventions. Cover: 200 for a seeded entity, response parsed with `NeighborhoodResponseSchema`; 401 without a token; 404 for an unknown UUID; 400 for a malformed id; fixture **G2** (cycle) and **G3** (multi-assertion) from api §5, inserting their data through the same helpers the tracing e2e tests use. If `authz-matrix.e2e-spec.ts` lists the tracing routes, add `GET /api/entities/:id/neighborhood` with every role allowed.
+- [x] T017 Create `apps/api/test/explorer.e2e-spec.ts` following `tracing.e2e-spec.ts` conventions. Cover: 200 for a seeded entity, response parsed with `NeighborhoodResponseSchema`; 401 without a token; 404 for an unknown UUID; 400 for a malformed id; fixture **G2** (cycle) and **G3** (multi-assertion) from api §5, inserting their data through the same helpers the tracing e2e tests use. If `authz-matrix.e2e-spec.ts` lists the tracing routes, add `GET /api/entities/:id/neighborhood` with every role allowed.
 
 **Checkpoint**: standard gate green. `grep -rn "WITH RECURSIVE" apps/` lists only `prisma-graph.repository.ts` and the existing smoke test.
 
