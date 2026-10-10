@@ -21,7 +21,7 @@
 ## Phase 1: Setup
 
 - [ ] T001 On branch `004-graph-explorer`, confirm the baseline is green before any change: `docker compose up -d db`, then the standard gate plus `pnpm build`. If anything fails, stop and record it in `specs/004-graph-explorer/questions.md`. Do not fix feature 003 code here.
-- [ ] T002 Add the dependency: `pnpm --filter web add @xyflow/react@^12.12.0`. Append the jsdom shims of ui §17 to `apps/web/src/test-setup.ts` exactly as written. Run `pnpm --filter web test` and `pnpm --filter web typecheck`: both must still pass.
+- [x] T002 Add the dependency: `pnpm --filter web add @xyflow/react@^12.12.0`. Append the jsdom shims of ui §17 to `apps/web/src/test-setup.ts` exactly as written. Run `pnpm --filter web test` and `pnpm --filter web typecheck`: both must still pass.
 
 **Checkpoint**: standard gate green; `git diff main -- '**/package.json'` shows only `@xyflow/react` added to `apps/web/package.json`.
 
@@ -33,8 +33,8 @@
 
 ### Shared (`packages/shared/src`)
 
-- [ ] T003 In `packages/shared/src/tracing.ts`, change `function commaList` to `export function commaList` (nothing else). Create `packages/shared/src/explorer.ts` with exactly the code in data-model.md §1 (`EXPLORER_LIMITS`, `NeighborhoodDirectionSchema`, `ExplorerUrlParamsSchema`, `NeighborhoodQuerySchema`, `NodeReasonSchema`, `NeighborhoodNodeDtoSchema`, `GraphEdgeDtoSchema`, `NeighborhoodResponseSchema` and their types). Add `export * from './explorer';` to `packages/shared/src/index.ts`. Rebuild shared.
-- [ ] T004 Create `packages/shared/src/explorer.spec.ts` (Vitest). Cover every row of the data-model §1 validation table:
+- [x] T003 In `packages/shared/src/tracing.ts`, change `function commaList` to `export function commaList` (nothing else). Create `packages/shared/src/explorer.ts` with exactly the code in data-model.md §1 (`EXPLORER_LIMITS`, `NeighborhoodDirectionSchema`, `ExplorerUrlParamsSchema`, `NeighborhoodQuerySchema`, `NodeReasonSchema`, `NeighborhoodNodeDtoSchema`, `GraphEdgeDtoSchema`, `NeighborhoodResponseSchema` and their types). Add `export * from './explorer';` to `packages/shared/src/index.ts`. Rebuild shared.
+- [x] T004 Create `packages/shared/src/explorer.spec.ts` (Vitest). Cover every row of the data-model §1 validation table:
   - defaults: `{}` parses to `direction 'all'`, `depth 2`, empty lists, `expand []`, `blockers false`;
   - `depth` `"0"`, `"5"`, `"2.5"`, `"abc"` rejected; `"4"` accepted;
   - `relationshipTypes: "RELATES_TO"` accepted with `direction=all`, rejected with `upstream` and `downstream` (issue path `['relationshipTypes']`);
@@ -46,15 +46,15 @@
 
 ### Traversal refactor and the `ALL` walk (`apps/api/src/graph/traversal/`)
 
-- [ ] T005 Make the relationship type generic as in data-model §2 "Internal traversal type widening": `EdgeRow<T>`, `TraversalEdge<T>`, `InternalPath<T>` in `types.ts` (default `TraceableRelationshipType`), and `selectCanonicalPaths<T extends RelationshipType>` with `CanonicalPathsResult<T>` in `canonical-paths.ts`. **No behavior change.** Every existing spec in this folder must pass unchanged.
-- [ ] T006 Create `apps/api/src/graph/traversal/edge-groups.ts` with `EdgeGroup<T>` and `groupEdgeRows<T>` (data-model §2): move the grouping, assertion sorting, effective origin/confidence and key logic out of `traversal-edges.ts` without changing it. Rewrite `buildTraversalEdges` to call `groupEdgeRows`; its output must be identical (existing `traversal-edges.spec.ts` passes unchanged). Create `edge-groups.spec.ts`: grouping by `(type, from, to)`, key = smallest relationship id, effective origin SOURCE > MANUAL > INFERRED, effective confidence = highest within the effective origin, assertion order, output sorted by key, and a RELATES_TO row grouped like any other.
-- [ ] T007 In `edge-groups.ts`, add `buildUndirectedTraversalEdges` (data-model §2): two `TraversalEdge`s per group with the same key, FORWARD (`sourceId = from`, `targetId = to`) then REVERSE, sorted by `(key, FORWARD before REVERSE)`, `nonSource = effectiveOrigin !== 'SOURCE'`. Extend `edge-groups.spec.ts`: both orientations, ordering, and that `selectCanonicalPaths` over these edges reaches entities through relationships in either direction.
-- [ ] T008 Extend `apps/api/src/graph/traversal/traversal-property.spec.ts` with an `ALL`-walk block over 1,000 generated graphs (reuse the file's generator and seeded random; include RELATES_TO and cycles). For each graph, a random start and `maxDepth` 1–4, run `selectCanonicalPaths(start, buildUndirectedTraversalEdges(groupEdgeRows(rows)), maxDepth)` and assert: it terminates; no path repeats an entity; every path has ≤ `maxDepth` edges; the reached set and each path's length are compatible with an independent undirected BFS oracle (reached set = BFS set within `maxDepth`; each path length ≥ BFS distance); each consecutive pair in `entityIds` is joined by the edge at that index.
+- [x] T005 Make the relationship type generic as in data-model §2 "Internal traversal type widening": `EdgeRow<T>`, `TraversalEdge<T>`, `InternalPath<T>` in `types.ts` (default `TraceableRelationshipType`), and `selectCanonicalPaths<T extends RelationshipType>` with `CanonicalPathsResult<T>` in `canonical-paths.ts`. **No behavior change.** Every existing spec in this folder must pass unchanged.
+- [x] T006 Create `apps/api/src/graph/traversal/edge-groups.ts` with `EdgeGroup<T>` and `groupEdgeRows<T>` (data-model §2): move the grouping, assertion sorting, effective origin/confidence and key logic out of `traversal-edges.ts` without changing it. Rewrite `buildTraversalEdges` to call `groupEdgeRows`; its output must be identical (existing `traversal-edges.spec.ts` passes unchanged). Create `edge-groups.spec.ts`: grouping by `(type, from, to)`, key = smallest relationship id, effective origin SOURCE > MANUAL > INFERRED, effective confidence = highest within the effective origin, assertion order, output sorted by key, and a RELATES_TO row grouped like any other.
+- [x] T007 In `edge-groups.ts`, add `buildUndirectedTraversalEdges` (data-model §2): two `TraversalEdge`s per group with the same key, FORWARD (`sourceId = from`, `targetId = to`) then REVERSE, sorted by `(key, FORWARD before REVERSE)`, `nonSource = effectiveOrigin !== 'SOURCE'`. Extend `edge-groups.spec.ts`: both orientations, ordering, and that `selectCanonicalPaths` over these edges reaches entities through relationships in either direction.
+- [x] T008 Extend `apps/api/src/graph/traversal/traversal-property.spec.ts` with an `ALL`-walk block over 1,000 generated graphs (reuse the file's generator and seeded random; include RELATES_TO and cycles). For each graph, a random start and `maxDepth` 1–4, run `selectCanonicalPaths(start, buildUndirectedTraversalEdges(groupEdgeRows(rows)), maxDepth)` and assert: it terminates; no path repeats an entity; every path has ≤ `maxDepth` edges; the reached set and each path's length are compatible with an independent undirected BFS oracle (reached set = BFS set within `maxDepth`; each path length ≥ BFS distance); each consecutive pair in `entityIds` is joined by the edge at that index.
 
 ### Repository (`apps/api/src/graph/`)
 
-- [ ] T009 In `graph.repository.ts`, add `NeighborhoodWalk`, `NeighborhoodTraceQuery`, `NeighborhoodReached` (with `pathEntityIds` **and** `pathEdgeKeys`, no `viaEdgeKey`), `NeighborhoodTrace`, `RelationshipGroup` (data-model §2) and the two `GraphRepository` methods `traceNeighborhood` and `findRelationshipsAmong`.
-- [ ] T010 In `prisma-graph.repository.ts`:
+- [x] T009 In `graph.repository.ts`, add `NeighborhoodWalk`, `NeighborhoodTraceQuery`, `NeighborhoodReached` (with `pathEntityIds` **and** `pathEdgeKeys`, no `viaEdgeKey`), `NeighborhoodTrace`, `RelationshipGroup` (data-model §2) and the two `GraphRepository` methods `traceNeighborhood` and `findRelationshipsAmong`.
+- [x] T010 In `prisma-graph.repository.ts`:
   - widen `reachableEntities` and `loadEdgeRows` type parameters to `readonly RelationshipType[]`; add the `probeBeyondDepth` option exactly as api §4; `traceDependencies` and `traceBlockers` pass `true`;
   - implement `traceNeighborhood` following api §4 steps 1–7 exactly (assert no RELATES_TO for UPSTREAM/DOWNSTREAM; throw otherwise);
   - implement `findRelationshipsAmong` per api §4 (empty input → `[]` without a query).
@@ -67,9 +67,9 @@
 
 ### Composition, service and endpoint (`apps/api/src/tracing/`)
 
-- [ ] T012 [P] In `tracing.mapper.ts`, add `toGraphEdgeDto(group: RelationshipGroup): GraphEdgeDto` (copy fields; `observedAt` → ISO). Add a case to `tracing.mapper.spec.ts`.
-- [ ] T013 [P] Create `compose-neighborhood.ts` with the types of data-model §3 (including `blockerEntities`) and `composeNeighborhood` implementing api §3 steps 1–7 **exactly**, including `basePriority`.
-- [ ] T014 Create `compose-neighborhood.spec.ts` with hand-built `NeighborhoodTrace` inputs. Cover:
+- [x] T012 [P] In `tracing.mapper.ts`, add `toGraphEdgeDto(group: RelationshipGroup): GraphEdgeDto` (copy fields; `observedAt` → ISO). Add a case to `tracing.mapper.spec.ts`.
+- [x] T013 [P] Create `compose-neighborhood.ts` with the types of data-model §3 (including `blockerEntities`) and `composeNeighborhood` implementing api §3 steps 1–7 **exactly**, including `basePriority`.
+- [x] T014 Create `compose-neighborhood.spec.ts` with hand-built `NeighborhoodTrace` inputs. Cover:
   - focus only (empty base) → 1 node, reasons `['FOCUS']`, distance 0, parent null;
   - base order follows `basePriority`, including the confidence and non-SOURCE tie-breaks;
   - entity-type filter: connectors added before the matching entity, in path order, with reason `CONNECTOR`; a matching intermediate gets `NEIGHBORHOOD`; non-matching entities on no listed path are not candidates (not counted in `omitted`);
@@ -77,8 +77,8 @@
   - expansions: applied in request order, `EXPANSION` reason, parent = expanded id, `viaEdgeKey = pathEdgeKeys[0]`; ignored when the trace is null or the expanded id is beyond the first `maxVisible` entries; the focus never gets `EXPANSION`; `expanded` flag set;
   - cap: `maxVisible` 5 with 9 candidates → 5 visible, `omitted` 4; `omittedIsLowerBound` from base or an applied expansion;
   - **property**: over 200 random inputs, every visible non-focus node's `parentId` appears earlier in `visible`, and the result is identical when computed twice.
-- [ ] T015 Create `neighborhood.service.ts` (`@Injectable`, injects `GRAPH_REPOSITORY`, `TracingService`, `StateEvidenceReader`) implementing api §2 steps 1–11 exactly. Register it in `tracing.module.ts` providers. Add the `@Get(':id/neighborhood')` handler to `tracing.controller.ts` exactly as api §1.
-- [ ] T016 Create `neighborhood.service.spec.ts` (Jest, repository and `TracingService` mocked):
+- [x] T015 Create `neighborhood.service.ts` (`@Injectable`, injects `GRAPH_REPOSITORY`, `TracingService`, `StateEvidenceReader`) implementing api §2 steps 1–11 exactly. Register it in `tracing.module.ts` providers. Add the `@Get(':id/neighborhood')` handler to `tracing.controller.ts` exactly as api §1.
+- [x] T016 Create `neighborhood.service.spec.ts` (Jest, repository and `TracingService` mocked):
   - `expand` containing the focus → `VALIDATION_FAILED` with path `expand`, before any repository call;
   - default `relationshipTypes`: 12 types for `all`, the 11 traceable for `upstream`;
   - `traceNeighborhood` returning null → `NOT_FOUND`;
