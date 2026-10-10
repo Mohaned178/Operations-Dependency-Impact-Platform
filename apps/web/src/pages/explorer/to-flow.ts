@@ -1,4 +1,4 @@
-import type { GraphEdgeDto, NeighborhoodNodeDto, NeighborhoodResponse } from '@opsgraph/shared';
+import type { GraphEdgeDto, NeighborhoodResponse } from '@opsgraph/shared';
 import { stateLabel } from '../entities/StateBadge';
 import { edgeStyle } from './edge-style';
 import type { EmphasisResult } from './emphasis';
@@ -10,17 +10,13 @@ import {
   type Selection,
 } from './flow-types';
 import type { LayoutResult } from './layout';
+import { hasConflict, isConnectorOnly } from './NodeChips';
 
 export interface ToFlowInput {
   response: NeighborhoodResponse;
   layout: LayoutResult;
   emphasis: EmphasisResult;
   selection: Selection;
-}
-
-/** Sources disagree on the entity's state (spec FR-009). */
-export function hasConflict(node: NeighborhoodNodeDto): boolean {
-  return new Set(node.state.latestBySource.map((o) => o.state)).size > 1;
 }
 
 function compareCodeUnits(a: string, b: string): number {
@@ -84,7 +80,7 @@ export function toFlow(input: ToFlowInput): {
       data: {
         entity,
         isFocus: entity.id === response.focusId,
-        isConnector: entity.reasons.length === 1 && entity.reasons[0] === 'CONNECTOR',
+        isConnector: isConnectorOnly(entity),
         hasConflict: hasConflict(entity),
         emphasis: emphasis.nodes.get(entity.id) ?? 'normal',
         blockerRole: emphasis.blockerRole.get(entity.id) ?? 'none',

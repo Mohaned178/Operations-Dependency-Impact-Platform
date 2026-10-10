@@ -2,7 +2,10 @@ import '@testing-library/jest-dom/vitest';
 
 class ResizeObserverStub {
   constructor(private readonly cb: ResizeObserverCallback) {}
-  observe(target: Element): void { this.cb([{ target } as ResizeObserverEntry], this); }
+  observe(target: Element): void {
+    const rect = target.getBoundingClientRect();
+    this.cb([{ target, contentRect: rect } as ResizeObserverEntry], this);
+  }
   unobserve(): void {}
   disconnect(): void {}
 }
