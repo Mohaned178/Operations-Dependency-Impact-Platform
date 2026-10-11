@@ -1,10 +1,7 @@
 import { IMPACT_STATE_CLASS } from '@opsgraph/shared';
-import type { ImpactReachedEntity, TraversalPath } from '../../graph/graph.repository';
+import type { ImpactReachedEntity } from '../../graph/graph.repository';
+import { sameHops } from './paths';
 import type { Affected } from './types';
-
-function sameHops(a: TraversalPath, b: TraversalPath): boolean {
-  return a.hops.length === b.hops.length && a.hops.every((item, index) => item.key === b.hops[index]?.key);
-}
 
 /**
  * Spec FR-003 to FR-009, data-model 4b: classifies every reached entity of an impact trace, in the
@@ -25,7 +22,12 @@ export function classifyReached(trace: { reached: readonly ImpactReachedEntity[]
       distance: row.distance,
       directness: row.distance === 1 ? 'DIRECT' : 'INDIRECT',
       primaryPath,
-      shortestPath: sameHops(row.shortestPath, primaryPath) ? null : row.shortestPath,
+      // A primary path as short as the distance already is a shortest path. Naming another path of
+      // the same length would only be a tie broken by entity ids.
+      shortestPath:
+        primaryPath.hops.length === row.distance || sameHops(row.shortestPath, primaryPath)
+          ? null
+          : row.shortestPath,
       flags: {
         stateUnknown: stateClass === 'INDETERMINATE',
         otherCause: stateClass === 'IMPAIRED' && classification === 'POTENTIAL',

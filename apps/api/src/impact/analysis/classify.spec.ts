@@ -43,6 +43,17 @@ describe('classifyReached', () => {
     expect(items.map((item) => item.distance)).toEqual([1, 2]);
   });
 
+  it('drops the shortest path when the primary path is itself as short as the distance', () => {
+    const order = ref('Order', 'Tie', 'BLOCKED');
+    const live = path([hop(ref('PurchaseOrder', 'Via PO'), { key: 'k1' }), hop(order, { key: 'k2' })]);
+    const tie = path([hop(ref('Product', 'Via product'), { key: 'k3' }), hop(order, { key: 'k4' })]);
+    const [item] = classifyReached({
+      reached: [reached(order, { distance: 2, canonical: tie, live, shortest: tie })],
+    });
+    expect(item?.primaryPath).toBe(live);
+    expect(item?.shortestPath).toBeNull();
+  });
+
   it('drops the shortest path when it equals the primary path by hop keys', () => {
     const order = ref('Order', 'Same');
     const first = hop(order, { key: 'k1' });
@@ -53,8 +64,9 @@ describe('classifyReached', () => {
 
     const other = ref('Order', 'Other');
     const shortest = path([hop(other, { key: 'k2' })]);
+    const longer = path([hop(ref('Product', 'Middle'), { key: 'k0' }), hop(other, { key: 'k1' })]);
     const [different] = classifyReached({
-      reached: [reached(other, { canonical: path([hop(other, { key: 'k1' })]), shortest })],
+      reached: [reached(other, { distance: 1, canonical: longer, shortest })],
     });
     expect(different?.shortestPath).toBe(shortest);
   });
