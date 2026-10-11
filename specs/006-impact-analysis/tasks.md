@@ -163,7 +163,7 @@
 
 ### Pure impact modules (data-model §4b, research R6/R7/R9)
 
-- [ ] T014 [P] Create `apps/api/src/impact/analysis/types.ts`, with the `Affected` and `Classification` types from data-model §4b plus `ExposureResult`, `ExposureFigure` and `ExposureShare`, mirroring `ExposureFigureDtoSchema` with `bigint` amounts.
+- [x] T014 [P] Create `apps/api/src/impact/analysis/types.ts`, with the `Affected` and `Classification` types from data-model §4b plus `ExposureResult`, `ExposureFigure` and `ExposureShare`, mirroring `ExposureFigureDtoSchema` with `bigint` amounts.
 
   Create `apps/api/src/impact/analysis/money.ts`, with `parseAmount`, `formatAmount`, `formatMoneyText` and `compareUnits` (research R6, KDN 5).
 
@@ -176,14 +176,14 @@
   - `formatMoneyText(840000000n,'USD') === '84,000.00 USD'`;
   - `formatMoneyText(8750000n,'USD') === '875.00 USD'`;
   - a 13-digit amount groups correctly.
-- [ ] T015 [P] Create `apps/api/src/impact/analysis/classify.ts` (`classifyReached`), following the data-model §4b rules. Its `classify.spec.ts` covers:
+- [x] T015 [P] Create `apps/api/src/impact/analysis/classify.ts` (`classifyReached`), following the data-model §4b rules. Its `classify.spec.ts` covers:
   - terminal entities become NOT_COUNTED with reason TERMINAL;
   - CURRENT takes `primaryPath` from `livePath`;
   - POTENTIAL takes the canonical path;
   - DIRECT/INDIRECT come from distance;
   - `shortestPath` is null when it equals the primary path by hop keys;
   - flags: `stateUnknown`, `otherCause` (an impaired potential entity) and `inferredOnly` (only for counted entities).
-- [ ] T016 [P] Create `apps/api/src/impact/analysis/customers.ts` (`mergeCustomers`, data-model §4b). Its `customers.spec.ts` covers:
+- [x] T016 [P] Create `apps/api/src/impact/analysis/customers.ts` (`mergeCustomers`, data-model §4b). Its `customers.spec.ts` covers:
   - an attributed-only customer has distance null, INDIRECT and no path;
   - a customer is CURRENT if any of its attributions is current;
   - a customer is inferredOnly only when all of its attributions are;
@@ -191,7 +191,7 @@
   - a downstream-reached customer is merged and keeps its distance;
   - attributions of NOT_COUNTED entities are ignored;
   - the attribution order is CURRENT first, then type, displayName, id.
-- [ ] T017 [P] Create `apps/api/src/impact/analysis/exposure.ts` (`computeExposure`, data-model §4b, research R6). Its `exposure.spec.ts` covers:
+- [x] T017 [P] Create `apps/api/src/impact/analysis/exposure.ts` (`computeExposure`, data-model §4b, research R6). Its `exposure.spec.ts` covers:
   - each order is counted once;
   - the start is excluded, and `startOwnValue` is reported for Order, Payment and Invoice starts;
   - NOT_COUNTED orders are excluded;
@@ -201,12 +201,12 @@
   - a disagreement: OMS 100.00 USD against ERP 120.00 USD gives `range` low 100.00 and high 120.00 and `disagreementOrderCount = 1`;
   - a source in another currency sets `currencyMismatch` and stays out of the range;
   - the per-customer exposure map.
-- [ ] T018 [P] Create `apps/api/src/impact/analysis/categories.ts` (`buildCategories` and `notCountedSummary`, contracts/api.md `ImpactCategoryDto` field rules). Its `categories.spec.ts` covers:
+- [x] T018 [P] Create `apps/api/src/impact/analysis/categories.ts` (`buildCategories` and `notCountedSummary`, contracts/api.md `ImpactCategoryDto` field rules). Its `categories.spec.ts` covers:
   - the 6 headline categories are always present, in order, even when 0;
   - other types follow only when non-zero, sorted by type name;
   - `inferredOnly` and `stateUnknown` cover counted entities only;
   - `notCounted.byType` is sorted by type name.
-- [ ] T019 Create `apps/api/src/impact/analysis/lists.ts` with:
+- [x] T019 Create `apps/api/src/impact/analysis/lists.ts` with:
   - `selectList(affected, exposure, selector)`;
   - `compareForList(selector)`, per research R7;
   - `paginate(items, cursor, limit, keyOf)`: base64url JSON `{ k: (string|number)[] }`, with bigint amounts as decimal strings. A malformed cursor throws `Errors.validation([{ path: 'cursor', message: 'Invalid cursor' }])`, reusing `common/pagination/cursor.ts` helpers where they fit.
@@ -218,7 +218,7 @@
   - other entities are sorted CURRENT, POTENTIAL, NOT_COUNTED, then distance with null last, then name, then id;
   - pagination is stable across pages;
   - a cursor after the last item gives an empty page.
-- [ ] T020 Create `apps/api/src/impact/analysis/summary.ts` (`buildSummary`), implementing contracts/api.md § Summary text lines 1 to 12, with the stated conditions and order. Its `summary.spec.ts` covers:
+- [x] T020 Create `apps/api/src/impact/analysis/summary.ts` (`buildSummary`), implementing contracts/api.md § Summary text lines 1 to 12, with the stated conditions and order. Its `summary.spec.ts` covers:
   - the exact text of fixtures **I1, I6, I8, I9, I10, I12 (line 1), I13 (last line) and I14**, from hand-built inputs;
   - singular and plural forms;
   - several currencies joined with " and ";
