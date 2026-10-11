@@ -25,7 +25,7 @@ Administrators can load entities, relationships and events into OpsGraph from JS
 | `sourceSystem` | 1–64 characters: letters, digits, space, `_`, `.`, `-`, starting with a letter or digit. Example: `OMS`. |
 | `sourceId` | 1–200 characters, and must not contain `\|`, `;` or line breaks. |
 | timestamps (`observedAt`, `occurredAt`) | ISO 8601 **with a timezone**: `2026-09-29T09:12:00Z` or `2026-09-29T11:12:00+02:00`. A timestamp without a timezone is rejected, as is one more than 5 minutes in the future. |
-| entity `type` | `Customer`, `Contract`, `Order`, `Product`, `Payment`, `Invoice`, `Approval`, `Warehouse`, `Shipment`, `Supplier`, `SLA`, `BudgetRequirement` |
+| entity `type` | `Customer`, `Contract`, `Order`, `Product`, `Payment`, `Invoice`, `Approval`, `Warehouse`, `Shipment`, `Supplier`, `SLA`, `BudgetRequirement`, `PurchaseOrder` |
 | `state` | `ACTIVE`, `PENDING`, `WAITING`, `BLOCKED`, `MISSING`, `DELAYED`, `AT_RISK`, `COMPLETED`, `FAILED`, `CANCELLED`, `SUSPENDED`, `UNKNOWN` |
 | relationship `type` | `HAS`, `PLACED`, `GOVERNS`, `CONTAINS`, `GENERATES`, `REQUIRES`, `DEPENDS_ON`, `BLOCKS`, `FULFILLED_BY`, `SUPPLIED_BY`, `DEFINES`, `RELATES_TO` |
 | `origin` | `SOURCE` (the source system states it), `INFERRED` (derived by a rule) or `MANUAL` (asserted by a person) |
@@ -41,10 +41,10 @@ Administrators can load entities, relationships and events into OpsGraph from JS
 | HAS | Customer | Contract |
 | PLACED | Customer | Order |
 | GOVERNS | Contract | Order |
-| CONTAINS | Order | Product |
+| CONTAINS | Order, PurchaseOrder | Product |
 | GENERATES | Order | Invoice |
 | FULFILLED_BY | Order, Shipment | Warehouse |
-| SUPPLIED_BY | Product | Supplier |
+| SUPPLIED_BY | Product, PurchaseOrder | Supplier |
 | DEFINES | Contract | SLA, BudgetRequirement |
 | REQUIRES, DEPENDS_ON, BLOCKS, RELATES_TO | any | any |
 

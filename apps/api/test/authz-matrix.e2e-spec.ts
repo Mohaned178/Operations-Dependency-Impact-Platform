@@ -185,6 +185,24 @@ const PROBES: RouteProbe[] = [
     path: `/api/entities/${MISSING_ID}/neighborhood`,
     expected: AUTHENTICATED,
   },
+  {
+    name: 'GET /entities/:id/impact',
+    method: 'get',
+    path: `/api/entities/${MISSING_ID}/impact`,
+    expected: AUTHENTICATED,
+  },
+  {
+    name: 'GET /entities/:id/impact/items',
+    method: 'get',
+    path: `/api/entities/${MISSING_ID}/impact/items?list=valueUnknown`,
+    expected: AUTHENTICATED,
+  },
+  {
+    name: 'GET /entities/:id/impact/items/:targetId',
+    method: 'get',
+    path: `/api/entities/${MISSING_ID}/impact/items/${MISSING_ID}`,
+    expected: AUTHENTICATED,
+  },
   { name: 'GET /source-systems', method: 'get', path: '/api/source-systems', expected: AUTHENTICATED },
 ];
 

@@ -36,6 +36,22 @@ describe('RELATIONSHIP_RULES', () => {
       expect(EntityTypeSchema.safeParse(type).success).toBe(true);
     }
   });
+
+  it('accepts PurchaseOrder as an entity type', () => {
+    expect(EntityTypeSchema.safeParse('PurchaseOrder').success).toBe(true);
+  });
+
+  it('allows PurchaseOrder CONTAINS Product and PurchaseOrder SUPPLIED_BY Supplier', () => {
+    expect(RELATIONSHIP_RULES.CONTAINS.from).toContain('PurchaseOrder');
+    expect(RELATIONSHIP_RULES.CONTAINS.to).toContain('Product');
+    expect(RELATIONSHIP_RULES.SUPPLIED_BY.from).toContain('PurchaseOrder');
+    expect(RELATIONSHIP_RULES.SUPPLIED_BY.to).toContain('Supplier');
+  });
+
+  it('refuses Product CONTAINS Product and PurchaseOrder SUPPLIED_BY Product', () => {
+    expect(RELATIONSHIP_RULES.CONTAINS.from).not.toContain('Product');
+    expect(RELATIONSHIP_RULES.SUPPLIED_BY.to).not.toContain('Product');
+  });
 });
 
 describe('graph DTOs', () => {

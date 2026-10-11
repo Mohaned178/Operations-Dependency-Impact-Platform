@@ -10,6 +10,6 @@ import { TracingService } from './tracing.service';
   imports: [GraphModule, PrismaModule],
   controllers: [TracingController],
   providers: [TracingService, NeighborhoodService, StateEvidenceReader],
-  exports: [TracingService],
+  exports: [TracingService, StateEvidenceReader],
 })
 export class TracingModule {}

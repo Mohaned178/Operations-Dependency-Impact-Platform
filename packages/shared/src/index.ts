@@ -6,6 +6,8 @@ export * from './explorer';
 export * from './graph';
 export * from './health';
 export * from './imports';
+export * from './impact';
+export * from './money';
 export * from './root-cause';
 export * from './tracing';
 export * from './users';

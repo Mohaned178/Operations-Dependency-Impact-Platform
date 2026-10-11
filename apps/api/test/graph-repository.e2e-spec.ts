@@ -6,6 +6,7 @@ import {
   type EntityType,
 } from '@opsgraph/shared';
 import { GRAPH_REPOSITORY, type GraphRepository } from '../src/graph/graph.repository';
+import { compareCodeUnits, compareIdSequences } from '../src/graph/traversal/path-order';
 import { SeedService } from '../src/ingestion/seed/seed.service';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { createTestApp, entityIdByKey, resetDb, runImport } from './helpers';
@@ -646,5 +647,358 @@ describe('GraphRepository.findIncomingRelationships on the seeded §39 scenario 
     const placedRows = await repository.findIncomingRelationships([orderId], ['PLACED']);
     expect(placedRows).toHaveLength(1);
     expect(placedRows[0]?.relationship.type).toBe('PLACED');
+  });
+});
+
+interface ImpactNode {
+  type: EntityType;
+  sourceId: string;
+  state?: string;
+  attributes?: Record<string, string>;
+}
+
+function impactEntity(node: ImpactNode) {
+  return {
+    type: node.type,
+    sourceSystem: 'IMPACT',
+    sourceId: node.sourceId,
+    displayName: node.sourceId,
+    observedAt: T1,
+    ...(node.state === undefined ? {} : { state: node.state }),
+    ...(node.attributes === undefined ? {} : { attributes: node.attributes }),
+  };
+}
+
+function impactRelationship(
+  type: string,
+  from: ImpactNode,
+  to: ImpactNode,
+  options: { origin?: 'SOURCE' | 'INFERRED'; confidence?: 'HIGH' | 'LOW' } = {},
+) {
+  const origin = options.origin ?? 'SOURCE';
+  return {
+    type,
+    sourceSystem: 'OPSGRAPH',
+    sourceId: `rel-${type}-${from.sourceId}-${to.sourceId}`,
+    from: keyRef(from.type, 'IMPACT', from.sourceId),
+    to: keyRef(to.type, 'IMPACT', to.sourceId),
+    origin,
+    confidence: options.confidence ?? 'HIGH',
+    ...(origin === 'SOURCE' ? {} : { basis: 'Added by the repository test' }),
+    observedAt: T1,
+  };
+}
+
+describe('GraphRepository.traceImpact (e2e)', () => {
+  const sup: ImpactNode = { type: 'Supplier', sourceId: 'SUP', state: 'SUSPENDED' };
+  const p1: ImpactNode = { type: 'Product', sourceId: 'P1', state: 'BLOCKED' };
+  const sh1: ImpactNode = { type: 'Shipment', sourceId: 'SH1', state: 'WAITING' };
+  const sh2: ImpactNode = { type: 'Shipment', sourceId: 'SH2', state: 'ACTIVE' };
+  const sh3: ImpactNode = { type: 'Shipment', sourceId: 'SH3', state: 'WAITING' };
+  const sh5: ImpactNode = { type: 'Shipment', sourceId: 'SH5', state: 'WAITING' };
+  const done: ImpactNode = { type: 'Shipment', sourceId: 'DONE', state: 'COMPLETED' };
+  const afterDone: ImpactNode = { type: 'Shipment', sourceId: 'AFTER-DONE', state: 'ACTIVE' };
+  const inferred: ImpactNode = { type: 'Shipment', sourceId: 'INF', state: 'ACTIVE' };
+  // A separate chain whose only entity past depth 1 is COMPLETED.
+  const chainStart: ImpactNode = { type: 'Shipment', sourceId: 'CHAIN-START', state: 'BLOCKED' };
+  const chainMid: ImpactNode = { type: 'Shipment', sourceId: 'CHAIN-MID', state: 'WAITING' };
+  const chainEnd: ImpactNode = { type: 'Shipment', sourceId: 'CHAIN-END', state: 'COMPLETED' };
+  const nodes = [sup, p1, sh1, sh2, sh3, sh5, done, afterDone, inferred, chainStart, chainMid, chainEnd];
+
+  let app: INestApplication;
+  let prisma: PrismaService;
+  let repository: GraphRepository;
+
+  beforeAll(async () => {
+    app = await createTestApp();
+    prisma = app.get(PrismaService);
+    repository = app.get<GraphRepository>(GRAPH_REPOSITORY);
+    await resetDb(prisma);
+    const report = await runImport(app, {
+      format: 'json',
+      content: JSON.stringify({
+        entities: nodes.map(impactEntity),
+        relationships: [
+          impactRelationship('DEPENDS_ON', p1, sup),
+          impactRelationship('DEPENDS_ON', sh1, p1),
+          impactRelationship('DEPENDS_ON', sh2, p1),
+          impactRelationship('DEPENDS_ON', sh3, sh2),
+          impactRelationship('DEPENDS_ON', sh5, sh1),
+          impactRelationship('DEPENDS_ON', sh5, sh2),
+          impactRelationship('DEPENDS_ON', done, sup),
+          impactRelationship('DEPENDS_ON', afterDone, done),
+          impactRelationship('DEPENDS_ON', inferred, sup, { origin: 'INFERRED', confidence: 'LOW' }),
+          impactRelationship('DEPENDS_ON', chainMid, chainStart),
+          impactRelationship('DEPENDS_ON', chainEnd, chainMid),
+        ],
+      }),
+    });
+    expect(report?.outcome).toBe('APPLIED');
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  const idOf = (node: ImpactNode) => entityIdByKey(prisma, node.type, 'IMPACT', node.sourceId);
+
+  it('returns null for an unknown start entity', async () => {
+    expect(await repository.traceImpact({ startId: randomUUID(), maxDepth: 6 })).toBeNull();
+  });
+
+  it('lists a COMPLETED entity but does not expand through it', async () => {
+    const trace = await repository.traceImpact({ startId: await idOf(sup), maxDepth: 6 });
+    const names = trace?.reached.map((row) => row.entity.displayName);
+    expect(names).toEqual(['P1', 'DONE', 'INF', 'SH1', 'SH2', 'SH3', 'SH5']);
+    expect(names).not.toContain('AFTER-DONE');
+    expect(trace?.start.displayName).toBe('SUP');
+  });
+
+  it('respects maxDepth and flags a depth cut', async () => {
+    const shallow = await repository.traceImpact({ startId: await idOf(sup), maxDepth: 1 });
+    expect(shallow?.reached.map((row) => row.entity.displayName)).toEqual(['P1', 'DONE', 'INF']);
+    expect(shallow?.reached.every((row) => row.distance === 1)).toBe(true);
+    expect(shallow?.depthLimitReached).toBe(true);
+
+    const deep = await repository.traceImpact({ startId: await idOf(sup), maxDepth: 6 });
+    expect(deep?.depthLimitReached).toBe(false);
+    expect(deep?.explorationLimitReached).toBe(false);
+  });
+
+  it('does not flag a depth cut when the only entity past the depth is COMPLETED', async () => {
+    const trace = await repository.traceImpact({ startId: await idOf(chainStart), maxDepth: 1 });
+    expect(trace?.reached.map((row) => row.entity.displayName)).toEqual(['CHAIN-MID']);
+    expect(trace?.depthLimitReached).toBe(false);
+
+    const full = await repository.traceImpact({ startId: await idOf(chainStart), maxDepth: 2 });
+    expect(full?.reached.map((row) => row.entity.displayName)).toEqual(['CHAIN-MID', 'CHAIN-END']);
+    expect(full?.depthLimitReached).toBe(false);
+  });
+
+  it('reports distances, live paths and sourced reach for the hand-built graph', async () => {
+    const trace = await repository.traceImpact({ startId: await idOf(sup), maxDepth: 6 });
+    const byName = new Map(trace?.reached.map((row) => [row.entity.displayName, row]));
+    const get = (name: string) => {
+      const row = byName.get(name);
+      if (row === undefined) throw new Error(`${name} was not reached`);
+      return row;
+    };
+    const names = ['P1', 'SH1', 'SH2', 'SH3', 'SH5', 'DONE', 'INF'];
+
+    expect(names.map((name) => get(name).distance)).toEqual([1, 2, 2, 3, 3, 1, 1]);
+    expect(names.map((name) => get(name).livePath !== null)).toEqual([
+      true,
+      true,
+      false,
+      false,
+      true,
+      false,
+      false,
+    ]);
+    expect(get('SH5').livePath?.hops.map((hop) => hop.target.displayName)).toEqual([
+      'P1',
+      'SH1',
+      'SH5',
+    ]);
+    expect(names.map((name) => get(name).sourcedReach)).toEqual([
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+    ]);
+
+    for (const row of trace?.reached ?? []) {
+      expect(row.shortestPath.hops).toHaveLength(row.distance);
+      expect(row.canonicalPath.hops.at(-1)?.target.id).toBe(row.entity.id);
+    }
+    expect(get('INF').canonicalPath.hops[0]?.effectiveOrigin).toBe('INFERRED');
+  });
+
+  it('has no live entities when the start is not impaired', async () => {
+    const idle = await repository.traceImpact({ startId: await idOf(sh2), maxDepth: 6 });
+    expect(idle?.reached.length).toBeGreaterThan(0);
+    expect(idle?.reached.every((row) => row.livePath === null)).toBe(true);
+  });
+
+  it('enumerates sorted paths on demand', async () => {
+    const trace = await repository.traceImpact({ startId: await idOf(sup), maxDepth: 6 });
+    const sh5Id = await idOf(sh5);
+    const unknownId = randomUUID();
+    const sets = trace?.paths([sh5Id, unknownId]);
+
+    const found = sets?.get(sh5Id);
+    expect(found?.morePaths).toBe(false);
+    expect(found?.found).toHaveLength(2);
+    const idLists = (found?.found ?? []).map((path) => path.hops.map((hop) => hop.target.id));
+    for (const ids of idLists) {
+      expect(ids).toHaveLength(3);
+      expect(ids.at(-1)).toBe(sh5Id);
+    }
+    expect(idLists).toEqual([...idLists].sort((a, b) => compareIdSequences(a, b)));
+    expect(sets?.get(unknownId)).toEqual({ found: [], morePaths: false });
+  });
+});
+
+describe('GraphRepository.traceImpact exploration limit (e2e)', () => {
+  let app: INestApplication;
+  let prisma: PrismaService;
+  let repository: GraphRepository;
+  let startId: string;
+
+  beforeAll(async () => {
+    app = await createTestApp();
+    prisma = app.get(PrismaService);
+    repository = app.get<GraphRepository>(GRAPH_REPOSITORY);
+    await resetDb(prisma);
+
+    const importId = randomUUID();
+    startId = randomUUID();
+    await prisma.$executeRaw`
+      INSERT INTO imports
+        (id, trigger, format, dry_run, outcome, actor_type, file_name, byte_size,
+          received_at, counts, file_errors, row_errors, correlation_id)
+      VALUES (${importId}::uuid, 'SEED', 'JSON', false, 'APPLIED', 'system', 'fanout.json', 0,
+        now(), '{}', '[]', '[]', ${randomUUID()}::uuid)`;
+    await prisma.$executeRaw`
+      INSERT INTO entities (id, type, display_name, attributes, current_state, last_observed_at, created_at, updated_at)
+      VALUES (${startId}::uuid, 'Supplier', 'Fan-out start', '{}', 'SUSPENDED', now(), now(), now())`;
+    await prisma.$executeRaw`
+      INSERT INTO entities (id, type, display_name, attributes, current_state, last_observed_at, created_at, updated_at)
+      SELECT md5('fanout-' || g)::uuid, 'Order', 'Fan-out order ' || lpad(g::text, 5, '0'), '{}', 'PENDING', now(), now(), now()
+      FROM generate_series(1, 10001) AS g`;
+    await prisma.$executeRaw`
+      INSERT INTO relationships
+        (id, type, from_entity_id, to_entity_id, origin, confidence,
+          source_system, source_id, observed_at, import_id, created_at, updated_at)
+      SELECT gen_random_uuid(), 'DEPENDS_ON', md5('fanout-' || g)::uuid, ${startId}::uuid,
+        'SOURCE', 'HIGH', 'Perf', 'FANOUT-' || g, now(), ${importId}::uuid, now(), now()
+      FROM generate_series(1, 10001) AS g`;
+  }, 120_000);
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  it('stops at 10,000 reached entities and says so', async () => {
+    const trace = await repository.traceImpact({ startId, maxDepth: 6 });
+    expect(trace?.explorationLimitReached).toBe(true);
+    expect(trace?.reached).toHaveLength(10_000);
+    expect(trace?.reached.every((row) => row.distance === 1)).toBe(true);
+  }, 120_000);
+});
+
+describe('GraphRepository.findAttributedCustomers (e2e)', () => {
+  const c1: ImpactNode = { type: 'Customer', sourceId: 'C1', state: 'ACTIVE' };
+  const c2: ImpactNode = { type: 'Customer', sourceId: 'C2', state: 'ACTIVE' };
+  const k1: ImpactNode = { type: 'Contract', sourceId: 'K1', state: 'ACTIVE' };
+  const k2: ImpactNode = { type: 'Contract', sourceId: 'K2', state: 'ACTIVE' };
+  const amount = { amount: '100.00', currency: 'USD' };
+  const o1: ImpactNode = { type: 'Order', sourceId: 'O1', state: 'PENDING', attributes: amount };
+  const o2: ImpactNode = { type: 'Order', sourceId: 'O2', state: 'PENDING', attributes: amount };
+  const sl1: ImpactNode = { type: 'SLA', sourceId: 'SL1', state: 'ACTIVE' };
+  const sl2: ImpactNode = { type: 'SLA', sourceId: 'SL2', state: 'ACTIVE' };
+  const nodes = [c1, c2, k1, k2, o1, o2, sl1, sl2];
+
+  let app: INestApplication;
+  let prisma: PrismaService;
+  let repository: GraphRepository;
+
+  beforeAll(async () => {
+    app = await createTestApp();
+    prisma = app.get(PrismaService);
+    repository = app.get<GraphRepository>(GRAPH_REPOSITORY);
+    await resetDb(prisma);
+    const report = await runImport(app, {
+      format: 'json',
+      content: JSON.stringify({
+        entities: nodes.map(impactEntity),
+        relationships: [
+          impactRelationship('HAS', c1, k1),
+          impactRelationship('HAS', c2, k2),
+          impactRelationship('PLACED', c1, o1),
+          impactRelationship('PLACED', c1, o2),
+          impactRelationship('PLACED', c2, o2),
+          impactRelationship('DEFINES', k1, sl1),
+          impactRelationship('DEFINES', k1, sl2),
+          impactRelationship('DEFINES', k2, sl2),
+        ],
+      }),
+    });
+    expect(report?.outcome).toBe('APPLIED');
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  const idOf = (node: ImpactNode) => entityIdByKey(prisma, node.type, 'IMPACT', node.sourceId);
+
+  it('returns [] without running a query for empty input', async () => {
+    const spy = jest.spyOn(prisma, '$queryRaw');
+    try {
+      expect(await repository.findAttributedCustomers({ orderIds: [], slaIds: [] })).toEqual([]);
+      expect(spy).not.toHaveBeenCalled();
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('attributes an order to its customer through PLACED (1 hop)', async () => {
+    const [orderId, customerId] = [await idOf(o1), await idOf(c1)];
+    const rows = await repository.findAttributedCustomers({ orderIds: [orderId], slaIds: [] });
+    expect(rows).toHaveLength(1);
+    const [row] = rows;
+    expect(row?.attributedEntityId).toBe(orderId);
+    expect(row?.customer.id).toBe(customerId);
+    expect(row?.customer.displayName).toBe('C1');
+    expect(row?.link.hops).toHaveLength(1);
+    expect(row?.link.hops[0]?.relationshipType).toBe('PLACED');
+    expect(row?.link.hops[0]?.target.id).toBe(customerId);
+  });
+
+  it('attributes an SLA through DEFINES then HAS, with the contract as the middle hop', async () => {
+    const [slaId, contractId, customerId] = [await idOf(sl1), await idOf(k1), await idOf(c1)];
+    const rows = await repository.findAttributedCustomers({ orderIds: [], slaIds: [slaId] });
+    expect(rows).toHaveLength(1);
+    const hops = rows[0]?.link.hops ?? [];
+    expect(hops.map((hop) => hop.relationshipType)).toEqual(['DEFINES', 'HAS']);
+    expect(hops.map((hop) => hop.target.id)).toEqual([contractId, customerId]);
+    expect(hops[0]?.target.type).toBe('Contract');
+  });
+
+  it('returns one row per customer, sorted, without duplicating a shared contract assertion', async () => {
+    const [o2Id, sl1Id, sl2Id] = [await idOf(o2), await idOf(sl1), await idOf(sl2)];
+    const rows = await repository.findAttributedCustomers({
+      orderIds: [o2Id],
+      slaIds: [sl1Id, sl2Id],
+    });
+
+    const customerIds = new Map([
+      ['C1', await idOf(c1)],
+      ['C2', await idOf(c2)],
+    ]);
+    const expected: Array<[string, string]> = [
+      [o2Id, 'C1'],
+      [o2Id, 'C2'],
+      [sl1Id, 'C1'],
+      [sl2Id, 'C1'],
+      [sl2Id, 'C2'],
+    ];
+    expected.sort(
+      (a, b) =>
+        compareCodeUnits(a[0], b[0]) ||
+        compareCodeUnits(customerIds.get(a[1]) ?? '', customerIds.get(b[1]) ?? ''),
+    );
+    expect(rows.map((row) => [row.attributedEntityId, row.customer.displayName])).toEqual(expected);
+
+    for (const row of rows) {
+      for (const hop of row.link.hops) {
+        const ids = hop.assertions.map((assertion) => assertion.relationshipId);
+        expect(new Set(ids).size).toBe(ids.length);
+      }
+    }
   });
 });

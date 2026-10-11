@@ -31,6 +31,7 @@ const PRIMARY_SYSTEM: Record<EntityType, string> = {
   Supplier: 'PIM',
   SLA: 'ContractMgmt',
   BudgetRequirement: 'FinanceApprovals',
+  PurchaseOrder: 'ERP',
 };
 
 function ref(entityType: EntityType, sourceId: string): EntityKeyRef {

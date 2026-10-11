@@ -203,6 +203,58 @@ export interface RelationshipGroup {
   assertions: HopAssertion[];
 }
 
+export interface ImpactTraceQuery {
+  startId: string;
+  /** Already validated 1..10. */
+  maxDepth: number;
+}
+
+export interface ImpactReachedEntity {
+  entity: GraphEntityRef;
+  /** CTE min depth over non-terminal expansion, 1..maxDepth. */
+  distance: number;
+  /** Best-ranked path over all filtered edges (research R2 `canonical`). */
+  canonicalPath: TraversalPath;
+  /** Best-ranked live path, or null when no live path reaches it (research R2 `live`). */
+  livePath: TraversalPath | null;
+  /** Best-ranked path among those of length `distance` (research R2 `shortest`). */
+  shortestPath: TraversalPath;
+  /** True when at least one path within maxDepth consists only of SOURCE hops. */
+  sourcedReach: boolean;
+}
+
+export interface ImpactPathSet {
+  /** At most IMPACT_LIMITS.maxEnumeratedPaths, sorted by comparePaths. */
+  found: TraversalPath[];
+  /** True when enumeration stopped on the path cap or the search budget. */
+  morePaths: boolean;
+}
+
+export interface ImpactTrace {
+  start: GraphEntityRef;
+  /** Within maxDepth, start excluded, terminal entities included; sorted by (distance, type, displayName, id). At most 10,000. */
+  reached: ImpactReachedEntity[];
+  depthLimitReached: boolean;
+  explorationLimitReached: boolean;
+  cycleClosingHops: CycleClosingHop[];
+  cycleClosingHopCount: number;
+  /** Research R4. Pure and in memory: no SQL. Unknown ids map to { found: [], morePaths: false }. */
+  paths(targetIds: readonly string[]): Map<string, ImpactPathSet>;
+}
+
+export interface AttributionQuery {
+  orderIds: readonly string[];
+  slaIds: readonly string[];
+}
+
+export interface CustomerAttribution {
+  /** The Order or SLA that is attributed. */
+  attributedEntityId: string;
+  customer: GraphEntityRef;
+  /** UPSTREAM path from the attributed entity to the customer: 1 hop (PLACED) or 2 hops (DEFINES, HAS). */
+  link: TraversalPath;
+}
+
 export interface GraphRepository {
   findNeighbors(query: NeighborQuery): Promise<NeighborPage>;
   countNeighbors(entityId: string): Promise<number>;
@@ -225,4 +277,8 @@ export interface GraphRepository {
     entityIds: readonly string[],
     types: readonly RelationshipType[],
   ): Promise<RelationshipGroup[]>;
+  /** Returns null when the start entity does not exist. */
+  traceImpact(query: ImpactTraceQuery): Promise<ImpactTrace | null>;
+  /** Fixed-shape attribution lookup (research R5). Sorted by (attributedEntityId, customer.id). Empty input returns [] without querying. */
+  findAttributedCustomers(query: AttributionQuery): Promise<CustomerAttribution[]>;
 }

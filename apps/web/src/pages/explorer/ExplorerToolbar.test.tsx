@@ -127,16 +127,16 @@ describe('ExplorerToolbar type filters', () => {
     await userEvent.click(screen.getByText(title));
   }
 
-  it('lists the 12 entity types in schema order with the selected count in the summary', async () => {
+  it('lists the 13 entity types in schema order with the selected count in the summary', async () => {
     renderToolbar('/graph/x?entityTypes=Order,Shipment', { ...DEFAULTS, entityTypes: ['Order', 'Shipment'] });
     expect(screen.getByText('Entity types (2)')).toBeInTheDocument();
     await open(/^Entity types/);
     const details = screen.getByText('Entity types (2)').closest('details') as HTMLElement;
     const boxes = Array.from(details.querySelectorAll('input[type="checkbox"]'));
-    expect(boxes).toHaveLength(12);
+    expect(boxes).toHaveLength(13);
     expect(boxes.map((b) => b.parentElement?.textContent)).toEqual([
       'Customer', 'Contract', 'Order', 'Product', 'Payment', 'Invoice', 'Approval',
-      'Warehouse', 'Shipment', 'Supplier', 'SLA', 'BudgetRequirement',
+      'Warehouse', 'Shipment', 'Supplier', 'SLA', 'BudgetRequirement', 'PurchaseOrder',
     ]);
     expect(screen.getByRole('checkbox', { name: 'Order' })).toBeChecked();
     expect(screen.getByRole('checkbox', { name: 'Customer' })).not.toBeChecked();

@@ -6,6 +6,7 @@ import { RequestContextModule } from './common/context/request-context';
 import { AllExceptionsFilter } from './common/errors/all-exceptions.filter';
 import { GraphModule } from './graph/graph.module';
 import { HealthModule } from './health/health.module';
+import { ImpactModule } from './impact/impact.module';
 import { IngestionModule } from './ingestion/ingestion.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { RootCauseModule } from './root-cause/root-cause.module';
@@ -24,6 +25,7 @@ import { UsersModule } from './users/users.module';
     IngestionModule,
     TracingModule,
     RootCauseModule,
+    ImpactModule,
   ],
   providers: [{ provide: APP_FILTER, useClass: AllExceptionsFilter }],
 })
