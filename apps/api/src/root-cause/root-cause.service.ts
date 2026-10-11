@@ -154,6 +154,7 @@ export class RootCauseService {
       evaluatedAt,
       entityEvidence: bundle.entities,
       relationshipEvidence: bundle.relationships,
+      activeDisputes: bundle.activeDisputes,
     });
 
     const hedged = confidence === 'LOW';

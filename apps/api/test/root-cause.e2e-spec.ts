@@ -577,6 +577,43 @@ describe('Root-cause analysis on built graphs (e2e)', () => {
     });
   });
 
+  describe('rule 8 sees every active dispute, not only the 50 newest notes', () => {
+    it('lowers confidence for a dispute buried under 50 newer notes on the same entity', async () => {
+      const ids = await setup(
+        [
+          { id: 'A', state: 'BLOCKED' },
+          { id: 'B', state: 'MISSING' },
+        ],
+        [{ type: 'REQUIRES', from: 'A', to: 'B' }],
+        corroborate('B'),
+      );
+      const post = (body: Record<string, unknown>) =>
+        request(server).post('/api/evidence-notes').set('Authorization', `Bearer ${token}`).send(body);
+      const target = { kind: 'ENTITY', entityId: ids['B'] };
+
+      const dispute = await post({ target, stance: 'DISPUTES', text: 'Old dispute' });
+      expect(dispute.status).toBe(201);
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      for (let n = 0; n < 50; n += 1) {
+        expect((await post({ target, stance: 'CONTEXT', text: `Context ${n}` })).status).toBe(201);
+      }
+
+      const body = await analyze(ids['A'] ?? '');
+      const notes = evidenceOf(body, ids['B'] ?? '').notes;
+      expect(notes.total).toBe(51);
+      expect(notes.items).toHaveLength(50);
+      expect(notes.items.some((note) => note.stance === 'DISPUTES')).toBe(false);
+
+      const candidate = onlyCandidate(body);
+      expect(ruleOf(candidate, 'DISPUTED')).toMatchObject({
+        applied: true,
+        confidenceAfter: 'MEDIUM',
+        refs: { stepIndexes: [1], noteIds: [(dispute.body as { id: string }).id] },
+      });
+      expect(candidate.confidence).toBe('MEDIUM');
+    });
+  });
+
   describe('evidence rules', () => {
     it('returns the newest 20 of 25 events with total 25', async () => {
       const events = Array.from({ length: 25 }, (_unused, index): EventSpec => ({

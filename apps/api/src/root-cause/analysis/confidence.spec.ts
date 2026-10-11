@@ -61,6 +61,7 @@ interface InputOptions {
   evaluatedAt?: Date;
   evidence?: Partial<Record<keyof Trio, Parameters<typeof entityEvidence>[1]>>;
   relationshipNotes?: Record<string, NoteEvidenceDto[]>;
+  activeDisputes?: Map<string, NoteEvidenceDto[]>;
 }
 
 function inputFor(entities: Trio, options: InputOptions = {}): ConfidenceInput {
@@ -107,6 +108,7 @@ function inputFor(entities: Trio, options: InputOptions = {}): ConfidenceInput {
     evaluatedAt: options.evaluatedAt ?? EVALUATED_AT,
     entityEvidence: entityEvidenceById,
     relationshipEvidence: relationshipEvidenceById,
+    activeDisputes: options.activeDisputes ?? new Map(),
   };
 }
 
@@ -462,6 +464,19 @@ describe('rule 7: UNCORROBORATED', () => {
       'The state of Budget code for Order #18492 is reported by 2 source systems.',
     );
   });
+
+  it('applies when the root has no source record and no event, the weakest case', () => {
+    const result = computeConfidence(
+      inputFor(trio(), { evidence: { root: { eventTotal: 0, stateRecords: [] } } }),
+    );
+    const uncorroborated = outcomeOf(result, 'UNCORROBORATED');
+    expect(uncorroborated.applied).toBe(true);
+    expect(uncorroborated.refs.stepIndexes).toEqual([2]);
+    expect(uncorroborated.reason).toBe(
+      'Confidence lowered to MEDIUM: the state of Budget code for Order #18492 has no source record and no operational event mentions it.',
+    );
+    expect(result.confidence).toBe('MEDIUM');
+  });
 });
 
 describe('rule 8: DISPUTED', () => {
@@ -501,6 +516,42 @@ describe('rule 8: DISPUTED', () => {
       relationshipIds: [relationshipId],
       noteIds: [note.id],
     });
+    expect(result.confidence).toBe('MEDIUM');
+  });
+
+  it('applies for an active dispute outside the capped notes list (older than 50 newer notes)', () => {
+    const entities = trio();
+    const old = noteEvidence({
+      target: { kind: 'ENTITY', entityId: entities.middle.id },
+      author: 'Analyst B',
+      createdAt: '2026-09-01T09:00:00.000Z',
+      text: 'Old dispute',
+    });
+    const newer = Array.from({ length: 50 }, () =>
+      noteEvidence({ target: { kind: 'ENTITY', entityId: entities.middle.id }, stance: 'CONTEXT' }),
+    );
+    const result = computeConfidence(
+      inputFor(entities, {
+        evidence: { middle: { notes: newer } },
+        activeDisputes: new Map([[entities.middle.id, [old]]]),
+      }),
+    );
+    const disputed = outcomeOf(result, 'DISPUTED');
+    expect(disputed.applied).toBe(true);
+    expect(disputed.refs).toEqual({ stepIndexes: [1], relationshipIds: [], noteIds: [old.id] });
+    expect(result.confidence).toBe('MEDIUM');
+  });
+
+  it('counts a dispute once when it is both in the notes list and in activeDisputes', () => {
+    const entities = trio();
+    const note = noteEvidence({ target: { kind: 'ENTITY', entityId: entities.root.id } });
+    const result = computeConfidence(
+      inputFor(entities, {
+        evidence: { root: { notes: [note] } },
+        activeDisputes: new Map([[entities.root.id, [note]]]),
+      }),
+    );
+    expect(outcomeOf(result, 'DISPUTED').refs.noteIds).toEqual([note.id]);
     expect(result.confidence).toBe('MEDIUM');
   });
 
@@ -674,6 +725,7 @@ describe('fixtures R1 and R6: Order #18492', () => {
       evaluatedAt,
       entityEvidence: entityEvidenceById,
       relationshipEvidence: relationshipEvidenceById,
+      activeDisputes: new Map(),
     };
   }
 

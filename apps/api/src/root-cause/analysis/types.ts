@@ -4,6 +4,7 @@ import type {
   Confidence,
   ConfidenceRuleOutcomeDto,
   EntityEvidenceDto,
+  NoteEvidenceDto,
   RelationshipEvidenceDto,
   TracedEntityDto,
   TruncationDto,
@@ -23,6 +24,11 @@ export interface ConfidenceInput {
   entityEvidence: ReadonlyMap<string, EntityEvidenceDto>;
   /** Evidence for every assertion id on every hop of the chain. */
   relationshipEvidence: ReadonlyMap<string, RelationshipEvidenceDto>;
+  /**
+   * Every active DISPUTES note per target id (entity or relationship), uncapped. Rule 8 reads it
+   * alongside the capped `notes.items`, so an older dispute behind 50 newer notes still counts.
+   */
+  activeDisputes: ReadonlyMap<string, readonly NoteEvidenceDto[]>;
 }
 
 export interface ConfidenceResult {

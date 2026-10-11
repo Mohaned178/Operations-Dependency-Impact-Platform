@@ -35,7 +35,12 @@ plan.md and data-model §4 call the roles function `assignRoles`; tasks.md T013/
 - **Needed**: settle which is right in the contract before the e2e for R7 copies the fixture string literally.
 - **Phase 5 (T040)**: the R7 e2e builds the expected reason from the template (`<B.displayName>` and `<createdAt>` come from the POST response), so it ends with `…suppli…".` and the test passes. If the fixture line is right, change the template, `explanation.ts` and the T040 assertion together.
 
-## Q5. Rule 8 sees only the capped notes list — KNOWN LIMITATION, carried forward
+## Q5. Rule 8 sees only the capped notes list — FIXED after the code review
+
+- **Fix**: `EvidenceReader` also loads every active DISPUTES note per target, uncapped (`EvidenceBundle.activeDisputes`, passed to `computeConfidence` as `ConfidenceInput.activeDisputes`). Rule 8 reads it alongside `notes.items` and de-duplicates by note id. The response shape is unchanged.
+- **Proof**: `root-cause.e2e-spec.ts` buries one dispute under 50 newer notes; `notes.items` no longer contains it, and DISPUTED still applies.
+
+The original analysis follows.
 
 - **Gap**: `computeConfidence` reads `notes.items`, which the evidence reader caps at the 50 newest notes per target, retracted ones included (research R4). An old active DISPUTES note behind 50 newer SUPPORTS or retracted notes would be missed, and DISPUTED would not apply.
 - **Done**: implemented exactly as research R4/R6 describe. This is not an implementation error.
@@ -62,3 +67,20 @@ plan.md and data-model §4 call the roles function `assignRoles`; tasks.md T013/
 - **Hypothesis (unconfirmed)**: `toTimelineEvent` in `apps/api/src/graph/timeline.service.ts` sorts an event's entities by role only (the comparator returns 0 within a role), so the two RELATED entities keep the database's order from an unordered `event_entities` include. The test expects `Acme Corp` before `Contract CON-3982`. Entity ids are random per run, so that order is not guaranteed.
 - **Not touched**: this is feature 002 code and test, outside 005. A fix would add a deterministic tie-break to the sort (for example by display name, then id with `compareCodeUnits`).
 - **Earlier in Phase 5**: 5-second timeouts in unrelated suites during one load-affected run were a different, load-related problem; those suites were green on the quiet reruns.
+
+## Q9. Code review of the branch (2026-10-11) — fixed items, and items that need a spec decision
+
+**Fixed** (each with a test):
+- Rule 8 missed old disputes: see Q5.
+- Rule 7 (UNCORROBORATED) skipped a root with **no** source record and no events, and printed "reported by 0 source systems". It now applies when there is at most one source. **New text, not in contracts/api.md**: `Confidence lowered to ${C}: the state of ${name(root)} has no source record and no operational event mentions it.` Please add this row to the contract's reasons table.
+- The requirement-source lookup no longer delays the other evidence queries; only the definers' state records wait for it.
+- Requirement rows are cut to 20 per entity in one place (`loadRequirementRows`).
+- The note order (createdAt then id, descending) and `NoteTargetColumn` live once in `evidence-note.mapper.ts`. `loadNotes` now picks its top 50 by millisecond-truncated `created_at`, like the note list endpoint.
+
+**Not changed: each conflicts with spec text and needs your decision**:
+1. When the blocker search hits the exploration limit and finds no path, the status is UNEXPLAINED, and the summary says no dependency explains the state, although the search stopped early. contracts/api.md has a single UNEXPLAINED summary with no truncated variant.
+2. `humanize` (research R5) splits before every capital, so `POApproval` becomes `P O Approval` and `SKU` becomes `S K U`.
+3. A hop backed by several assertions shows identical relationship lines, and "the link" note target is only the first assertion (task T045 says first assertion id).
+4. `findIncomingRelationships` has no row limit (data-model §3a specifies a plain `findMany`). The cut to 20 happens in TypeScript after loading every row. Measured p95 is 55 ms, so this matters only for entities with very many DEFINES/GOVERNS links.
+
+**Skipped**: `loadStateRecords` runs two DISTINCT ON queries where one could serve both. It is low value, and the perf budget is met.

@@ -253,13 +253,14 @@ export function computeConfidence(input: ConfidenceInput): ConfidenceResult {
     ),
   );
 
-  // 7. UNCORROBORATED: the root cause's state comes from one source and no event mentions it.
+  // 7. UNCORROBORATED: the root cause's state comes from at most one source (none at all is the
+  // weakest case, never a reason to skip the rule) and no event mentions it.
   const rootEvidence = evidenceOfEntity(root.id);
   const rootSources = ids(
     rootEvidence.stateRecords.map((record) => record.observation.sourceSystem),
   );
   const eventTotal = rootEvidence.events.total;
-  const uncorroboratedApplied = rootSources.length === 1 && eventTotal === 0;
+  const uncorroboratedApplied = rootSources.length <= 1 && eventTotal === 0;
   if (uncorroboratedApplied) {
     confidence = lower(confidence);
   }
@@ -288,12 +289,16 @@ export function computeConfidence(input: ConfidenceInput): ConfidenceResult {
       }
     }
   };
+  // `notes.items` is capped per target; `activeDisputes` is not, so both are read.
+  const disputesOf = (targetId: string) => input.activeDisputes.get(targetId) ?? [];
   steps.forEach((step, index) => {
     collect(evidenceOfEntity(step.id).notes.items, index);
+    collect(disputesOf(step.id), index);
   });
   chain.hops.forEach((hop, offset) => {
     for (const assertion of hop.assertions) {
       collect(evidenceOfRelationship(assertion.relationshipId).notes.items, offset + 1);
+      collect(disputesOf(assertion.relationshipId), offset + 1);
     }
   });
   const disputing = [...disputes.values()].sort(

@@ -19,10 +19,19 @@ import {
   type SourceRecordDto,
   type StateRecordEvidenceDto,
 } from '@opsgraph/shared';
-import { GRAPH_REPOSITORY, type GraphRepository } from '../graph/graph.repository';
+import {
+  GRAPH_REPOSITORY,
+  type GraphRepository,
+  type IncomingRelationshipRow,
+} from '../graph/graph.repository';
 import { compareCodeUnits } from '../graph/traversal/path-order';
 import { PrismaService } from '../prisma/prisma.service';
-import { toNoteEvidenceDto, type EvidenceNoteRow } from './evidence-note.mapper';
+import {
+  compareNotesNewestFirst,
+  toNoteEvidenceDto,
+  type EvidenceNoteRow,
+  type NoteTargetColumn,
+} from './evidence-note.mapper';
 
 export interface EvidenceRequest {
   /** Every chain entity, start included, de-duplicated. */
@@ -38,6 +47,17 @@ export interface EvidenceBundle {
   relationships: Map<string, RelationshipEvidenceDto>;
   /** Root-cause entities only. */
   attributes: Map<string, Record<string, JsonValue>>;
+  /**
+   * Every active DISPUTES note per target id (entity or relationship), uncapped. The `notes` lists
+   * above stop at the 50 newest per target, so rule 8 reads this to never miss an older dispute.
+   */
+  activeDisputes: Map<string, NoteEvidenceDto[]>;
+}
+
+interface RequirementRows {
+  /** At most `requirementSourcesPerEntity`, in GraphRepository order. */
+  kept: IncomingRelationshipRow[];
+  total: number;
 }
 
 interface RawStateRecordRow {
@@ -117,8 +137,6 @@ interface RawNoteRow {
   retracted_at: Date | null;
 }
 
-type NoteTargetColumn = 'entity_id' | 'relationship_id';
-
 const AttributesSchema = z.record(JsonValueSchema);
 
 function toStateRecord(row: RawStateRecordRow, current: boolean): StateRecordEvidenceDto {
@@ -176,11 +194,6 @@ function toNoteRow(row: RawNoteRow): EvidenceNoteRow {
   };
 }
 
-/** Newest first; ties by id, both in code-unit order (research R4). */
-function compareNotes(a: NoteEvidenceDto, b: NoteEvidenceDto): number {
-  return compareCodeUnits(b.createdAt, a.createdAt) || compareCodeUnits(b.id, a.id);
-}
-
 function compareEvents(a: EventEvidenceDto, b: EventEvidenceDto): number {
   return (
     compareCodeUnits(b.occurredAt, a.occurredAt) ||
@@ -215,33 +228,41 @@ export class EvidenceReader {
     const relationshipIds = [...new Set(request.relationshipIds)];
     const rootIds = [...new Set(request.rootCauseEntityIds)];
 
-    const incoming = await this.graph.findIncomingRelationships(
-      entityIds,
-      REQUIREMENT_SOURCE_RELATIONSHIP_TYPES,
+    // Only the definers' state records depend on the requirement rows, so everything else starts
+    // at once and just that one query waits for them.
+    const requirementsWithDefinerStates = this.loadRequirementRows(entityIds).then(
+      async (requirementRows) => {
+        const definerIds = [...requirementRows.values()]
+          .flatMap((rows) => rows.kept.map((row) => row.source.id))
+          .filter((id) => !entityIds.includes(id));
+        return { requirementRows, definerStates: await this.loadStateRecords([...new Set(definerIds)]) };
+      },
     );
-    const requirementRows = new Map<string, typeof incoming>();
-    for (const row of incoming) {
-      pushTo(requirementRows, row.targetEntityId, row);
-    }
-    const keptRequirementRows = [...requirementRows.values()].flatMap((rows) =>
-      rows.slice(0, ROOT_CAUSE_LIMITS.requirementSourcesPerEntity),
-    );
-    const definerIds = keptRequirementRows.map((row) => row.source.id);
-
-    const [stateRecords, events, entityNotes, relationshipEvidence, attributes] = await Promise.all([
-      this.loadStateRecords([...new Set([...entityIds, ...definerIds])]),
+    const [
+      { requirementRows, definerStates },
+      chainStates,
+      events,
+      entityNotes,
+      relationshipEvidence,
+      attributes,
+      entityDisputes,
+      relationshipDisputes,
+    ] = await Promise.all([
+      requirementsWithDefinerStates,
+      this.loadStateRecords(entityIds),
       this.loadEvents(entityIds),
       this.loadNotes('entity_id', entityIds),
       this.loadRelationshipEvidence(relationshipIds),
       this.loadAttributes(rootIds),
+      this.loadActiveDisputes('entity_id', entityIds),
+      this.loadActiveDisputes('relationship_id', relationshipIds),
     ]);
+    const stateRecords = new Map([...definerStates, ...chainStates]);
 
     const entities = new Map<string, EntityEvidenceDto>();
     for (const id of entityIds) {
-      const rows = requirementRows.get(id) ?? [];
-      const requirementSources: RequirementSourceDto[] = rows
-        .slice(0, ROOT_CAUSE_LIMITS.requirementSourcesPerEntity)
-        .map((row) => {
+      const rows = requirementRows.get(id) ?? { kept: [], total: 0 };
+      const requirementSources: RequirementSourceDto[] = rows.kept.map((row) => {
           const type = row.relationship.type;
           if (type !== 'DEFINES' && type !== 'GOVERNS') {
             throw new Error(`evidence reader: unexpected requirement relationship type ${type}`);
@@ -277,13 +298,75 @@ export class EvidenceReader {
       entities.set(id, {
         entityId: id,
         stateRecords: stateRecords.get(id) ?? [],
-        requirementSources: { items: requirementSources, total: rows.length },
+        requirementSources: { items: requirementSources, total: rows.total },
         events: eventEvidence ?? { items: [], total: 0 },
         notes: noteEvidence ?? { items: [], total: 0 },
       });
     }
 
-    return { entities, relationships: relationshipEvidence, attributes };
+    return {
+      entities,
+      relationships: relationshipEvidence,
+      attributes,
+      activeDisputes: new Map([...entityDisputes, ...relationshipDisputes]),
+    };
+  }
+
+  /** Incoming DEFINES/GOVERNS per chain entity, cut to the evidence limit in one place. */
+  private async loadRequirementRows(entityIds: string[]): Promise<Map<string, RequirementRows>> {
+    const incoming = await this.graph.findIncomingRelationships(
+      entityIds,
+      REQUIREMENT_SOURCE_RELATIONSHIP_TYPES,
+    );
+    const byTarget = new Map<string, IncomingRelationshipRow[]>();
+    for (const row of incoming) {
+      pushTo(byTarget, row.targetEntityId, row);
+    }
+    const result = new Map<string, RequirementRows>();
+    for (const [targetId, rows] of byTarget) {
+      result.set(targetId, {
+        kept: rows.slice(0, ROOT_CAUSE_LIMITS.requirementSourcesPerEntity),
+        total: rows.length,
+      });
+    }
+    return result;
+  }
+
+  /**
+   * Every active DISPUTES note per target, with no top-N cut (rule 8). Retracted notes are
+   * excluded in SQL, so the list holds only what can lower confidence.
+   */
+  private async loadActiveDisputes(
+    column: NoteTargetColumn,
+    ids: string[],
+  ): Promise<Map<string, NoteEvidenceDto[]>> {
+    const result = new Map<string, NoteEvidenceDto[]>();
+    if (ids.length === 0) {
+      return result;
+    }
+    // `column` is one of two string literals, never user input.
+    const target = Prisma.raw(`n.${column}`);
+    const rows = await this.prisma.$queryRaw<RawNoteRow[]>`
+      SELECT n.id::text AS id, n.entity_id::text AS entity_id, n.relationship_id::text AS relationship_id,
+             n.stance::text AS stance, n.text, n.reference, n.author_id::text AS author_id,
+             author.display_name AS author_name, n.created_at,
+             NULL::text AS retracted_by_id, NULL::text AS retracted_by_name,
+             NULL::text AS retraction_reason, NULL::timestamptz AS retracted_at
+      FROM evidence_notes n
+      JOIN users author ON author.id = n.author_id
+      WHERE ${target} = ANY(${ids}::uuid[])
+        AND n.stance = 'DISPUTES'
+        AND NOT EXISTS (SELECT 1 FROM evidence_note_retractions rt WHERE rt.note_id = n.id)`;
+    for (const row of rows) {
+      const targetId = column === 'entity_id' ? row.entity_id : row.relationship_id;
+      if (targetId !== null) {
+        pushTo(result, targetId, toNoteEvidenceDto(toNoteRow(row)));
+      }
+    }
+    for (const notes of result.values()) {
+      notes.sort(compareNotesNewestFirst);
+    }
+    return result;
   }
 
   /** The current observation first, then the latest from each other source system. */
@@ -444,7 +527,10 @@ export class EvidenceReader {
                  author.display_name AS author_name, n.created_at,
                  rt.retracted_by_id::text AS retracted_by_id, retractor.display_name AS retracted_by_name,
                  rt.reason AS retraction_reason, rt.retracted_at,
-                 ROW_NUMBER() OVER (PARTITION BY ${target} ORDER BY n.created_at DESC, n.id DESC) AS rn
+                 ROW_NUMBER() OVER (
+                   PARTITION BY ${target}
+                   ORDER BY date_trunc('milliseconds', n.created_at) DESC, n.id DESC
+                 ) AS rn
           FROM evidence_notes n
           JOIN users author ON author.id = n.author_id
           LEFT JOIN evidence_note_retractions rt ON rt.note_id = n.id
@@ -469,7 +555,7 @@ export class EvidenceReader {
     }
     for (const id of ids) {
       result.set(id, {
-        items: (itemsByTarget.get(id) ?? []).sort(compareNotes),
+        items: (itemsByTarget.get(id) ?? []).sort(compareNotesNewestFirst),
         total: totals.get(id) ?? 0,
       });
     }

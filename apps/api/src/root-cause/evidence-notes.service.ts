@@ -12,11 +12,12 @@ import { AuditService } from '../audit/audit.service';
 import type { AuthUser } from '../auth/decorators/current-user.decorator';
 import { Errors } from '../common/errors/app-error';
 import { decodeCursor, encodeCursor } from '../common/pagination/cursor';
-import { compareCodeUnits } from '../graph/traversal/path-order';
 import { PrismaService, type Tx } from '../prisma/prisma.service';
 import {
+  compareNotesNewestFirst,
   EVIDENCE_NOTE_INCLUDE,
   toEvidenceNoteDto,
+  type NoteTargetColumn,
   type EvidenceNoteWithRelations,
 } from './evidence-note.mapper';
 
@@ -34,12 +35,6 @@ interface IdRow {
   id: string;
 }
 
-type NoteTargetColumn = 'entity_id' | 'relationship_id';
-
-/** Notes are ordered by createdAt (ISO, milliseconds) descending, then id descending (contracts/api.md). */
-function compareNewestFirst(a: EvidenceNoteDto, b: EvidenceNoteDto): number {
-  return compareCodeUnits(b.createdAt, a.createdAt) || compareCodeUnits(b.id, a.id);
-}
 
 @Injectable()
 export class EvidenceNotesService {
@@ -210,7 +205,7 @@ export class EvidenceNotesService {
       where: { id: { in: ids } },
       include: EVIDENCE_NOTE_INCLUDE,
     });
-    const items = notes.map(toEvidenceNoteDto).sort(compareNewestFirst);
+    const items = notes.map(toEvidenceNoteDto).sort(compareNotesNewestFirst);
     const last = items.at(-1);
     return {
       items,

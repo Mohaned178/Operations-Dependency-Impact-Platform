@@ -163,7 +163,9 @@ export function corroborationReason(
   eventTotal: number,
 ): string {
   if (applied) {
-    return `Confidence lowered to ${confidence}: the state of ${rootName} comes from a single source (${sourceSystems.join(', ')}) and no operational event mentions it.`;
+    return sourceSystems.length === 0
+      ? `Confidence lowered to ${confidence}: the state of ${rootName} has no source record and no operational event mentions it.`
+      : `Confidence lowered to ${confidence}: the state of ${rootName} comes from a single source (${sourceSystems.join(', ')}) and no operational event mentions it.`;
   }
   return eventTotal > 0
     ? `The state of ${rootName} is corroborated by ${events(eventTotal)}.`
