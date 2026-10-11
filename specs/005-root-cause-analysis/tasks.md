@@ -33,7 +33,7 @@
 
 ## Phase 1: Setup
 
-- [ ] T001 On branch `005-root-cause-analysis`, confirm the baseline is green before any change. With `docker compose up -d db` running, run the standard gate plus `pnpm build`. If anything fails, stop and record it in `specs/005-root-cause-analysis/questions.md`. Do not fix 003 code in this feature. The untracked `specs/004-graph-explorer/` folder is unrelated: do not touch or commit it.
+- [x] T001 On branch `005-root-cause-analysis`, confirm the baseline is green before any change. With `docker compose up -d db` running, run the standard gate plus `pnpm build`. If anything fails, stop and record it in `specs/005-root-cause-analysis/questions.md`. Do not fix 003 code in this feature. The untracked `specs/004-graph-explorer/` folder is unrelated: do not touch or commit it.
 
 ---
 
@@ -43,20 +43,20 @@
 
 ### Shared (`packages/shared/src`)
 
-- [ ] T002 [P] Create `packages/shared/src/evidence-notes.ts` with everything in contracts/api.md for notes:
+- [x] T002 [P] Create `packages/shared/src/evidence-notes.ts` with everything in contracts/api.md for notes:
   - `EvidenceNoteStanceSchema` and `EVIDENCE_NOTE_LIMITS` (data-model §2);
   - `EvidenceNoteTargetSchema`, `CreateEvidenceNoteRequestSchema` (`.strict()`, with the `reference` transform: empty or absent becomes `null`), `RetractEvidenceNoteRequestSchema` (`.strict()`) and `EvidenceNoteListQuerySchema` (= `PageQuerySchema`);
   - `UserRefDtoSchema`, `EvidenceNoteDtoSchema` and `EvidenceNoteListResponseSchema`.
 
   Export an inferred type for each schema. Add `export * from './evidence-notes';` to `index.ts`.
-- [ ] T003 Create `packages/shared/src/root-cause.ts`:
+- [x] T003 Create `packages/shared/src/root-cause.ts`:
   - the constants in data-model §2: `CAUSAL_ROLES`/`CausalRoleSchema`, `CONFIDENCE_RULES`/`ConfidenceRuleSchema`, `LabelRuleSchema`, `EvidenceRuleSchema`, `RootCauseStatusSchema`, `ROOT_CAUSE_LIMITS`, `REQUIREMENT_SOURCE_RELATIONSHIP_TYPES`;
   - every schema in contracts/api.md § Query and request schemas (`RootCauseQuerySchema`) and § Response schemas, from `StateRecordEvidenceDtoSchema` through `RootCauseResponseSchema`. `Counted` is a non-exported helper.
 
   Import `TraceDepthSchema`, `TracedEntityDtoSchema`, `HopDtoSchema` and `TruncationDtoSchema` from `./tracing`, base schemas from `./graph`, and `EvidenceNoteDtoSchema` from `./evidence-notes`. Export inferred types, and add `export * from './root-cause';` to `index.ts`.
 
   In `packages/shared/src/audit.ts`, add `EVIDENCE_NOTE_CREATED: 'evidence_note.created'` and `EVIDENCE_NOTE_RETRACTED: 'evidence_note.retracted'` to `AUDIT_ACTIONS`.
-- [ ] T004 Create `packages/shared/src/evidence-notes.spec.ts` and `packages/shared/src/root-cause.spec.ts` (Vitest).
+- [x] T004 Create `packages/shared/src/evidence-notes.spec.ts` and `packages/shared/src/root-cause.spec.ts` (Vitest).
 
   **Notes schemas**:
   - `text: '  x  '` becomes `'x'`;
