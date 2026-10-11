@@ -106,11 +106,11 @@
 
 ### Traversal (research R2/R4, data-model §3d)
 
-- [ ] T008 Create `apps/api/src/graph/traversal/impact-paths.ts` with `impactEdges`, `computeImpactSelections`, `sourcedReach` and `enumerateImpactPaths`. Follow the signatures and pseudo-code in data-model §3d exactly.
+- [x] T008 Create `apps/api/src/graph/traversal/impact-paths.ts` with `impactEdges`, `computeImpactSelections`, `sourcedReach` and `enumerateImpactPaths`. Follow the signatures and pseudo-code in data-model §3d exactly.
   - Import `IMPACT_STATE_CLASS` from `@opsgraph/shared`.
   - Reuse `selectCanonicalPaths` (`./canonical-paths`), `comparePaths` and `compareCodeUnits` (`./path-order`), and the `TraversalEdge`/`InternalPath` types (`./types`).
   - The `weakestConfidence` and `nonSourceHops` of an enumerated path are computed as in `blocking-paths.ts` `weakestOf`. Make a local copy; do not export a new helper from `blocking-paths.ts`.
-- [ ] T009 Create `apps/api/src/graph/traversal/impact-paths.spec.ts` (Jest, pure). Build small `TraversalEdge[]` fixtures with a local helper modeled on the existing `canonical-paths.spec.ts` helpers, and cover:
+- [x] T009 Create `apps/api/src/graph/traversal/impact-paths.spec.ts` (Jest, pure). Build small `TraversalEdge[]` fixtures with a local helper modeled on the existing `canonical-paths.spec.ts` helpers, and cover:
   1. **Terminal stop**: in S→T(COMPLETED)→X, T is in `canonical` and X is not reachable. Add S→Y→X, and X is reached through Y.
   2. **Live**:
      - with S impaired and S→A(BLOCKED)→B(WAITING), both A and B are live;
@@ -128,7 +128,7 @@
      - the depth bound is respected;
      - the start and an unknown target return `{ found: [], morePaths: false }`.
   6. **Start handling**: edges into the start are dropped, and the start is never in any map.
-- [ ] T010 Create `apps/api/src/graph/traversal/impact-property.spec.ts` (Jest). Generate at least 1,000 random graphs with a seeded PRNG, written inline as a small LCG; do not add a dependency. Each graph has 2 to 9 nodes, random states, random edges with random origin and confidence, cycles, diamonds and parallel edges, and a random `maxDepth` from 1 to 4.
+- [x] T010 Create `apps/api/src/graph/traversal/impact-property.spec.ts` (Jest). Generate at least 1,000 random graphs with a seeded PRNG, written inline as a small LCG; do not add a dependency. Each graph has 2 to 9 nodes, random states, random edges with random origin and confidence, cycles, diamonds and parallel edges, and a random `maxDepth` from 1 to 4.
 
   A **brute force** enumerates every simple path from the start within `maxDepth`, never expanding a terminal non-start node and never re-entering the start. Assert that `computeImpactSelections` and `enumerateImpactPaths` agree with it:
   - the reached set;
