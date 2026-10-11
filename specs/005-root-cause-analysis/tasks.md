@@ -33,7 +33,7 @@
 
 ## Phase 1: Setup
 
-- [ ] T001 On branch `005-root-cause-analysis`, confirm the baseline is green before any change. With `docker compose up -d db` running, run the standard gate plus `pnpm build`. If anything fails, stop and record it in `specs/005-root-cause-analysis/questions.md`. Do not fix 003 code in this feature. The untracked `specs/004-graph-explorer/` folder is unrelated: do not touch or commit it.
+- [x] T001 On branch `005-root-cause-analysis`, confirm the baseline is green before any change. With `docker compose up -d db` running, run the standard gate plus `pnpm build`. If anything fails, stop and record it in `specs/005-root-cause-analysis/questions.md`. Do not fix 003 code in this feature. The untracked `specs/004-graph-explorer/` folder is unrelated: do not touch or commit it.
 
 ---
 
@@ -43,20 +43,20 @@
 
 ### Shared (`packages/shared/src`)
 
-- [ ] T002 [P] Create `packages/shared/src/evidence-notes.ts` with everything in contracts/api.md for notes:
+- [x] T002 [P] Create `packages/shared/src/evidence-notes.ts` with everything in contracts/api.md for notes:
   - `EvidenceNoteStanceSchema` and `EVIDENCE_NOTE_LIMITS` (data-model §2);
   - `EvidenceNoteTargetSchema`, `CreateEvidenceNoteRequestSchema` (`.strict()`, with the `reference` transform: empty or absent becomes `null`), `RetractEvidenceNoteRequestSchema` (`.strict()`) and `EvidenceNoteListQuerySchema` (= `PageQuerySchema`);
   - `UserRefDtoSchema`, `EvidenceNoteDtoSchema` and `EvidenceNoteListResponseSchema`.
 
   Export an inferred type for each schema. Add `export * from './evidence-notes';` to `index.ts`.
-- [ ] T003 Create `packages/shared/src/root-cause.ts`:
+- [x] T003 Create `packages/shared/src/root-cause.ts`:
   - the constants in data-model §2: `CAUSAL_ROLES`/`CausalRoleSchema`, `CONFIDENCE_RULES`/`ConfidenceRuleSchema`, `LabelRuleSchema`, `EvidenceRuleSchema`, `RootCauseStatusSchema`, `ROOT_CAUSE_LIMITS`, `REQUIREMENT_SOURCE_RELATIONSHIP_TYPES`;
   - every schema in contracts/api.md § Query and request schemas (`RootCauseQuerySchema`) and § Response schemas, from `StateRecordEvidenceDtoSchema` through `RootCauseResponseSchema`. `Counted` is a non-exported helper.
 
   Import `TraceDepthSchema`, `TracedEntityDtoSchema`, `HopDtoSchema` and `TruncationDtoSchema` from `./tracing`, base schemas from `./graph`, and `EvidenceNoteDtoSchema` from `./evidence-notes`. Export inferred types, and add `export * from './root-cause';` to `index.ts`.
 
   In `packages/shared/src/audit.ts`, add `EVIDENCE_NOTE_CREATED: 'evidence_note.created'` and `EVIDENCE_NOTE_RETRACTED: 'evidence_note.retracted'` to `AUDIT_ACTIONS`.
-- [ ] T004 Create `packages/shared/src/evidence-notes.spec.ts` and `packages/shared/src/root-cause.spec.ts` (Vitest).
+- [x] T004 Create `packages/shared/src/evidence-notes.spec.ts` and `packages/shared/src/root-cause.spec.ts` (Vitest).
 
   **Notes schemas**:
   - `text: '  x  '` becomes `'x'`;
@@ -78,11 +78,11 @@
 
 ### Storage (data-model §1, research R9)
 
-- [ ] T005 In `apps/api/prisma/schema.prisma`, add `EvidenceNoteStance`, `EvidenceNote` and `EvidenceNoteRetraction`, plus the 4 back-relations, exactly as in data-model §1a.
+- [x] T005 In `apps/api/prisma/schema.prisma`, add `EvidenceNoteStance`, `EvidenceNote` and `EvidenceNoteRetraction`, plus the 4 back-relations, exactly as in data-model §1a.
   1. Run `pnpm --filter api prisma migrate dev --create-only --name evidence_notes`.
   2. Append the SQL of data-model §1b, verbatim, to the generated `migration.sql`. Do **not** redefine `forbid_provenance_mutation()`.
   3. Apply it with `pnpm --filter api prisma migrate dev`, then run `prisma generate`.
-- [ ] T006 In `apps/api/test/helpers.ts → resetDb`:
+- [x] T006 In `apps/api/test/helpers.ts → resetDb`:
   - add `ALTER TABLE evidence_notes DISABLE TRIGGER USER` and `ALTER TABLE evidence_note_retractions DISABLE TRIGGER USER` next to the existing ones, with matching `ENABLE` lines;
   - add `evidence_note_retractions, evidence_notes` to the front of the `TRUNCATE` list.
 
@@ -90,8 +90,8 @@
 
 ### 003 extensions (research R2, R8)
 
-- [ ] T007 [P] In `apps/api/src/tracing/tracing.module.ts`, add `exports: [TracingService]`.
-- [ ] T008 [P] In `apps/api/src/tracing/explanation.ts`, add a third optional parameter `mood: 'ASSERTIVE' | 'HEDGED' = 'ASSERTIVE'` to `explainBlockingPath`, and pass it to `subjectClause`. HEDGED changes only two rows (contracts/api.md § Chain sentences):
+- [x] T007 [P] In `apps/api/src/tracing/tracing.module.ts`, add `exports: [TracingService]`.
+- [x] T008 [P] In `apps/api/src/tracing/explanation.ts`, add a third optional parameter `mood: 'ASSERTIVE' | 'HEDGED' = 'ASSERTIVE'` to `explainBlockingPath`, and pass it to `subjectClause`. HEDGED changes only two rows (contracts/api.md § Chain sentences):
   - UNSATISFIED: `${name} may be ${label} because`;
   - SATISFIED + AT_RISK: `${name} may be at risk because`.
 
@@ -104,14 +104,14 @@
 
 ### One-hop repository lookup (data-model §3a)
 
-- [ ] T009 In `apps/api/src/graph/graph.repository.ts`, add `IncomingRelationshipRow` and `findIncomingRelationships(entityIds, types)` exactly as in data-model §3a. In `prisma-graph.repository.ts`, implement it:
+- [x] T009 In `apps/api/src/graph/graph.repository.ts`, add `IncomingRelationshipRow` and `findIncomingRelationships(entityIds, types)` exactly as in data-model §3a. In `prisma-graph.repository.ts`, implement it:
   - **Empty input**: return `[]` without querying when `entityIds` or `types` is empty.
   - **Query**: a single `prisma.relationship.findMany({ where: { toEntityId: { in }, type: { in } }, include: { from: true } })`.
   - **Mapping**: map each row to `relationship` (with `direction: 'IN'`), `targetEntityId` and `source` (with `attributes` cast through `JsonValueSchema.parse`, so no `any`).
   - **Sorting**: sort in TypeScript by `(targetEntityId, type, source.displayName, source.id, relationship.id)` with `compareCodeUnits`.
 
   It contains no raw SQL and no recursion.
-- [ ] T010 Extend `apps/api/test/graph-repository.e2e-spec.ts` with `findIncomingRelationships`. Seed the §39 scenario the way `tracing-seed.e2e-spec.ts` does. Assert:
+- [x] T010 Extend `apps/api/test/graph-repository.e2e-spec.ts` with `findIncomingRelationships`. Seed the §39 scenario the way `tracing-seed.e2e-spec.ts` does. Assert:
   - `([], ['DEFINES'])` returns `[]`;
   - for BR-18492 with `['DEFINES','GOVERNS']`: exactly 1 row, `source` = CON-3982, `relationship.type = 'DEFINES'`, and `source.attributes.clause` = "Orders above 10,000.00 USD require finance approval with a budget code";
   - for Order #18492: 1 GOVERNS row from CON-3982;
@@ -120,8 +120,8 @@
 
 ### Pure analysis modules (`apps/api/src/root-cause/analysis/`, no Nest, no Prisma, no clock)
 
-- [ ] T011 [P] Create `types.ts` with `ConfidenceInput` and `ConfidenceResult` (data-model §3c). Also add `CandidateGroup { deepestEntityId: string; primary: BlockingPathDto; primaryIndex: number; alternatives: BlockingPathDto[] }`.
-- [ ] T012 [P] Create `label.ts` (research R5):
+- [x] T011 [P] Create `types.ts` with `ConfidenceInput` and `ConfidenceResult` (data-model §3c). Also add `CandidateGroup { deepestEntityId: string; primary: BlockingPathDto; primaryIndex: number; alternatives: BlockingPathDto[] }`.
+- [x] T012 [P] Create `label.ts` (research R5):
   - `stateWords(state)`;
   - `humanize(field)`;
   - `rootCauseLabel(entity: TracedEntityDto, attributes: Record<string, JsonValue> | undefined): { label: string; labelRule: LabelRule }`.
@@ -131,8 +131,8 @@
   - `cost_center` gives `Cost Center`, `po-number` gives `Po Number`, and `x` gives `X`;
   - an empty-string or non-string `requiredField` falls back to DISPLAY_NAME_STATE (`Payment PAY-88213 Pending`);
   - `stateWords` for all 12 states (AT_RISK gives `At Risk`).
-- [ ] T013 [P] Create `roles.ts`: `toCausalChain(start: TracedEntityDto, path: BlockingPathDto, sentences: string[]): CausalChainDto`. Use the research R3 role table, set `possible` from `currentState === 'UNKNOWN'`, set `hop` to `null` at index 0, and copy `length`, `weakestConfidence`, `nonSourceHops`, `continuesBeyondDepth` and `endsInCycle` from the path. Create `roles.spec.ts` with hand-built paths of 1, 2, 3 and 6 hops (asserting each step's `roles` array exactly), plus an UNKNOWN step giving `possible: true`.
-- [ ] T014 [P] Create `candidates.ts`:
+- [x] T013 [P] Create `roles.ts`: `toCausalChain(start: TracedEntityDto, path: BlockingPathDto, sentences: string[]): CausalChainDto`. Use the research R3 role table, set `possible` from `currentState === 'UNKNOWN'`, set `hop` to `null` at index 0, and copy `length`, `weakestConfidence`, `nonSourceHops`, `continuesBeyondDepth` and `endsInCycle` from the path. Create `roles.spec.ts` with hand-built paths of 1, 2, 3 and 6 hops (asserting each step's `roles` array exactly), plus an UNKNOWN step giving `possible: true`.
+- [x] T014 [P] Create `candidates.ts`:
   - `groupCandidates(paths: readonly BlockingPathDto[]): CandidateGroup[]`: group by the last hop's `entity.id`, in first-appearance order, keeping alternatives in `paths` order;
   - `orderCandidates<T extends { confidence: Confidence; primaryIndex: number }>(items: T[]): T[]`: CONFIDENCE_RANK descending, then `primaryIndex` ascending, without mutating the input.
 
@@ -141,7 +141,7 @@
   - ordering with a MEDIUM X and a HIGH Y gives Y first;
   - equal confidence keeps `primaryIndex` order;
   - `[]` gives `[]`.
-- [ ] T015 Create `explanation.ts` (root-cause), with pure functions exactly as specified in contracts/api.md § Explanation text:
+- [x] T015 Create `explanation.ts` (root-cause), with pure functions exactly as specified in contracts/api.md § Explanation text:
   - `headline(candidate fields, candidateCount, depth)`;
   - one reason builder per rule: `weakestLinkReason`, `unknownStateReason`, `cycleReason`, `searchLimitReason`, `staleReason`, `disagreementReason`, `corroborationReason`, `disputedReason`. Each takes the data it names and returns the applied or not-applied sentence;
   - `evidenceSentence(keyEvidence, eventCount)`;
@@ -157,7 +157,7 @@
   - an R7-shaped disputed reason with a 97-character text, giving the exact 80-character excerpt plus `…`;
   - the headline variants: LOW, more than one candidate, `(state unknown)`, `(circular dependency)`, `(deepest cause found within 6 steps)`, and all three suffixes together in order;
   - the summary variants: 1 LOW candidate and k = 2.
-- [ ] T016 Create `confidence.ts`: `computeConfidence(input: ConfidenceInput): ConfidenceResult`. It follows research R6 exactly, using the reason builders from T015.
+- [x] T016 Create `confidence.ts`: `computeConfidence(input: ConfidenceInput): ConfidenceResult`. It follows research R6 exactly, using the reason builders from T015.
   - It always returns 8 outcomes, in `CONFIDENCE_RULES` order.
   - Each outcome carries `confidenceAfter` and sorted `refs` (contracts/api.md § Refs).
   - `lower()` floors at LOW.
@@ -177,7 +177,7 @@
   - rule 8 with a retracted DISPUTES note (ignored), and with SUPPORTS and CONTEXT notes (ignored);
   - HIGH with rules 5, 6, 7 and 8 all firing gives LOW, with each firing once;
   - the full R1 input gives HIGH and exactly the 8 R1 reasons.
-- [ ] T017 [P] Create `key-evidence.ts`:
+- [x] T017 [P] Create `key-evidence.ts`:
   - `keyEvidence(chain: CausalChainDto, entityEvidence): KeyEvidenceItemDto[]`, following contracts/api.md § Key evidence: chain order, state records then requirement-source state records, de-duplicated by `sourceRecordId`, skipping null state records;
   - `eventCount(chain, entityEvidence): number`: the distinct event ids over the steps' `events.items`.
 
@@ -194,7 +194,7 @@
 
 ### Backend
 
-- [ ] T018 [US1] Create `apps/api/src/root-cause/evidence.reader.ts`: an `@Injectable() EvidenceReader` with `load(req: EvidenceRequest): Promise<EvidenceBundle>` (data-model §3b, research R4). It runs one query per row of the R4 table, batched over all ids. Raw SQL uses `::uuid[]` casts, and `COLLATE "C"` inside window `ORDER BY`. Every returned list is re-sorted in TypeScript with `compareCodeUnits`.
+- [x] T018 [US1] Create `apps/api/src/root-cause/evidence.reader.ts`: an `@Injectable() EvidenceReader` with `load(req: EvidenceRequest): Promise<EvidenceBundle>` (data-model §3b, research R4). It runs one query per row of the R4 table, batched over all ids. Raw SQL uses `::uuid[]` casts, and `COLLATE "C"` inside window `ORDER BY`. Every returned list is re-sorted in TypeScript with `compareCodeUnits`.
   1. **State records**:
      - the current observation plus the latest from each other source system, both joined to `source_records` for `SourceRecordDto` (`rawPayload` included);
      - the current record goes first with `current: true`, and the others follow sorted by `sourceSystem` with `current: false`.
@@ -214,7 +214,7 @@
   6. **Attributes** for `rootCauseEntityIds`.
 
   Every requested entity id and relationship id gets an entry, even when it is empty. Empty inputs make no queries.
-- [ ] T019 [US1] Create `apps/api/src/root-cause/root-cause.service.ts`: `analyze(id: string, query: RootCauseQuery): Promise<RootCauseResponse>`, exactly as data-model §4 and plan KDN 2–4 describe:
+- [x] T019 [US1] Create `apps/api/src/root-cause/root-cause.service.ts`: `analyze(id: string, query: RootCauseQuery): Promise<RootCauseResponse>`, exactly as data-model §4 and plan KDN 2–4 describe:
   - Read `computedAt` once.
   - Call `tracing.blockers` (`relationshipTypes: []`, `entityTypes: []`).
   - Status rules are in contracts/api.md.
@@ -229,13 +229,13 @@
   - Then `orderCandidates`. The headline needs the final candidate count, so compute headlines after grouping.
   - Build `summarizeRootCause`, then the `evidence.entities` and `evidence.relationships` arrays in first-appearance order (data-model §4.6).
   - Echo `query.evaluatedAt` as an ISO string.
-- [ ] T020 [US1] Create `root-cause.controller.ts`: `@Controller('entities')` with `@Get(':id/root-cause')`, using `ParseUUIDPipe` and `ZodValidationPipe(RootCauseQuerySchema)`. Create `root-cause.module.ts`, importing `TracingModule`, `GraphModule` and `PrismaModule`, with providers `RootCauseService` and `EvidenceReader`. Register `RootCauseModule` in `apps/api/src/app.module.ts`.
-- [ ] T021 [US1] Create `apps/api/test/root-cause-seed.e2e-spec.ts`. Seed as `tracing-seed.e2e-spec.ts` does, and sign in as an ANALYST. Parse every response with `RootCauseResponseSchema`. Use `evaluatedAt=2026-09-29T16:00:00Z` and look up ids with `entityIdByKey`. Assert **every line** of fixtures R1, R2, R3, R4 and R8 in contracts/api.md.
+- [x] T020 [US1] Create `root-cause.controller.ts`: `@Controller('entities')` with `@Get(':id/root-cause')`, using `ParseUUIDPipe` and `ZodValidationPipe(RootCauseQuerySchema)`. Create `root-cause.module.ts`, importing `TracingModule`, `GraphModule` and `PrismaModule`, with providers `RootCauseService` and `EvidenceReader`. Register `RootCauseModule` in `apps/api/src/app.module.ts`.
+- [x] T021 [US1] Create `apps/api/test/root-cause-seed.e2e-spec.ts`. Seed as `tracing-seed.e2e-spec.ts` does, and sign in as an ANALYST. Parse every response with `RootCauseResponseSchema`. Use `evaluatedAt=2026-09-29T16:00:00Z` and look up ids with `entityIdByKey`. Assert **every line** of fixtures R1, R2, R3, R4 and R8 in contracts/api.md.
 
   Add the SC-004 test: for Order #18492, Shipment SHP-77120 and the Acme SLA, 100 sequential calls with the same `evaluatedAt` produce responses that are deep-equal after deleting `computedAt`.
 
   Add the SC-002 check: the analyses of Order #18492, SHP-77120 and all 4 delivery SLAs name `Budget Code Missing`. The SLA keys are in the seed scenario. The Umbrella SLA is ACTIVE, but it still depends on SHP-77120.
-- [ ] T022 [US1] Create `apps/api/test/root-cause.e2e-spec.ts`. Build small graphs with `runImport`, using JSON entity, relationship and event rows; the shapes are in `tracing.e2e-spec.ts`. Cover US1 behaviour:
+- [x] T022 [US1] Create `apps/api/test/root-cause.e2e-spec.ts`. Build small graphs with `runImport`, using JSON entity, relationship and event rows; the shapes are in `tracing.e2e-spec.ts`. Cover US1 behaviour:
   - **validation**: `depth` 0, 11 and `abc`, and `evaluatedAt=yesterday` all give 400 with the right detail path; a malformed id gives 400; an unknown id gives 404; no token gives 401;
   - **evidence rules**:
     - an entity with 25 events returns 20 items, newest first, with `total 25`;
@@ -243,26 +243,26 @@
     - a GOVERNS and a DEFINES into one step both appear as requirement sources, sorted by type;
     - a relationship evidence `record` is the latest of its 2 observations;
   - `GET /root-cause` writes no `audit_entries` rows: count them before and after.
-- [ ] T023 [US1] In `apps/api/test/authz-matrix.e2e-spec.ts`, add an AUTHENTICATED probe for `GET /api/entities/:id/root-cause`, using `MISSING_ID` like the other entity probes.
+- [x] T023 [US1] In `apps/api/test/authz-matrix.e2e-spec.ts`, add an AUTHENTICATED probe for `GET /api/entities/:id/root-cause`, using `MISSING_ID` like the other entity probes.
 
 ### Web (`apps/web/src/pages/entities/`, research R11)
 
-- [ ] T024 [P] [US1] Create `root-cause-test-data.ts` with typed `RootCauseResponse` constants:
+- [x] T024 [P] [US1] Create `root-cause-test-data.ts` with typed `RootCauseResponse` constants:
   - `R1_ORDER` (the R1 shape);
   - `R2_SHIPMENT` (with 1 alternative chain);
   - `R4_NOT_BLOCKED`;
   - `R5_UNEXPLAINED`.
 
   Each must parse with `RootCauseResponseSchema`; assert this in the first component test. Reuse entity and hop samples from `tracing-test-data.ts` where they fit.
-- [ ] T025 [P] [US1] Create `useRootCause.ts`: `useRootCause(entityId)` is a `useQuery` with key `['entities', entityId, 'root-cause']`, and `apiFetch('/entities/${id}/root-cause', { schema: RootCauseResponseSchema })`.
-- [ ] T026 [P] [US1] Create `StepEvidence.tsx`, which renders one step's evidence from `EntityEvidenceDto` plus, when the step has a hop, its `RelationshipEvidenceDto`s. Groups are headed **State records**, **Relationship records**, **Requirement sources**, **Events (n of total)** and **Notes**. Every item shows its source system, source id and observed time (`formatTimestamp`), and `OriginBadge` for non-SOURCE items. A requirement source shows its relationship (`Contract CON-3982 DEFINES Budget code…`) and its attributes as key: value lines. Leave the Notes group showing only the list for now: a read-only list of text, stance and author, marked "retracted" when inactive. US3 replaces it. Create `StepEvidence.test.tsx` (BR-18492 evidence from R1 shows the clause and "Events (1 of 1)").
-- [ ] T027 [US1] Create `CausalChainView.tsx`:
+- [x] T025 [P] [US1] Create `useRootCause.ts`: `useRootCause(entityId)` is a `useQuery` with key `['entities', entityId, 'root-cause']`, and `apiFetch('/entities/${id}/root-cause', { schema: RootCauseResponseSchema })`.
+- [x] T026 [P] [US1] Create `StepEvidence.tsx`, which renders one step's evidence from `EntityEvidenceDto` plus, when the step has a hop, its `RelationshipEvidenceDto`s. Groups are headed **State records**, **Relationship records**, **Requirement sources**, **Events (n of total)** and **Notes**. Every item shows its source system, source id and observed time (`formatTimestamp`), and `OriginBadge` for non-SOURCE items. A requirement source shows its relationship (`Contract CON-3982 DEFINES Budget code…`) and its attributes as key: value lines. Leave the Notes group showing only the list for now: a read-only list of text, stance and author, marked "retracted" when inactive. US3 replaces it. Create `StepEvidence.test.tsx` (BR-18492 evidence from R1 shows the clause and "Events (1 of 1)").
+- [x] T027 [US1] Create `CausalChainView.tsx`:
   - an ordered list of steps;
   - each step shows its `RoleBadge` (text labels: Symptom, Immediate Blocker, Upstream Cause, Root Cause; multiple roles show multiple badges), the entity link (`/entities/:id`), `StateBadge`, "possible" when `possible`, and the linking relationship as recorded with `OriginBadge` and its confidence;
   - a disclosure button per step reveals `StepEvidence`.
 
   Create `CausalChainView.test.tsx` covering R1's 4 steps and roles, an R8-like step with 2 badges, and expanding a step to show its evidence.
-- [ ] T028 [US1] Create `RootCauseCandidate.tsx`. It renders:
+- [x] T028 [US1] Create `RootCauseCandidate.tsx`. It renders:
   - the `headline`;
   - the `explanation.chain` sentences through `ExplanationSentence`, with link targets built from the chain's step entities. If `linkTargets` only accepts a start and a path, add an overload that takes `TracedEntityDto[]`, without changing existing callers;
   - `explanation.confidence` and `explanation.evidence`;
@@ -270,7 +270,7 @@
   - a collapsed "Alternative chains (n)" disclosure, with one `CausalChainView` each.
 
   Create `RootCauseCandidate.test.tsx` covering R1 (headline, 3 sentences, evidence sentence) and R2 (the alternative chain is collapsed by default, and expanding it shows "manually recorded").
-- [ ] T029 [US1] Create `RootCauseSection.tsx` (`<section id="root-cause">`, heading `Root cause`, using `useRootCause`):
+- [x] T029 [US1] Create `RootCauseSection.tsx` (`<section id="root-cause">`, heading `Root cause`, using `useRootCause`):
   - **loading**: a loading line;
   - **error**: its own `role="alert"` line, without throwing;
   - **NOT_BLOCKED**: a single line containing the `summary`;
@@ -278,7 +278,7 @@
   - **ROOT_CAUSES_FOUND**: the `summary`, then one `RootCauseCandidate` per candidate.
 
   Create `RootCauseSection.test.tsx` covering all four states, using `apiFetchMock` as in `BlockerCallout.test.tsx`.
-- [ ] T030 [US1] Update `BlockerCallout.tsx` (research R11):
+- [x] T030 [US1] Update `BlockerCallout.tsx` (research R11):
   - use `useRootCause` and `useBlockers`;
   - when there are candidates, render the root-cause `summary`, the first candidate's `headline` and its chain sentences, and a link `#root-cause` ("See root cause");
   - then, when blockers exist, the 003 blocker `summary` and the link `#blockers`;
@@ -288,7 +288,7 @@
   - R1 together with F2 shows the headline and no duplicate explanation;
   - a mismatching-chain case shows both explanations;
   - a failed root-cause query still shows the blocker summary.
-- [ ] T031 [US1] In `EntityDetailPage.tsx`, render `<RootCauseSection entityId={entity.id} />` between `CurrentStateSection` and `BlockersSection`. In `EntityDetailPage.test.tsx`:
+- [x] T031 [US1] In `EntityDetailPage.tsx`, render `<RootCauseSection entityId={entity.id} />` between `CurrentStateSection` and `BlockersSection`. In `EntityDetailPage.test.tsx`:
   - add a mock answer for `/root-cause`;
   - update the heading-order test to Identity, Current state, Root cause, Blockers, Dependencies, Relationships, Timeline, Source records;
   - keep the FR-032 assertion (no risk, exception, impact or investigation headings);
@@ -303,8 +303,8 @@
 **Goal**: every confidence rule is shown with its outcome, and weak evidence is reported as "Possible root cause — insufficient evidence" with "may be" wording. Unexplained states name no cause.
 **Independent test**: fixtures R5, R6 and R9 pass, every Story 2 acceptance scenario passes on built graphs, and the confidence details are visible on the page.
 
-- [ ] T032 [US2] Extend `apps/api/test/root-cause-seed.e2e-spec.ts` with fixtures **R5** (Order #18532 UNEXPLAINED, start-only evidence), **R6** (`evaluatedAt=2026-10-06T12:00:00Z`, exact stale reason, MEDIUM) and **R9** (BR-18492 UNEXPLAINED). Assert every line.
-- [ ] T033 [US2] Extend `apps/api/test/root-cause.e2e-spec.ts` with built graphs, one `describe` per spec Story 2 scenario. Assert the candidate `confidence`, which rule outcomes have `applied`, the exact reason for the applied rule, and the headline form:
+- [x] T032 [US2] Extend `apps/api/test/root-cause-seed.e2e-spec.ts` with fixtures **R5** (Order #18532 UNEXPLAINED, start-only evidence), **R6** (`evaluatedAt=2026-10-06T12:00:00Z`, exact stale reason, MEDIUM) and **R9** (BR-18492 UNEXPLAINED). Assert every line.
+- [x] T033 [US2] Extend `apps/api/test/root-cause.e2e-spec.ts` with built graphs, one `describe` per spec Story 2 scenario. Assert the candidate `confidence`, which rule outcomes have `applied`, the exact reason for the applied rule, and the headline form:
   1. **Inferred low link**: a chain of SOURCE/HIGH, SOURCE/HIGH and INFERRED/LOW hops. Expect LOW, the `Possible root cause — insufficient evidence:` headline, and every chain sentence containing `may be` (except INDETERMINATE subjects).
   2. **Unknown root**: the deepest entity is UNKNOWN. Expect LOW, `possible: true`, a ` (state unknown)` headline suffix, and sentences saying `whose state is unknown`.
   3. **Depth limit**: depth 2 on a 4-hop chain. Expect `continuesBeyondDepth`, a cap at MEDIUM, and the ` (deepest cause found within 2 steps)` suffix.
@@ -314,8 +314,8 @@
   7. **Two root causes**: one entity REQUIRES two separate MISSING entities. Expect 2 candidates, headlines starting `Possible root cause:`, and a summary starting `… 2 possible root causes found; highest ranked:`.
   8. **Cycle**: A REQUIRES B, B REQUIRES A, both BLOCKED. Expect a `(circular dependency)` suffix and LOW.
   9. **Uncorroborated root**: one source system and no events. Expect rule 7 applied.
-- [ ] T034 [P] [US2] Create `apps/web/src/pages/entities/ConfidenceRules.tsx`. It is a disclosure labeled `Confidence: <LEVEL> — show the 8 rules`, containing a list with one row per outcome: the rule name in words, `Applied` or `Not applied` as text (not colour only), `confidenceAfter`, and the `reason`. Create `ConfidenceRules.test.tsx` checking that R1 shows 8 rows with only Weakest link applied, and that an R6-like outcome list marks Stale evidence as applied.
-- [ ] T035 [US2] In `RootCauseCandidate.tsx`:
+- [x] T034 [P] [US2] Create `apps/web/src/pages/entities/ConfidenceRules.tsx`. It is a disclosure labeled `Confidence: <LEVEL> — show the 8 rules`, containing a list with one row per outcome: the rule name in words, `Applied` or `Not applied` as text (not colour only), `confidenceAfter`, and the `reason`. Create `ConfidenceRules.test.tsx` checking that R1 shows 8 rows with only Weakest link applied, and that an R6-like outcome list marks Stale evidence as applied.
+- [x] T035 [US2] In `RootCauseCandidate.tsx`:
   - render `ConfidenceRules` under the explanation;
   - when `insufficientEvidence`, give the candidate an amber "Insufficient evidence" text badge and an `aria-describedby` pointing at the applied reasons;
   - show "possible" on `possible` candidates.
@@ -333,8 +333,8 @@
 
 ### Backend
 
-- [ ] T036 [US3] Complete `apps/api/src/root-cause/evidence-note.mapper.ts`, started in T018. It provides `toEvidenceNoteDto(row)` for both Prisma rows (with `author` and `retraction.retractedBy` included) and the raw rows used by `EvidenceReader`. `active` is `retraction === null`, and every date is ISO. Create `evidence-note.mapper.spec.ts` covering an active note, a retracted note, and both target kinds.
-- [ ] T037 [US3] Create `evidence-notes.service.ts` (plan KDN 6, research R9 and R10):
+- [x] T036 [US3] Complete `apps/api/src/root-cause/evidence-note.mapper.ts`, started in T018. It provides `toEvidenceNoteDto(row)` for both Prisma rows (with `author` and `retraction.retractedBy` included) and the raw rows used by `EvidenceReader`. `active` is `retraction === null`, and every date is ISO. Create `evidence-note.mapper.spec.ts` covering an active note, a retracted note, and both target kinds.
+- [x] T037 [US3] Create `evidence-notes.service.ts` (plan KDN 6, research R9 and R10):
   - **`create(input, user)`**: in one `$transaction`:
     1. check that the target exists; otherwise `Errors.validation([{ path: 'target.entityId' | 'target.relationshipId', message: 'Entity not found' | 'Relationship not found' }])`;
     2. insert the note;
@@ -349,14 +349,14 @@
     - order by `createdAt DESC`, then `id DESC`;
     - cursor `{ createdAt, id }` via `encodeCursor`/`decodeCursor`, with the next page starting strictly after the cursor;
     - fetch `limit + 1` to decide `nextCursor`.
-- [ ] T038 [US3] Create `evidence-notes.controller.ts` (`@Controller()`):
+- [x] T038 [US3] Create `evidence-notes.controller.ts` (`@Controller()`):
   - `POST evidence-notes` (201);
   - `POST evidence-notes/:noteId/retract` (200, `@HttpCode(200)`);
   - `GET entities/:id/evidence-notes`;
   - `GET relationships/:id/evidence-notes`.
 
   Use `ZodValidationPipe` with the T002 schemas, `ParseUUIDPipe`, and `@CurrentUser()`; pass `method` and `path` from the request for the forbidden audit. Register the controller and `EvidenceNotesService` in `RootCauseModule`.
-- [ ] T039 [US3] Create `apps/api/test/evidence-notes.e2e-spec.ts`:
+- [x] T039 [US3] Create `apps/api/test/evidence-notes.e2e-spec.ts`:
   - **creation**: create on an entity and on a relationship (201, schema-valid, `active true`), with exactly one `evidence_note.created` audit row whose `after.text` matches;
   - **validation**: every note row of the contracts/api.md § Validation and access table gives 400 with the stated detail, and no note or `evidence_note.*` row is written;
   - **listing**: list paging over 3 notes with `limit=2` (order, `nextCursor`, second page); listing for a missing entity gives 404;
@@ -367,8 +367,8 @@
     - repeated: 200, with no new audit row;
     - for a missing note: 404;
   - **database immutability** (SC-006): raw `UPDATE evidence_notes SET text = 'x'`, `DELETE FROM evidence_notes` and `DELETE FROM evidence_note_retractions` each reject with an error matching `/append-only/`.
-- [ ] T040 [US3] Extend `apps/api/test/root-cause-seed.e2e-spec.ts` with fixture **R7**. Run steps 1–6 in order, with users A, B (ANALYST) and C (ADMIN) created through `createUser`, and assert every line, including R2 dropping to MEDIUM while the dispute is active.
-- [ ] T041 [US3] In `apps/api/test/authz-matrix.e2e-spec.ts`, add AUTHENTICATED probes for:
+- [x] T040 [US3] Extend `apps/api/test/root-cause-seed.e2e-spec.ts` with fixture **R7**. Run steps 1–6 in order, with users A, B (ANALYST) and C (ADMIN) created through `createUser`, and assert every line, including R2 dropping to MEDIUM while the dispute is active.
+- [x] T041 [US3] In `apps/api/test/authz-matrix.e2e-spec.ts`, add AUTHENTICATED probes for:
   - `POST /api/evidence-notes` (body `{}`, expecting 400 for signed-in users);
   - `POST /api/evidence-notes/:MISSING_ID/retract` (body `{ reason: 'x' }`, expecting 404);
   - `GET /api/entities/:MISSING_ID/evidence-notes`;
@@ -378,17 +378,17 @@
 
 ### Web
 
-- [ ] T042 [P] [US3] Create `apps/web/src/pages/entities/useEvidenceNotes.ts`:
+- [x] T042 [P] [US3] Create `apps/web/src/pages/entities/useEvidenceNotes.ts`:
   - `useEvidenceNotes(target)`: `useInfiniteQuery`, key `['evidence-notes', kind, targetId]`;
   - `useCreateEvidenceNote()` and `useRetractEvidenceNote()`: mutations through `apiFetch` with the shared schemas. On success, `queryClient.invalidateQueries({ predicate: q => q.queryKey[0] === 'evidence-notes' || q.queryKey[2] === 'root-cause' })`.
-- [ ] T043 [P] [US3] Create `EvidenceNoteList.tsx`. It renders notes newest first, each with:
+- [x] T043 [P] [US3] Create `EvidenceNoteList.tsx`. It renders notes newest first, each with:
   - a stance badge (Supports, Disputes or Context, as text);
   - the text and reference;
   - the author and time;
   - for retracted notes, a "Retracted by X on T: reason" line, with the text struck through but still readable.
 
   It shows a **Retract** button only when `useAuth().user` is the author or has role ADMIN. Retracting opens an inline reason field (required, 500 characters at most) with Confirm and Cancel. Create `EvidenceNoteList.test.tsx` covering: the button is hidden for a non-author analyst, shown for the author and for an admin, and confirming calls the retract mutation with the reason.
-- [ ] T044 [P] [US3] Create `EvidenceNoteForm.tsx`, with props `targets: { label: string; target: EvidenceNoteTarget }[]`, so that a step can offer "this entity" and "the link to it". It contains:
+- [x] T044 [P] [US3] Create `EvidenceNoteForm.tsx`, with props `targets: { label: string; target: EvidenceNoteTarget }[]`, so that a step can offer "this entity" and "the link to it". It contains:
   - a target radio (when there is more than one target);
   - a stance radio (Supports, Disputes, Context; required);
   - a text area (required, 2,000 characters at most, with a counter);
@@ -396,7 +396,7 @@
   - a submit button that is disabled while pending, with the server error shown when submission fails.
 
   Create `EvidenceNoteForm.test.tsx` covering client-side required errors, a successful submit payload that matches `CreateEvidenceNoteRequestSchema`, and a server 400 detail shown in the form.
-- [ ] T045 [US3] In `StepEvidence.tsx`, replace the read-only Notes group from T026 with `EvidenceNoteList`, using the notes already present in `EntityEvidenceDto.notes` and `RelationshipEvidenceDto.notes` (plus "Show all n" via `useEvidenceNotes` when `total` exceeds the items). Add an **Add note** action that opens `EvidenceNoteForm` with targets "this entity" and, when the step has a hop, "the link: <relationship as recorded>" for its first assertion id. Update `StepEvidence.test.tsx`: the add-note form opens with 2 targets on a hop step and 1 on the symptom step, and a retracted note renders as retracted.
+- [x] T045 [US3] In `StepEvidence.tsx`, replace the read-only Notes group from T026 with `EvidenceNoteList`, using the notes already present in `EntityEvidenceDto.notes` and `RelationshipEvidenceDto.notes` (plus "Show all n" via `useEvidenceNotes` when `total` exceeds the items). Add an **Add note** action that opens `EvidenceNoteForm` with targets "this entity" and, when the step has a hop, "the link: <relationship as recorded>" for its first assertion id. Update `StepEvidence.test.tsx`: the add-note form opens with 2 targets on a hop step and 1 on the symptom step, and a retracted note renders as retracted.
 
 **Checkpoint**: standard gate. Then walk quickstart §2 (the R7 calls) and §3 step 4 in the browser, signed in as two different analysts.
 
@@ -404,13 +404,13 @@
 
 ## Phase 6: Polish and cross-cutting
 
-- [ ] T046 Create `apps/api/test/perf-root-cause.e2e-spec.ts` (`describePerf`, `RUN_PERF=1` only). Reuse the dataset builder and the 6-hop blocking chain from `perf-tracing.e2e-spec.ts`; import or copy its setup helper, as that file allows. Run `GET /root-cause` 20 times for the 6-hop start entity, and assert p95 < 1,500 ms (SC-003). Run it locally and record the p95 in the `quickstart.md` § 4 table. If it fails, follow research R13 (check the indexes with `EXPLAIN`) and write the findings to `questions.md`, rather than adding caching.
-- [ ] T047 Run the repository-wide checks and fix any hit:
+- [x] T046 Create `apps/api/test/perf-root-cause.e2e-spec.ts` (`describePerf`, `RUN_PERF=1` only). Reuse the dataset builder and the 6-hop blocking chain from `perf-tracing.e2e-spec.ts`; import or copy its setup helper, as that file allows. Run `GET /root-cause` 20 times for the 6-hop start entity, and assert p95 < 1,500 ms (SC-003). Run it locally and record the p95 in the `quickstart.md` § 4 table. If it fails, follow research R13 (check the indexes with `EXPLAIN`) and write the findings to `questions.md`, rather than adding caching.
+- [x] T047 Run the repository-wide checks and fix any hit:
   - `git grep -n "WITH RECURSIVE" -- apps/api/src` returns only `prisma-graph.repository.ts`;
   - `git grep -n "localeCompare\|: any\|as any\|TODO" -- apps packages` returns no new hits;
   - `git grep -n "new Date()\|Date.now()" -- apps/api/src/root-cause/analysis` returns nothing;
   - `git diff main -- '**/package.json' pnpm-lock.yaml` adds no dependencies.
-- [ ] T048 Run the full standard gate plus `pnpm build`. Then, with the dev DB re-seeded, walk all of `quickstart.md` §2 and §3 at 1366×768 and confirm every expected output. Tick the remaining boxes and commit.
+- [x] T048 Run the full standard gate plus `pnpm build`. Then, with the dev DB re-seeded, walk all of `quickstart.md` §2 and §3 at 1366×768 and confirm every expected output. Tick the remaining boxes and commit.
 
 ---
 

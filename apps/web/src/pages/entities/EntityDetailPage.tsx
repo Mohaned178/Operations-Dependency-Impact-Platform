@@ -8,6 +8,7 @@ import { CurrentStateSection } from './CurrentStateSection';
 import { DependenciesSection } from './DependenciesSection';
 import { IdentitySection } from './IdentitySection';
 import { RelationshipsSection } from './RelationshipsSection';
+import { RootCauseSection } from './RootCauseSection';
 import { SourceRecordsSection } from './SourceRecordsSection';
 import { StateBadge } from './StateBadge';
 import { TimelineSection } from './TimelineSection';
@@ -55,10 +56,16 @@ export function EntityDetailPage() {
           <StateBadge state={entity.currentState} />
         </div>
         <BlockerCallout entityId={entity.id} />
+        <div>
+          <Link to={`/graph/${entity.id}`} className="text-sm underline">
+            Open in Graph Explorer
+          </Link>
+        </div>
       </header>
 
       <IdentitySection entity={entity} />
       <CurrentStateSection entity={entity} />
+      <RootCauseSection entityId={entity.id} />
       <BlockersSection entityId={entity.id} />
       <DependenciesSection entityId={entity.id} />
       <RelationshipsSection entityId={entity.id} />

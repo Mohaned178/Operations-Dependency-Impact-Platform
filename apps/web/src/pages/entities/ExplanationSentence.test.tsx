@@ -90,4 +90,16 @@ describe('ExplanationSentence', () => {
     expect(targets.has(APPROVAL.displayName)).toBe(false);
     expect(targets.get(SHIPMENT.displayName)).toBe(SHIPMENT.id);
   });
+
+  it('builds link targets from a plain list of entities and drops ambiguous names', () => {
+    const duplicate = tracedEntity(
+      '11111111-1111-4111-8111-111111111111',
+      'Order',
+      ORDER.displayName,
+      'BLOCKED',
+    );
+    const targets = linkTargets([ORDER, SHIPMENT, duplicate]);
+    expect(targets.get(SHIPMENT.displayName)).toBe(SHIPMENT.id);
+    expect(targets.has(ORDER.displayName)).toBe(false);
+  });
 });
