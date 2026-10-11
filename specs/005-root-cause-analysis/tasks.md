@@ -333,8 +333,8 @@
 
 ### Backend
 
-- [ ] T036 [US3] Complete `apps/api/src/root-cause/evidence-note.mapper.ts`, started in T018. It provides `toEvidenceNoteDto(row)` for both Prisma rows (with `author` and `retraction.retractedBy` included) and the raw rows used by `EvidenceReader`. `active` is `retraction === null`, and every date is ISO. Create `evidence-note.mapper.spec.ts` covering an active note, a retracted note, and both target kinds.
-- [ ] T037 [US3] Create `evidence-notes.service.ts` (plan KDN 6, research R9 and R10):
+- [x] T036 [US3] Complete `apps/api/src/root-cause/evidence-note.mapper.ts`, started in T018. It provides `toEvidenceNoteDto(row)` for both Prisma rows (with `author` and `retraction.retractedBy` included) and the raw rows used by `EvidenceReader`. `active` is `retraction === null`, and every date is ISO. Create `evidence-note.mapper.spec.ts` covering an active note, a retracted note, and both target kinds.
+- [x] T037 [US3] Create `evidence-notes.service.ts` (plan KDN 6, research R9 and R10):
   - **`create(input, user)`**: in one `$transaction`:
     1. check that the target exists; otherwise `Errors.validation([{ path: 'target.entityId' | 'target.relationshipId', message: 'Entity not found' | 'Relationship not found' }])`;
     2. insert the note;
@@ -349,14 +349,14 @@
     - order by `createdAt DESC`, then `id DESC`;
     - cursor `{ createdAt, id }` via `encodeCursor`/`decodeCursor`, with the next page starting strictly after the cursor;
     - fetch `limit + 1` to decide `nextCursor`.
-- [ ] T038 [US3] Create `evidence-notes.controller.ts` (`@Controller()`):
+- [x] T038 [US3] Create `evidence-notes.controller.ts` (`@Controller()`):
   - `POST evidence-notes` (201);
   - `POST evidence-notes/:noteId/retract` (200, `@HttpCode(200)`);
   - `GET entities/:id/evidence-notes`;
   - `GET relationships/:id/evidence-notes`.
 
   Use `ZodValidationPipe` with the T002 schemas, `ParseUUIDPipe`, and `@CurrentUser()`; pass `method` and `path` from the request for the forbidden audit. Register the controller and `EvidenceNotesService` in `RootCauseModule`.
-- [ ] T039 [US3] Create `apps/api/test/evidence-notes.e2e-spec.ts`:
+- [x] T039 [US3] Create `apps/api/test/evidence-notes.e2e-spec.ts`:
   - **creation**: create on an entity and on a relationship (201, schema-valid, `active true`), with exactly one `evidence_note.created` audit row whose `after.text` matches;
   - **validation**: every note row of the contracts/api.md § Validation and access table gives 400 with the stated detail, and no note or `evidence_note.*` row is written;
   - **listing**: list paging over 3 notes with `limit=2` (order, `nextCursor`, second page); listing for a missing entity gives 404;
@@ -367,8 +367,8 @@
     - repeated: 200, with no new audit row;
     - for a missing note: 404;
   - **database immutability** (SC-006): raw `UPDATE evidence_notes SET text = 'x'`, `DELETE FROM evidence_notes` and `DELETE FROM evidence_note_retractions` each reject with an error matching `/append-only/`.
-- [ ] T040 [US3] Extend `apps/api/test/root-cause-seed.e2e-spec.ts` with fixture **R7**. Run steps 1–6 in order, with users A, B (ANALYST) and C (ADMIN) created through `createUser`, and assert every line, including R2 dropping to MEDIUM while the dispute is active.
-- [ ] T041 [US3] In `apps/api/test/authz-matrix.e2e-spec.ts`, add AUTHENTICATED probes for:
+- [x] T040 [US3] Extend `apps/api/test/root-cause-seed.e2e-spec.ts` with fixture **R7**. Run steps 1–6 in order, with users A, B (ANALYST) and C (ADMIN) created through `createUser`, and assert every line, including R2 dropping to MEDIUM while the dispute is active.
+- [x] T041 [US3] In `apps/api/test/authz-matrix.e2e-spec.ts`, add AUTHENTICATED probes for:
   - `POST /api/evidence-notes` (body `{}`, expecting 400 for signed-in users);
   - `POST /api/evidence-notes/:MISSING_ID/retract` (body `{ reason: 'x' }`, expecting 404);
   - `GET /api/entities/:MISSING_ID/evidence-notes`;
@@ -378,17 +378,17 @@
 
 ### Web
 
-- [ ] T042 [P] [US3] Create `apps/web/src/pages/entities/useEvidenceNotes.ts`:
+- [x] T042 [P] [US3] Create `apps/web/src/pages/entities/useEvidenceNotes.ts`:
   - `useEvidenceNotes(target)`: `useInfiniteQuery`, key `['evidence-notes', kind, targetId]`;
   - `useCreateEvidenceNote()` and `useRetractEvidenceNote()`: mutations through `apiFetch` with the shared schemas. On success, `queryClient.invalidateQueries({ predicate: q => q.queryKey[0] === 'evidence-notes' || q.queryKey[2] === 'root-cause' })`.
-- [ ] T043 [P] [US3] Create `EvidenceNoteList.tsx`. It renders notes newest first, each with:
+- [x] T043 [P] [US3] Create `EvidenceNoteList.tsx`. It renders notes newest first, each with:
   - a stance badge (Supports, Disputes or Context, as text);
   - the text and reference;
   - the author and time;
   - for retracted notes, a "Retracted by X on T: reason" line, with the text struck through but still readable.
 
   It shows a **Retract** button only when `useAuth().user` is the author or has role ADMIN. Retracting opens an inline reason field (required, 500 characters at most) with Confirm and Cancel. Create `EvidenceNoteList.test.tsx` covering: the button is hidden for a non-author analyst, shown for the author and for an admin, and confirming calls the retract mutation with the reason.
-- [ ] T044 [P] [US3] Create `EvidenceNoteForm.tsx`, with props `targets: { label: string; target: EvidenceNoteTarget }[]`, so that a step can offer "this entity" and "the link to it". It contains:
+- [x] T044 [P] [US3] Create `EvidenceNoteForm.tsx`, with props `targets: { label: string; target: EvidenceNoteTarget }[]`, so that a step can offer "this entity" and "the link to it". It contains:
   - a target radio (when there is more than one target);
   - a stance radio (Supports, Disputes, Context; required);
   - a text area (required, 2,000 characters at most, with a counter);
@@ -396,7 +396,7 @@
   - a submit button that is disabled while pending, with the server error shown when submission fails.
 
   Create `EvidenceNoteForm.test.tsx` covering client-side required errors, a successful submit payload that matches `CreateEvidenceNoteRequestSchema`, and a server 400 detail shown in the form.
-- [ ] T045 [US3] In `StepEvidence.tsx`, replace the read-only Notes group from T026 with `EvidenceNoteList`, using the notes already present in `EntityEvidenceDto.notes` and `RelationshipEvidenceDto.notes` (plus "Show all n" via `useEvidenceNotes` when `total` exceeds the items). Add an **Add note** action that opens `EvidenceNoteForm` with targets "this entity" and, when the step has a hop, "the link: <relationship as recorded>" for its first assertion id. Update `StepEvidence.test.tsx`: the add-note form opens with 2 targets on a hop step and 1 on the symptom step, and a retracted note renders as retracted.
+- [x] T045 [US3] In `StepEvidence.tsx`, replace the read-only Notes group from T026 with `EvidenceNoteList`, using the notes already present in `EntityEvidenceDto.notes` and `RelationshipEvidenceDto.notes` (plus "Show all n" via `useEvidenceNotes` when `total` exceeds the items). Add an **Add note** action that opens `EvidenceNoteForm` with targets "this entity" and, when the step has a hop, "the link: <relationship as recorded>" for its first assertion id. Update `StepEvidence.test.tsx`: the add-note form opens with 2 targets on a hop step and 1 on the symptom step, and a retracted note renders as retracted.
 
 **Checkpoint**: standard gate. Then walk quickstart §2 (the R7 calls) and §3 step 4 in the browser, signed in as two different analysts.
 

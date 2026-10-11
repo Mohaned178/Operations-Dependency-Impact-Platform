@@ -124,6 +124,7 @@ function CausalStepItem({ step, previous, evidence }: CausalStepItemProps) {
               relationships={relationships}
               entityName={name}
               relationshipLabel={recorded ?? undefined}
+              linkRelationshipId={hop?.assertions.at(0)?.relationshipId}
             />
           )}
         </div>

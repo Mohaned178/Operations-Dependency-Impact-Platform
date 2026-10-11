@@ -1,15 +1,19 @@
 import type {
   EntityEvidenceDto,
   EventEvidenceDto,
-  NoteEvidenceDto,
+  EvidenceNoteDto,
+  EvidenceNoteTarget,
   RelationshipEvidenceDto,
   RequirementSourceDto,
   StateRecordEvidenceDto,
 } from '@opsgraph/shared';
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { formatTimestamp } from '../../lib/format';
+import { EvidenceNoteForm, type EvidenceNoteFormTarget } from './EvidenceNoteForm';
+import { EvidenceNoteList } from './EvidenceNoteList';
 import { OriginBadge } from './OriginBadge';
 import { StateBadge } from './StateBadge';
+import { useEvidenceNotes } from './useEvidenceNotes';
 
 export interface StepEvidenceProps {
   evidence: EntityEvidenceDto;
@@ -18,19 +22,29 @@ export interface StepEvidenceProps {
   entityName?: string;
   /** The hop as recorded, e.g. `Order #18492 REQUIRES Payment PAY-88213`, naming the relationships. */
   relationshipLabel?: string;
+  /** The first assertion id of the hop to this step: the target of a note about "the link". */
+  linkRelationshipId?: string;
 }
 
-/** One step's evidence, grouped as in FR-011. Notes are read-only until the note form lands. */
+/** One step's evidence, grouped as in FR-011, with the notes on the entity and on the link to it. */
 export function StepEvidence({
   evidence,
   relationships = [],
   entityName = 'this entity',
   relationshipLabel,
+  linkRelationshipId,
 }: StepEvidenceProps) {
-  const notes: NoteEvidenceDto[] = [
-    ...evidence.notes.items,
-    ...relationships.flatMap((relationship) => relationship.notes.items),
-  ];
+  const [adding, setAdding] = useState(false);
+  const entityTarget: EvidenceNoteTarget = { kind: 'ENTITY', entityId: evidence.entityId };
+  const noteTargets: EvidenceNoteFormTarget[] = [{ label: 'this entity', target: entityTarget }];
+  if (linkRelationshipId !== undefined && relationshipLabel !== undefined) {
+    noteTargets.push({
+      label: `the link: ${relationshipLabel}`,
+      target: { kind: 'RELATIONSHIP', relationshipId: linkRelationshipId },
+    });
+  }
+  const hasNotes =
+    evidence.notes.total > 0 || relationships.some((relationship) => relationship.notes.total > 0);
 
   return (
     <div className="flex flex-col gap-4 text-sm">
@@ -84,13 +98,45 @@ export function StepEvidence({
         </ul>
       </Group>
 
-      <Group title="Notes" isEmpty={notes.length === 0}>
-        <ul className="flex flex-col gap-2">
-          {notes.map((note) => (
-            <NoteItem key={note.id} note={note} />
+      <Group title="Notes" isEmpty={!hasNotes}>
+        <div className="flex flex-col gap-3">
+          <NotesOfTarget
+            heading={relationships.length > 0 ? 'On this entity' : null}
+            target={entityTarget}
+            notes={evidence.notes.items}
+            total={evidence.notes.total}
+          />
+          {relationships.map((relationship) => (
+            <NotesOfTarget
+              key={relationship.relationshipId}
+              heading={relationshipLabel === undefined ? 'On the link' : `On the link: ${relationshipLabel}`}
+              target={{ kind: 'RELATIONSHIP', relationshipId: relationship.relationshipId }}
+              notes={relationship.notes.items}
+              total={relationship.notes.total}
+              linkSuffix=" on the link"
+            />
           ))}
-        </ul>
+        </div>
       </Group>
+
+      {adding ? (
+        <section className="flex flex-col gap-2">
+          <h4 className="font-medium">Add note</h4>
+          <EvidenceNoteForm
+            targets={noteTargets}
+            onDone={() => setAdding(false)}
+            onCancel={() => setAdding(false)}
+          />
+        </section>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setAdding(true)}
+          className="w-fit rounded border px-2 py-1 text-slate-700 hover:bg-slate-100"
+        >
+          Add note
+        </button>
+      )}
     </div>
   );
 }
@@ -198,17 +244,64 @@ function EventItem({ event }: { event: EventEvidenceDto }) {
   );
 }
 
-function NoteItem({ note }: { note: NoteEvidenceDto }) {
+interface NotesOfTargetProps {
+  heading: string | null;
+  target: EvidenceNoteTarget;
+  notes: readonly EvidenceNoteDto[];
+  total: number;
+  linkSuffix?: string;
+}
+
+/** The notes already in the analysis for one target; "Show all n" pages in the rest. */
+function NotesOfTarget({ heading, target, notes, total, linkSuffix = '' }: NotesOfTargetProps) {
+  const [showAll, setShowAll] = useState(false);
+  if (total === 0) {
+    return null;
+  }
+
   return (
-    <li className="flex flex-col gap-1">
-      <span className="flex flex-wrap items-center gap-2">
-        <span className="rounded border border-dotted border-violet-400 bg-violet-50 px-2 py-0.5 text-xs font-medium text-violet-800">
-          Manual
-        </span>
-        {note.active ? null : <span className="font-medium text-slate-700">retracted</span>}
-      </span>
-      <span>{note.text}</span>
-      <span className="text-slate-600">{`Stance: ${note.stance} · Author: ${note.author.displayName}`}</span>
-    </li>
+    <div className="flex flex-col gap-2">
+      {heading === null ? null : <h5 className="text-slate-600">{heading}</h5>}
+      {showAll ? (
+        <AllNotes target={target} />
+      ) : (
+        <>
+          <EvidenceNoteList notes={notes} />
+          {total > notes.length ? (
+            <button
+              type="button"
+              onClick={() => setShowAll(true)}
+              className="w-fit text-slate-600 underline"
+            >
+              {`Show all ${total}${linkSuffix}`}
+            </button>
+          ) : null}
+        </>
+      )}
+    </div>
+  );
+}
+
+function AllNotes({ target }: { target: EvidenceNoteTarget }) {
+  const query = useEvidenceNotes(target);
+  const notes = query.data?.pages.flatMap((page) => page.items) ?? [];
+
+  if (query.isError) {
+    return <p role="alert">Unable to load the notes.</p>;
+  }
+  return (
+    <div className="flex flex-col gap-2">
+      {query.isPending ? <p>Loading…</p> : <EvidenceNoteList notes={notes} />}
+      {query.hasNextPage ? (
+        <button
+          type="button"
+          disabled={query.isFetchingNextPage}
+          onClick={() => void query.fetchNextPage()}
+          className="w-fit text-slate-600 underline"
+        >
+          Load more notes
+        </button>
+      ) : null}
+    </div>
   );
 }
