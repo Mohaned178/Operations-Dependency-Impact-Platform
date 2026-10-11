@@ -9,7 +9,12 @@ import type {
   RelationshipType,
   TraceableRelationshipType,
 } from '@opsgraph/shared';
-import { RelationshipTypeSchema, SATISFIED_STATES, TRACING_LIMITS } from '@opsgraph/shared';
+import {
+  JsonValueSchema,
+  RelationshipTypeSchema,
+  SATISFIED_STATES,
+  TRACING_LIMITS,
+} from '@opsgraph/shared';
 import { decodeCursor, encodeCursor } from '../common/pagination/cursor';
 import { PrismaService } from '../prisma/prisma.service';
 import type {
@@ -20,6 +25,7 @@ import type {
   DependencyTraceQuery,
   GraphEntityRef,
   GraphRepository,
+  IncomingRelationshipRow,
   NeighborPage,
   NeighborQuery,
   NeighborRow,
@@ -285,6 +291,54 @@ export class PrismaGraphRepository implements GraphRepository {
       FROM relationships
       WHERE from_entity_id = ${entityId}::uuid OR to_entity_id = ${entityId}::uuid`;
     return Number(rows[0]?.count ?? 0n);
+  }
+
+  async findIncomingRelationships(
+    entityIds: readonly string[],
+    types: readonly RelationshipType[],
+  ): Promise<IncomingRelationshipRow[]> {
+    if (entityIds.length === 0 || types.length === 0) {
+      return [];
+    }
+
+    const rows = await this.prisma.relationship.findMany({
+      where: { toEntityId: { in: [...entityIds] }, type: { in: [...types] } },
+      include: { from: true },
+    });
+
+    return rows
+      .map(
+        (row): IncomingRelationshipRow => ({
+          relationship: {
+            id: row.id,
+            type: row.type,
+            direction: 'IN',
+            origin: row.origin,
+            confidence: row.confidence,
+            basis: row.basis,
+            sourceSystem: row.sourceSystem,
+            sourceId: row.sourceId,
+            observedAt: row.observedAt,
+            importId: row.importId,
+          },
+          targetEntityId: row.toEntityId,
+          source: {
+            id: row.from.id,
+            type: row.from.type,
+            displayName: row.from.displayName,
+            currentState: row.from.currentState,
+            attributes: z.record(JsonValueSchema).parse(row.from.attributes),
+          },
+        }),
+      )
+      .sort(
+        (a, b) =>
+          compareCodeUnits(a.targetEntityId, b.targetEntityId) ||
+          compareCodeUnits(a.relationship.type, b.relationship.type) ||
+          compareCodeUnits(a.source.displayName, b.source.displayName) ||
+          compareCodeUnits(a.source.id, b.source.id) ||
+          compareCodeUnits(a.relationship.id, b.relationship.id),
+      );
   }
 
   async traceDependencies(query: DependencyTraceQuery): Promise<DependencyTrace | null> {

@@ -2,6 +2,7 @@ import type {
   BlockerRelationshipType,
   Confidence,
   EntityType,
+  JsonValue,
   OperationalState,
   RelationshipOrigin,
   RelationshipType,
@@ -151,9 +152,26 @@ export interface BlockerTrace {
   cycleClosingHopCount: number;
 }
 
+export interface IncomingRelationshipRow {
+  /** Direction is always 'IN'. */
+  relationship: NeighborRelationship;
+  /** The relationship's `to` end: one of the requested entity ids. */
+  targetEntityId: string;
+  /** The `from` end, with its attributes (needed for requirement-source evidence). */
+  source: GraphEntityRef & { attributes: Record<string, JsonValue> };
+}
+
 export interface GraphRepository {
   findNeighbors(query: NeighborQuery): Promise<NeighborPage>;
   countNeighbors(entityId: string): Promise<number>;
+  /**
+   * One hop, no recursion: every relationship of the given types whose `to` end is in entityIds.
+   * Returns [] for an empty id list or type list without querying.
+   */
+  findIncomingRelationships(
+    entityIds: readonly string[],
+    types: readonly RelationshipType[],
+  ): Promise<IncomingRelationshipRow[]>;
   /** Returns null when the start entity does not exist. */
   traceDependencies(query: DependencyTraceQuery): Promise<DependencyTrace | null>;
   /** Returns null when the start entity does not exist. */

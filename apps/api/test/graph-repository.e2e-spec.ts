@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { INestApplication } from '@nestjs/common';
 import type { EntityType } from '@opsgraph/shared';
 import { GRAPH_REPOSITORY, type GraphRepository } from '../src/graph/graph.repository';
+import { SeedService } from '../src/ingestion/seed/seed.service';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { createTestApp, entityIdByKey, resetDb, runImport } from './helpers';
 
@@ -434,5 +435,83 @@ describe('Recursive CTE smoke test on a 3-node cycle (research R3)', () => {
       depthByKey.set(sourceId, row.depth);
     }
     expect(Object.fromEntries(depthByKey)).toEqual({ A: 0, B: 1, C: 2 });
+  });
+});
+
+describe('GraphRepository.findIncomingRelationships on the seeded §39 scenario (e2e)', () => {
+  const CLAUSE = 'Orders above 10,000.00 USD require finance approval with a budget code';
+  let app: INestApplication;
+  let prisma: PrismaService;
+  let repository: GraphRepository;
+  let orderId: string;
+  let budgetId: string;
+  let contractId: string;
+
+  beforeAll(async () => {
+    app = await createTestApp();
+    prisma = app.get(PrismaService);
+    repository = app.get<GraphRepository>(GRAPH_REPOSITORY);
+
+    await resetDb(prisma);
+    const report = await app.get(SeedService).seedScenario39();
+    expect(report?.outcome).toBe('APPLIED');
+
+    orderId = await entityIdByKey(prisma, 'Order', 'OMS', '18492');
+    budgetId = await entityIdByKey(prisma, 'BudgetRequirement', 'FinanceApprovals', 'BR-18492');
+    contractId = await entityIdByKey(prisma, 'Contract', 'ContractMgmt', 'CON-3982');
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  it('returns [] for an empty id list or an empty type list', async () => {
+    expect(await repository.findIncomingRelationships([], ['DEFINES'])).toEqual([]);
+    expect(await repository.findIncomingRelationships([orderId], [])).toEqual([]);
+  });
+
+  it('returns the DEFINES relationship into BR-18492 with the contract and its clause', async () => {
+    const rows = await repository.findIncomingRelationships([budgetId], ['DEFINES', 'GOVERNS']);
+    expect(rows).toHaveLength(1);
+    const [row] = rows;
+    expect(row?.targetEntityId).toBe(budgetId);
+    expect(row?.relationship.type).toBe('DEFINES');
+    expect(row?.relationship.direction).toBe('IN');
+    expect(row?.source.id).toBe(contractId);
+    expect(row?.source.displayName).toBe('Contract CON-3982');
+    expect(row?.source.attributes['clause']).toBe(CLAUSE);
+  });
+
+  it('returns the GOVERNS relationship into Order #18492 from CON-3982', async () => {
+    const rows = await repository.findIncomingRelationships([orderId], ['DEFINES', 'GOVERNS']);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.relationship.type).toBe('GOVERNS');
+    expect(rows[0]?.source.id).toBe(contractId);
+  });
+
+  it('returns rows for several targets together, ordered by targetEntityId', async () => {
+    const rows = await repository.findIncomingRelationships(
+      [orderId, budgetId],
+      ['DEFINES', 'GOVERNS'],
+    );
+    expect(rows).toHaveLength(2);
+    expect(rows.map((row) => row.targetEntityId)).toEqual([orderId, budgetId].sort());
+  });
+
+  it('does not return PLACED relationships when only DEFINES and GOVERNS are requested', async () => {
+    const placed = await repository.findNeighbors({
+      entityId: orderId,
+      direction: 'IN',
+      relationshipTypes: ['PLACED'],
+      limit: 10,
+    });
+    expect(placed.items).toHaveLength(1);
+
+    const rows = await repository.findIncomingRelationships([orderId], ['DEFINES', 'GOVERNS']);
+    expect(rows.some((row) => row.relationship.type === 'PLACED')).toBe(false);
+
+    const placedRows = await repository.findIncomingRelationships([orderId], ['PLACED']);
+    expect(placedRows).toHaveLength(1);
+    expect(placedRows[0]?.relationship.type).toBe('PLACED');
   });
 });

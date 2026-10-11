@@ -90,8 +90,8 @@
 
 ### 003 extensions (research R2, R8)
 
-- [ ] T007 [P] In `apps/api/src/tracing/tracing.module.ts`, add `exports: [TracingService]`.
-- [ ] T008 [P] In `apps/api/src/tracing/explanation.ts`, add a third optional parameter `mood: 'ASSERTIVE' | 'HEDGED' = 'ASSERTIVE'` to `explainBlockingPath`, and pass it to `subjectClause`. HEDGED changes only two rows (contracts/api.md § Chain sentences):
+- [x] T007 [P] In `apps/api/src/tracing/tracing.module.ts`, add `exports: [TracingService]`.
+- [x] T008 [P] In `apps/api/src/tracing/explanation.ts`, add a third optional parameter `mood: 'ASSERTIVE' | 'HEDGED' = 'ASSERTIVE'` to `explainBlockingPath`, and pass it to `subjectClause`. HEDGED changes only two rows (contracts/api.md § Chain sentences):
   - UNSATISFIED: `${name} may be ${label} because`;
   - SATISFIED + AT_RISK: `${name} may be at risk because`.
 
@@ -104,14 +104,14 @@
 
 ### One-hop repository lookup (data-model §3a)
 
-- [ ] T009 In `apps/api/src/graph/graph.repository.ts`, add `IncomingRelationshipRow` and `findIncomingRelationships(entityIds, types)` exactly as in data-model §3a. In `prisma-graph.repository.ts`, implement it:
+- [x] T009 In `apps/api/src/graph/graph.repository.ts`, add `IncomingRelationshipRow` and `findIncomingRelationships(entityIds, types)` exactly as in data-model §3a. In `prisma-graph.repository.ts`, implement it:
   - **Empty input**: return `[]` without querying when `entityIds` or `types` is empty.
   - **Query**: a single `prisma.relationship.findMany({ where: { toEntityId: { in }, type: { in } }, include: { from: true } })`.
   - **Mapping**: map each row to `relationship` (with `direction: 'IN'`), `targetEntityId` and `source` (with `attributes` cast through `JsonValueSchema.parse`, so no `any`).
   - **Sorting**: sort in TypeScript by `(targetEntityId, type, source.displayName, source.id, relationship.id)` with `compareCodeUnits`.
 
   It contains no raw SQL and no recursion.
-- [ ] T010 Extend `apps/api/test/graph-repository.e2e-spec.ts` with `findIncomingRelationships`. Seed the §39 scenario the way `tracing-seed.e2e-spec.ts` does. Assert:
+- [x] T010 Extend `apps/api/test/graph-repository.e2e-spec.ts` with `findIncomingRelationships`. Seed the §39 scenario the way `tracing-seed.e2e-spec.ts` does. Assert:
   - `([], ['DEFINES'])` returns `[]`;
   - for BR-18492 with `['DEFINES','GOVERNS']`: exactly 1 row, `source` = CON-3982, `relationship.type = 'DEFINES'`, and `source.attributes.clause` = "Orders above 10,000.00 USD require finance approval with a budget code";
   - for Order #18492: 1 GOVERNS row from CON-3982;
