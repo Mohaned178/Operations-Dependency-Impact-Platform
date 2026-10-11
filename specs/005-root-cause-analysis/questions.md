@@ -28,7 +28,7 @@ contracts/api.md § Refs defines `stepIndexes` as "the triggering steps" and fix
 
 plan.md and data-model §4 call the roles function `assignRoles`; tasks.md T013/T019 call it `toCausalChain`. Implemented as `toCausalChain` (tasks.md is the implementer's authority), with no alias.
 
-## Q4. Fixture R7 DISPUTED reason: trailing period — IMPLEMENTED PER TEMPLATE, confirm
+## Q4. Fixture R7 DISPUTED reason: trailing period — DECIDED: keep the period (contract fixture fixed)
 
 - **Conflict**: contracts/api.md fixture R7 shows the reason ending `…suppli…"` with no final period, but the DISPUTED template (§ Confidence reasons) is `…: ${items}.`, which ends `…suppli…".`.
 - **Done**: the code follows the template (`explanation.ts`, asserted in `explanation.spec.ts`). The template is the more specific source.
@@ -61,7 +61,7 @@ The original analysis follows.
 - **Also for T045** (resolved): `CausalChainView` now passes `linkRelationshipId` (the hop's first assertion id) to `StepEvidence`, next to the existing `relationshipLabel`.
 - **Original note, T045**: `StepEvidence` currently receives only `relationships`, not the hop, so offering "the link" as a note target needs the hop (or its label) passed down. `StepEvidence` already takes an optional `relationshipLabel`.
 
-## Q8. Intermittent failure in `entities.e2e-spec.ts` (feature 002), seen once in Phase 6 — NOT FIXED, for the orchestrator
+## Q8. Intermittent failure in `entities.e2e-spec.ts` (feature 002), seen once in Phase 6 — DECIDED: fix later in its own small branch, outside 005
 
 - **Observed**: in one of five full e2e runs on an otherwise quiet machine, `Entities (e2e) › returns the timeline in chronological order with events before state changes` failed. It passed in the three runs of that file alone and in the next full run. The assertion text was not captured.
 - **Hypothesis (unconfirmed)**: `toTimelineEvent` in `apps/api/src/graph/timeline.service.ts` sorts an event's entities by role only (the comparator returns 0 within a role), so the two RELATED entities keep the database's order from an unordered `event_entities` include. The test expects `Acme Corp` before `Contract CON-3982`. Entity ids are random per run, so that order is not guaranteed.
@@ -77,7 +77,7 @@ The original analysis follows.
 - Requirement rows are cut to 20 per entity in one place (`loadRequirementRows`).
 - The note order (createdAt then id, descending) and `NoteTargetColumn` live once in `evidence-note.mapper.ts`. `loadNotes` now picks its top 50 by millisecond-truncated `created_at`, like the note list endpoint.
 
-**Not changed: each conflicts with spec text and needs your decision**:
+**Not changed — DECIDED: kept as known limitations for the MVP, candidates for a follow-up** (each conflicts with spec text):
 1. When the blocker search hits the exploration limit and finds no path, the status is UNEXPLAINED, and the summary says no dependency explains the state, although the search stopped early. contracts/api.md has a single UNEXPLAINED summary with no truncated variant.
 2. `humanize` (research R5) splits before every capital, so `POApproval` becomes `P O Approval` and `SKU` becomes `S K U`.
 3. A hop backed by several assertions shows identical relationship lines, and "the link" note target is only the first assertion (task T045 says first assertion id).
