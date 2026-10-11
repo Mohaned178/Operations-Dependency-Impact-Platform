@@ -54,10 +54,14 @@ pnpm lint && pnpm typecheck && pnpm test && pnpm test:e2e
 RUN_PERF=1 pnpm --filter api test:e2e -- perf-impact      # SC-003, records timings below
 ```
 
-## 5. Performance record (fill in after T-perf)
+## 5. Performance record
+
+Measured on 2026-10-11 with `RUN_PERF=1 pnpm --filter api test:e2e -- perf-impact`, on the developer machine against Docker Postgres 16. The dataset has 50,000 entities and 213,590 relationships (163,590 traversable, 90 of them hub rows, and 50,000 RELATES_TO noise). The hub supplier's summary counts 3,996 entities. Each measure is 1 warm-up run and then 20 runs.
 
 | Measure | Budget | p95 | Runs |
 |---|---|---|---|
-| `GET /impact` (hub supplier, ≥ 2,000 reached) | < 2,000 ms | _tbd_ | 20 |
-| `GET /impact/items` first page (`category.Order.total`) | < 2,000 ms | _tbd_ | 20 |
-| `GET /impact/items` first page (`exposure.USD.total`) | < 2,000 ms | _tbd_ | 20 |
+| `GET /impact` (hub supplier, ≥ 2,000 reached) | < 2,000 ms | 458 ms | 20 |
+| `GET /impact/items` first page (`category.Order.total`) | < 2,000 ms | 447 ms | 20 |
+| `GET /impact/items` first page (`exposure.USD.total`) | < 2,000 ms | 489 ms | 20 |
+
+All three are within budget, so no optimization was needed.

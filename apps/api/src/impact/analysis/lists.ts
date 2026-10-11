@@ -137,7 +137,7 @@ export function keyForList(
   };
 }
 
-export function compareKeys(a: readonly KeyPart[], b: readonly KeyPart[]): number {
+function compareKeys(a: readonly KeyPart[], b: readonly KeyPart[]): number {
   const shared = Math.min(a.length, b.length);
   for (let i = 0; i < shared; i += 1) {
     const left = a[i];

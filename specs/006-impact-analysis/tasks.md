@@ -422,7 +422,7 @@
 
 ## Phase 7: Polish & Cross-Cutting
 
-- [ ] T046 Create `apps/api/test/perf-impact.e2e-spec.ts` (`RUN_PERF=1` only). Generate the research R12 dataset with `generate_series` and deterministic ids `md5('perf-impact-' || g)::uuid`:
+- [x] T046 Create `apps/api/test/perf-impact.e2e-spec.ts` (`RUN_PERF=1` only). Generate the research R12 dataset with `generate_series` and deterministic ids `md5('perf-impact-' || g)::uuid`:
   - **entities**: 50 blocks of 1,000;
   - **relationships**: all listed in R12, plus 50,000 RELATES_TO noise; assert at least 150,000 relationships;
   - **hub supplier**: block 0's supplier also supplies blocks 1–3's products;
@@ -434,8 +434,8 @@
   - `GET /impact/items?list=exposure&currency=USD&bucket=total` first page (< 2,000 ms).
 
   Log the timings in the `perf-tracing` format.
-- [ ] T047 Run `RUN_PERF=1 pnpm --filter api test:e2e -- perf-impact` and record the p95 values in `specs/006-impact-analysis/quickstart.md` §5. If a budget is missed, profile first and write the findings to `questions.md` before optimizing. Follow the research R12 escape hatch, and never add a cache.
-- [ ] T048 Run the final gate: the standard gate, `pnpm build`, and `pnpm --filter api prisma migrate reset --force && pnpm --filter api prisma db seed` (both scenarios load). Check the Definition of Done in CLAUDE.md:
+- [x] T047 Run `RUN_PERF=1 pnpm --filter api test:e2e -- perf-impact` and record the p95 values in `specs/006-impact-analysis/quickstart.md` §5. If a budget is missed, profile first and write the findings to `questions.md` before optimizing. Follow the research R12 escape hatch, and never add a cache.
+- [x] T048 Run the final gate: the standard gate, `pnpm build`, and `pnpm --filter api prisma migrate reset --force && pnpm --filter api prisma db seed` (both scenarios load). Check the Definition of Done in CLAUDE.md:
   - no TODOs, dead code or unused exports;
   - every new endpoint has a shared schema and an e2e test;
   - no audit rows from impact routes.

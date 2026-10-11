@@ -82,7 +82,7 @@ function weakestOf(
   return { origin, confidence };
 }
 
-export function toOrderValueDto(value: OrderValue): OrderValueDto {
+function toOrderValueDto(value: OrderValue): OrderValueDto {
   return {
     current: value.current,
     bySource: value.bySource.map((source) => ({ ...source })),
