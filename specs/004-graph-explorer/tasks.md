@@ -20,8 +20,8 @@
 
 ## Phase 1: Setup
 
-- [ ] T001 On branch `004-graph-explorer`, confirm the baseline is green before any change: `docker compose up -d db`, then the standard gate plus `pnpm build`. If anything fails, stop and record it in `specs/004-graph-explorer/questions.md`. Do not fix feature 003 code here.
-- [ ] T002 Add the dependency: `pnpm --filter web add @xyflow/react@^12.12.0`. Append the jsdom shims of ui §17 to `apps/web/src/test-setup.ts` exactly as written. Run `pnpm --filter web test` and `pnpm --filter web typecheck`: both must still pass.
+- [x] T001 On branch `004-graph-explorer`, confirm the baseline is green before any change: `docker compose up -d db`, then the standard gate plus `pnpm build`. If anything fails, stop and record it in `specs/004-graph-explorer/questions.md`. Do not fix feature 003 code here.
+- [x] T002 Add the dependency: `pnpm --filter web add @xyflow/react@^12.12.0`. Append the jsdom shims of ui §17 to `apps/web/src/test-setup.ts` exactly as written. Run `pnpm --filter web test` and `pnpm --filter web typecheck`: both must still pass.
 
 **Checkpoint**: standard gate green; `git diff main -- '**/package.json'` shows only `@xyflow/react` added to `apps/web/package.json`.
 
@@ -33,8 +33,8 @@
 
 ### Shared (`packages/shared/src`)
 
-- [ ] T003 In `packages/shared/src/tracing.ts`, change `function commaList` to `export function commaList` (nothing else). Create `packages/shared/src/explorer.ts` with exactly the code in data-model.md §1 (`EXPLORER_LIMITS`, `NeighborhoodDirectionSchema`, `ExplorerUrlParamsSchema`, `NeighborhoodQuerySchema`, `NodeReasonSchema`, `NeighborhoodNodeDtoSchema`, `GraphEdgeDtoSchema`, `NeighborhoodResponseSchema` and their types). Add `export * from './explorer';` to `packages/shared/src/index.ts`. Rebuild shared.
-- [ ] T004 Create `packages/shared/src/explorer.spec.ts` (Vitest). Cover every row of the data-model §1 validation table:
+- [x] T003 In `packages/shared/src/tracing.ts`, change `function commaList` to `export function commaList` (nothing else). Create `packages/shared/src/explorer.ts` with exactly the code in data-model.md §1 (`EXPLORER_LIMITS`, `NeighborhoodDirectionSchema`, `ExplorerUrlParamsSchema`, `NeighborhoodQuerySchema`, `NodeReasonSchema`, `NeighborhoodNodeDtoSchema`, `GraphEdgeDtoSchema`, `NeighborhoodResponseSchema` and their types). Add `export * from './explorer';` to `packages/shared/src/index.ts`. Rebuild shared.
+- [x] T004 Create `packages/shared/src/explorer.spec.ts` (Vitest). Cover every row of the data-model §1 validation table:
   - defaults: `{}` parses to `direction 'all'`, `depth 2`, empty lists, `expand []`, `blockers false`;
   - `depth` `"0"`, `"5"`, `"2.5"`, `"abc"` rejected; `"4"` accepted;
   - `relationshipTypes: "RELATES_TO"` accepted with `direction=all`, rejected with `upstream` and `downstream` (issue path `['relationshipTypes']`);
@@ -46,19 +46,19 @@
 
 ### Traversal refactor and the `ALL` walk (`apps/api/src/graph/traversal/`)
 
-- [ ] T005 Make the relationship type generic as in data-model §2 "Internal traversal type widening": `EdgeRow<T>`, `TraversalEdge<T>`, `InternalPath<T>` in `types.ts` (default `TraceableRelationshipType`), and `selectCanonicalPaths<T extends RelationshipType>` with `CanonicalPathsResult<T>` in `canonical-paths.ts`. **No behavior change.** Every existing spec in this folder must pass unchanged.
-- [ ] T006 Create `apps/api/src/graph/traversal/edge-groups.ts` with `EdgeGroup<T>` and `groupEdgeRows<T>` (data-model §2): move the grouping, assertion sorting, effective origin/confidence and key logic out of `traversal-edges.ts` without changing it. Rewrite `buildTraversalEdges` to call `groupEdgeRows`; its output must be identical (existing `traversal-edges.spec.ts` passes unchanged). Create `edge-groups.spec.ts`: grouping by `(type, from, to)`, key = smallest relationship id, effective origin SOURCE > MANUAL > INFERRED, effective confidence = highest within the effective origin, assertion order, output sorted by key, and a RELATES_TO row grouped like any other.
-- [ ] T007 In `edge-groups.ts`, add `buildUndirectedTraversalEdges` (data-model §2): two `TraversalEdge`s per group with the same key, FORWARD (`sourceId = from`, `targetId = to`) then REVERSE, sorted by `(key, FORWARD before REVERSE)`, `nonSource = effectiveOrigin !== 'SOURCE'`. Extend `edge-groups.spec.ts`: both orientations, ordering, and that `selectCanonicalPaths` over these edges reaches entities through relationships in either direction.
-- [ ] T008 Extend `apps/api/src/graph/traversal/traversal-property.spec.ts` with an `ALL`-walk block over 1,000 generated graphs (reuse the file's generator and seeded random; include RELATES_TO and cycles). For each graph, a random start and `maxDepth` 1–4, run `selectCanonicalPaths(start, buildUndirectedTraversalEdges(groupEdgeRows(rows)), maxDepth)` and assert: it terminates; no path repeats an entity; every path has ≤ `maxDepth` edges; the reached set and each path's length are compatible with an independent undirected BFS oracle (reached set = BFS set within `maxDepth`; each path length ≥ BFS distance); each consecutive pair in `entityIds` is joined by the edge at that index.
+- [x] T005 Make the relationship type generic as in data-model §2 "Internal traversal type widening": `EdgeRow<T>`, `TraversalEdge<T>`, `InternalPath<T>` in `types.ts` (default `TraceableRelationshipType`), and `selectCanonicalPaths<T extends RelationshipType>` with `CanonicalPathsResult<T>` in `canonical-paths.ts`. **No behavior change.** Every existing spec in this folder must pass unchanged.
+- [x] T006 Create `apps/api/src/graph/traversal/edge-groups.ts` with `EdgeGroup<T>` and `groupEdgeRows<T>` (data-model §2): move the grouping, assertion sorting, effective origin/confidence and key logic out of `traversal-edges.ts` without changing it. Rewrite `buildTraversalEdges` to call `groupEdgeRows`; its output must be identical (existing `traversal-edges.spec.ts` passes unchanged). Create `edge-groups.spec.ts`: grouping by `(type, from, to)`, key = smallest relationship id, effective origin SOURCE > MANUAL > INFERRED, effective confidence = highest within the effective origin, assertion order, output sorted by key, and a RELATES_TO row grouped like any other.
+- [x] T007 In `edge-groups.ts`, add `buildUndirectedTraversalEdges` (data-model §2): two `TraversalEdge`s per group with the same key, FORWARD (`sourceId = from`, `targetId = to`) then REVERSE, sorted by `(key, FORWARD before REVERSE)`, `nonSource = effectiveOrigin !== 'SOURCE'`. Extend `edge-groups.spec.ts`: both orientations, ordering, and that `selectCanonicalPaths` over these edges reaches entities through relationships in either direction.
+- [x] T008 Extend `apps/api/src/graph/traversal/traversal-property.spec.ts` with an `ALL`-walk block over 1,000 generated graphs (reuse the file's generator and seeded random; include RELATES_TO and cycles). For each graph, a random start and `maxDepth` 1–4, run `selectCanonicalPaths(start, buildUndirectedTraversalEdges(groupEdgeRows(rows)), maxDepth)` and assert: it terminates; no path repeats an entity; every path has ≤ `maxDepth` edges; the reached set and each path's length are compatible with an independent undirected BFS oracle (reached set = BFS set within `maxDepth`; each path length ≥ BFS distance); each consecutive pair in `entityIds` is joined by the edge at that index.
 
 ### Repository (`apps/api/src/graph/`)
 
-- [ ] T009 In `graph.repository.ts`, add `NeighborhoodWalk`, `NeighborhoodTraceQuery`, `NeighborhoodReached` (with `pathEntityIds` **and** `pathEdgeKeys`, no `viaEdgeKey`), `NeighborhoodTrace`, `RelationshipGroup` (data-model §2) and the two `GraphRepository` methods `traceNeighborhood` and `findRelationshipsAmong`.
-- [ ] T010 In `prisma-graph.repository.ts`:
+- [x] T009 In `graph.repository.ts`, add `NeighborhoodWalk`, `NeighborhoodTraceQuery`, `NeighborhoodReached` (with `pathEntityIds` **and** `pathEdgeKeys`, no `viaEdgeKey`), `NeighborhoodTrace`, `RelationshipGroup` (data-model §2) and the two `GraphRepository` methods `traceNeighborhood` and `findRelationshipsAmong`.
+- [x] T010 In `prisma-graph.repository.ts`:
   - widen `reachableEntities` and `loadEdgeRows` type parameters to `readonly RelationshipType[]`; add the `probeBeyondDepth` option exactly as api §4; `traceDependencies` and `traceBlockers` pass `true`;
   - implement `traceNeighborhood` following api §4 steps 1–7 exactly (assert no RELATES_TO for UPSTREAM/DOWNSTREAM; throw otherwise);
   - implement `findRelationshipsAmong` per api §4 (empty input → `[]` without a query).
-- [ ] T011 Extend `apps/api/test/graph-repository.e2e-spec.ts` (seeded scenario):
+- [x] T011 Extend `apps/api/test/graph-repository.e2e-spec.ts` (seeded scenario):
   - `traceNeighborhood` UPSTREAM/DOWNSTREAM at depths 1–4 from Order #18492 and the Budget code: reached ids and distances equal `traceDependencies` with the same direction, depth and types;
   - `ALL` depth 2 from Order #18492: 31 reached (fixture N1 minus focus), each `pathEntityIds[0]` is the start, `pathEdgeKeys.length === pathEntityIds.length - 1`;
   - nonexistent start → `null`;
@@ -67,9 +67,9 @@
 
 ### Composition, service and endpoint (`apps/api/src/tracing/`)
 
-- [ ] T012 [P] In `tracing.mapper.ts`, add `toGraphEdgeDto(group: RelationshipGroup): GraphEdgeDto` (copy fields; `observedAt` → ISO). Add a case to `tracing.mapper.spec.ts`.
-- [ ] T013 [P] Create `compose-neighborhood.ts` with the types of data-model §3 (including `blockerEntities`) and `composeNeighborhood` implementing api §3 steps 1–7 **exactly**, including `basePriority`.
-- [ ] T014 Create `compose-neighborhood.spec.ts` with hand-built `NeighborhoodTrace` inputs. Cover:
+- [x] T012 [P] In `tracing.mapper.ts`, add `toGraphEdgeDto(group: RelationshipGroup): GraphEdgeDto` (copy fields; `observedAt` → ISO). Add a case to `tracing.mapper.spec.ts`.
+- [x] T013 [P] Create `compose-neighborhood.ts` with the types of data-model §3 (including `blockerEntities`) and `composeNeighborhood` implementing api §3 steps 1–7 **exactly**, including `basePriority`.
+- [x] T014 Create `compose-neighborhood.spec.ts` with hand-built `NeighborhoodTrace` inputs. Cover:
   - focus only (empty base) → 1 node, reasons `['FOCUS']`, distance 0, parent null;
   - base order follows `basePriority`, including the confidence and non-SOURCE tie-breaks;
   - entity-type filter: connectors added before the matching entity, in path order, with reason `CONNECTOR`; a matching intermediate gets `NEIGHBORHOOD`; non-matching entities on no listed path are not candidates (not counted in `omitted`);
@@ -77,8 +77,8 @@
   - expansions: applied in request order, `EXPANSION` reason, parent = expanded id, `viaEdgeKey = pathEdgeKeys[0]`; ignored when the trace is null or the expanded id is beyond the first `maxVisible` entries; the focus never gets `EXPANSION`; `expanded` flag set;
   - cap: `maxVisible` 5 with 9 candidates → 5 visible, `omitted` 4; `omittedIsLowerBound` from base or an applied expansion;
   - **property**: over 200 random inputs, every visible non-focus node's `parentId` appears earlier in `visible`, and the result is identical when computed twice.
-- [ ] T015 Create `neighborhood.service.ts` (`@Injectable`, injects `GRAPH_REPOSITORY`, `TracingService`, `StateEvidenceReader`) implementing api §2 steps 1–11 exactly. Register it in `tracing.module.ts` providers. Add the `@Get(':id/neighborhood')` handler to `tracing.controller.ts` exactly as api §1.
-- [ ] T016 Create `neighborhood.service.spec.ts` (Jest, repository and `TracingService` mocked):
+- [x] T015 Create `neighborhood.service.ts` (`@Injectable`, injects `GRAPH_REPOSITORY`, `TracingService`, `StateEvidenceReader`) implementing api §2 steps 1–11 exactly. Register it in `tracing.module.ts` providers. Add the `@Get(':id/neighborhood')` handler to `tracing.controller.ts` exactly as api §1.
+- [x] T016 Create `neighborhood.service.spec.ts` (Jest, repository and `TracingService` mocked):
   - `expand` containing the focus → `VALIDATION_FAILED` with path `expand`, before any repository call;
   - default `relationshipTypes`: 12 types for `all`, the 11 traceable for `upstream`;
   - `traceNeighborhood` returning null → `NOT_FOUND`;
@@ -86,7 +86,7 @@
   - expansions traced sequentially in request order with `maxDepth 1`;
   - edge filtering: a group of a type outside `types` is kept only when its key is a blocker hop key;
   - the step-10 invariant throws when a `viaEdgeKey` is missing from the kept edges.
-- [ ] T017 Create `apps/api/test/explorer.e2e-spec.ts` following `tracing.e2e-spec.ts` conventions. Cover: 200 for a seeded entity, response parsed with `NeighborhoodResponseSchema`; 401 without a token; 404 for an unknown UUID; 400 for a malformed id; fixture **G2** (cycle) and **G3** (multi-assertion) from api §5, inserting their data through the same helpers the tracing e2e tests use. If `authz-matrix.e2e-spec.ts` lists the tracing routes, add `GET /api/entities/:id/neighborhood` with every role allowed.
+- [x] T017 Create `apps/api/test/explorer.e2e-spec.ts` following `tracing.e2e-spec.ts` conventions. Cover: 200 for a seeded entity, response parsed with `NeighborhoodResponseSchema`; 401 without a token; 404 for an unknown UUID; 400 for a malformed id; fixture **G2** (cycle) and **G3** (multi-assertion) from api §5, inserting their data through the same helpers the tracing e2e tests use. If `authz-matrix.e2e-spec.ts` lists the tracing routes, add `GET /api/entities/:id/neighborhood` with every role allowed.
 
 **Checkpoint**: standard gate green. `grep -rn "WITH RECURSIVE" apps/` lists only `prisma-graph.repository.ts` and the existing smoke test.
 
@@ -99,35 +99,35 @@
 
 ### Backend fixtures
 
-- [ ] T018 [US1] Create `apps/api/test/explorer-seed.e2e-spec.ts` (seeded, ADMIN login, look up ids by display name as `tracing-seed.e2e-spec.ts` does). Assert fixtures **N1**, **N3**, **N9** and **N10** of api §5 literally: node counts per distance, the named entities per distance, edge counts, the INFERRED/LOW and MANUAL/MEDIUM edges, the Order #18492 per-source states, reasons, every validation case.
+- [x] T018 [US1] Create `apps/api/test/explorer-seed.e2e-spec.ts` (seeded, ADMIN login, look up ids by display name as `tracing-seed.e2e-spec.ts` does). Assert fixtures **N1**, **N3**, **N9** and **N10** of api §5 literally: node counts per distance, the named entities per distance, edge counts, the INFERRED/LOW and MANUAL/MEDIUM edges, the Order #18492 per-source states, reasons, every validation case.
 
 ### Web pure modules (`apps/web/src/pages/explorer/`)
 
-- [ ] T019 [P] [US1] Create `explorer-params.ts` + `explorer-params.test.ts` (research R10, ui §15 step 1):
+- [x] T019 [P] [US1] Create `explorer-params.ts` + `explorer-params.test.ts` (research R10, ui §15 step 1):
   - `parseExplorerParams(sp: URLSearchParams): { ok: true; params: ExplorerUrlParams } | { ok: false; issues: string[] }` using `ExplorerUrlParamsSchema.safeParse` on `{ direction, depth, relationshipTypes, entityTypes, blockers }` (absent → `undefined`); issues formatted `` `${path}: ${message}` ``;
   - `writeExplorerParams(current, partial): URLSearchParams` that omits defaults (`direction=all`, `depth=2`, empty lists, `blockers=false`) and keeps unrelated params;
   - `toNeighborhoodQueryString(params, expand: string[]): string` with lists comma-joined and only when non-empty, `expand` in given order;
   - tests: round trip, defaults omitted, invalid values produce issues (never fallback), RELATES_TO with upstream is an issue.
-- [ ] T020 [P] [US1] Create `layout.ts` + `layout.test.ts` exactly per ui §4. Tests: `stepBetween` for every relationship type in both directions (RELATES_TO → 0); a small hand-built response where upstream nodes get negative layers, downstream positive, a sibling (shipment → other order) layer 0 below the focus; tree-order row sorting; column centering; focus at (0, 0); identical output on two runs.
-- [ ] T021 [P] [US1] Create `edge-style.ts` + `edge-style.test.ts` exactly per ui §6 table: every origin, confidence, emphasis and selected combination, RELATES_TO stroke and no marker, labels.
-- [ ] T022 [P] [US1] Create `emphasis.ts` + `emphasis.test.ts` implementing **all three** rules of ui §7 (blocker and focus-mode inputs are wired later, but the function is complete now). Tests: no blockers + no focus mode → all normal; blocker paths highlight/dim with the focus normal; `selectedPathIndex` restricts highlighting but not `blockerRole`; focus mode dims outside the selected node's closed neighborhood and restores dimmed neighbors to normal; focus mode ignored for an edge selection.
-- [ ] T023 [P] [US1] Create `describe-view.ts` + `describe-view.test.ts` exactly per ui §10, including singular/plural, filters text, both omitted messages and the empty message.
-- [ ] T024 [P] [US1] Create `flow-types.ts` exactly as ui §3 (types and the four constants; not the actions context yet).
-- [ ] T025 [US1] Create `to-flow.ts` + `to-flow.test.ts` per ui §5: node and edge objects field by field, handle rule for `<`, `>` and `=` layers, `parallelIndex` grouping by unordered pair sorted by key, `selected` from the selection, `ariaLabel`s, `markerEnd` from `edgeStyle`. Set `canExpand: false` for every node in this phase (expansion arrives in T043).
+- [x] T020 [P] [US1] Create `layout.ts` + `layout.test.ts` exactly per ui §4. Tests: `stepBetween` for every relationship type in both directions (RELATES_TO → 0); a small hand-built response where upstream nodes get negative layers, downstream positive, a sibling (shipment → other order) layer 0 below the focus; tree-order row sorting; column centering; focus at (0, 0); identical output on two runs.
+- [x] T021 [P] [US1] Create `edge-style.ts` + `edge-style.test.ts` exactly per ui §6 table: every origin, confidence, emphasis and selected combination, RELATES_TO stroke and no marker, labels.
+- [x] T022 [P] [US1] Create `emphasis.ts` + `emphasis.test.ts` implementing **all three** rules of ui §7 (blocker and focus-mode inputs are wired later, but the function is complete now). Tests: no blockers + no focus mode → all normal; blocker paths highlight/dim with the focus normal; `selectedPathIndex` restricts highlighting but not `blockerRole`; focus mode dims outside the selected node's closed neighborhood and restores dimmed neighbors to normal; focus mode ignored for an edge selection.
+- [x] T023 [P] [US1] Create `describe-view.ts` + `describe-view.test.ts` exactly per ui §10, including singular/plural, filters text, both omitted messages and the empty message.
+- [x] T024 [P] [US1] Create `flow-types.ts` exactly as ui §3 (types and the four constants; not the actions context yet).
+- [x] T025 [US1] Create `to-flow.ts` + `to-flow.test.ts` per ui §5: node and edge objects field by field, handle rule for `<`, `>` and `=` layers, `parallelIndex` grouping by unordered pair sorted by key, `selected` from the selection, `ariaLabel`s, `markerEnd` from `edgeStyle`. Set `canExpand: false` for every node in this phase (expansion arrives in T043).
 
 ### Web components
 
-- [ ] T026 [P] [US1] Create `EntityNode.tsx` + `EntityNode.test.tsx` per ui §8, **without** the expand button (added in T043). Test inside a minimal `<ReactFlowProvider><ReactFlow nodes=[…] nodeTypes=…>` with a fixed-size container: focus, selected, connector, highlighted, dimmed classes; chips and their order (Conflict, State unknown, Direct blocker, Deepest blocker, Connector).
-- [ ] T027 [P] [US1] Create `RelationshipEdge.tsx` + `RelationshipEdge.test.tsx` per ui §6: `BaseEdge` style from `edgeStyle`, curvature from `parallelIndex`, label only when `showLabel`.
-- [ ] T028 [P] [US1] Create `GraphLegend.tsx` per ui §6 (SVG samples rendered with `edgeStyle` output, node samples).
-- [ ] T029 [US1] Create `GraphCanvas.tsx` exactly per ui §9: module-level `nodeTypes`/`edgeTypes`, the listed `<ReactFlow>` props, `Background`, `Controls showInteractive={false}`, `GraphLegend`, the `centerOn` effect with `useReactFlow().setCenter`.
-- [ ] T030 [P] [US1] Create `useNeighborhood.ts` (key `['entities', id, 'neighborhood', params, expand]`, `placeholderData: keepPreviousData`, parsed with `NeighborhoodResponseSchema`) and `useBlocks.ts` (research R11 URL, parsed with `DependenciesResponseSchema`).
-- [ ] T031 [P] [US1] Create `ExplorerSummary.tsx` per ui §10 (title, filters, loaded time + `Refresh`, omitted `role="status"`, empty message).
-- [ ] T032 [US1] Create `ExplorerList.tsx` + `ExplorerList.test.tsx` per ui §12 **with only** row selection and the `Open Entity 360` action for the selected row (Expand/Collapse, Focus mode and Explore from here are added in Phase 5). Tests: groups and counts for an N1-shaped fixture; relationship order; `aria-pressed`; keyboard (Tab to a row, Enter selects); **the set of node ids and edge keys in the list equals the set in `toFlow` output** (SC-005).
-- [ ] T033 [US1] Create `NodeDetailsPanel.tsx` and `EdgeDetailsPanel.tsx` + tests per ui §14 (without `Explore from here`; added in T046). Mock `apiFetch`. Tests: state with source and time; disagreeing sources listed; Blocked by from `/blockers`; Blocks hidden-as-text for a SATISFIED entity and listed with `OriginBadge` otherwise; evidence first 10 records; relationship panel lists every assertion with basis.
-- [ ] T034 [US1] Create `ExplorerToolbar.tsx` + test with **only** the Steps `<select>` (1–4) for now, writing the URL through `writeExplorerParams` with `replace: true`.
-- [ ] T035 [US1] Create `ExplorerPage.tsx` + `ExplorerPage.test.tsx` per ui §15 steps 1–5 and 7 (no blockers panel, no expand, no explore-from-here yet): URL validation alert with `Reset settings`; keyed `ExplorerView`; grid layout with canvas left and list right; loading, 404 and error states; selection from graph or list highlights both and opens the matching panel; list selection sets `centerOn`; `Close` clears selection. Mock `apiFetch` with an N1-shaped response.
-- [ ] T036 [US1] Create `ExplorerPickerPage.tsx` + test per ui §16. In `apps/web/src/router.tsx`, replace the `graph` `ComingSoonPage` route with `graph` → `ExplorerPickerPage` and add `graph/:id` → `ExplorerPage`. In `apps/web/src/pages/entities/EntityDetailPage.tsx`, add the `Open in Graph Explorer` link after `BlockerCallout`; extend `EntityDetailPage.test.tsx` to assert its `href`.
+- [x] T026 [P] [US1] Create `EntityNode.tsx` + `EntityNode.test.tsx` per ui §8, **without** the expand button (added in T043). Test inside a minimal `<ReactFlowProvider><ReactFlow nodes=[…] nodeTypes=…>` with a fixed-size container: focus, selected, connector, highlighted, dimmed classes; chips and their order (Conflict, State unknown, Direct blocker, Deepest blocker, Connector).
+- [x] T027 [P] [US1] Create `RelationshipEdge.tsx` + `RelationshipEdge.test.tsx` per ui §6: `BaseEdge` style from `edgeStyle`, curvature from `parallelIndex`, label only when `showLabel`.
+- [x] T028 [P] [US1] Create `GraphLegend.tsx` per ui §6 (SVG samples rendered with `edgeStyle` output, node samples).
+- [x] T029 [US1] Create `GraphCanvas.tsx` exactly per ui §9: module-level `nodeTypes`/`edgeTypes`, the listed `<ReactFlow>` props, `Background`, `Controls showInteractive={false}`, `GraphLegend`, the `centerOn` effect with `useReactFlow().setCenter`.
+- [x] T030 [P] [US1] Create `useNeighborhood.ts` (key `['entities', id, 'neighborhood', params, expand]`, `placeholderData: keepPreviousData`, parsed with `NeighborhoodResponseSchema`) and `useBlocks.ts` (research R11 URL, parsed with `DependenciesResponseSchema`).
+- [x] T031 [P] [US1] Create `ExplorerSummary.tsx` per ui §10 (title, filters, loaded time + `Refresh`, omitted `role="status"`, empty message).
+- [x] T032 [US1] Create `ExplorerList.tsx` + `ExplorerList.test.tsx` per ui §12 **with only** row selection and the `Open Entity 360` action for the selected row (Expand/Collapse, Focus mode and Explore from here are added in Phase 5). Tests: groups and counts for an N1-shaped fixture; relationship order; `aria-pressed`; keyboard (Tab to a row, Enter selects); **the set of node ids and edge keys in the list equals the set in `toFlow` output** (SC-005).
+- [x] T033 [US1] Create `NodeDetailsPanel.tsx` and `EdgeDetailsPanel.tsx` + tests per ui §14 (without `Explore from here`; added in T046). Mock `apiFetch`. Tests: state with source and time; disagreeing sources listed; Blocked by from `/blockers`; Blocks hidden-as-text for a SATISFIED entity and listed with `OriginBadge` otherwise; evidence first 10 records; relationship panel lists every assertion with basis.
+- [x] T034 [US1] Create `ExplorerToolbar.tsx` + test with **only** the Steps `<select>` (1–4) for now, writing the URL through `writeExplorerParams` with `replace: true`.
+- [x] T035 [US1] Create `ExplorerPage.tsx` + `ExplorerPage.test.tsx` per ui §15 steps 1–5 and 7 (no blockers panel, no expand, no explore-from-here yet): URL validation alert with `Reset settings`; keyed `ExplorerView`; grid layout with canvas left and list right; loading, 404 and error states; selection from graph or list highlights both and opens the matching panel; list selection sets `centerOn`; `Close` clears selection. Mock `apiFetch` with an N1-shaped response.
+- [x] T036 [US1] Create `ExplorerPickerPage.tsx` + test per ui §16. In `apps/web/src/router.tsx`, replace the `graph` `ComingSoonPage` route with `graph` → `ExplorerPickerPage` and add `graph/:id` → `ExplorerPage`. In `apps/web/src/pages/entities/EntityDetailPage.tsx`, add the `Open in Graph Explorer` link after `BlockerCallout`; extend `EntityDetailPage.test.tsx` to assert its `href`.
 
 **Checkpoint**: standard gate green. Manually: quickstart steps 1–2 and selecting a node and an edge work in the browser.
 
@@ -138,10 +138,10 @@
 **Goal**: turn on blocker highlighting; see feature 003's paths on the graph and the same explanation text beside it.
 **Independent test**: open Shipment SHP-77120 and Order #18492, turn on highlighting, compare with fixtures N2, N4 and with feature 003's `/blockers` output.
 
-- [ ] T037 [US2] Extend `apps/api/test/explorer-seed.e2e-spec.ts` with fixtures **N2** and **N4** of api §5 (including deep-equality of `blockers` with `GET /blockers` minus `computedAt`), and a determinism test: 100 consecutive N4 calls produce identical bodies once `computedAt` and `blockers.computedAt` are removed (SC-008).
-- [ ] T038 [P] [US2] Add the `Highlight blockers` checkbox to `ExplorerToolbar.tsx` (ui §11): checked → `blockers=true`, unchecked → param removed. Extend its test.
-- [ ] T039 [P] [US2] Create `BlockerHighlightPanel.tsx` + test per ui §13, reusing `ExplanationSentence`/`linkTargets` and the label texts used by `pages/entities/BlockersSection.tsx` (import shared helpers if they exist; do not duplicate strings that are already exported). Tests: summary; `Path n` buttons with `aria-pressed`; `Show all paths`; labels for MANUAL hop, unknown state, cycle, depth limit, truncation; no-blocker case shows only the summary.
-- [ ] T040 [US2] Wire blockers into `ExplorerPage.tsx`: `selectedPathIndex` state (reset by the keyed remount), `BlockerHighlightPanel` above `ExplorerList` when `response.blockers !== null`, pass `selectedPathIndex` to `computeEmphasis`. Extend `ExplorerPage.test.tsx` with an N4-shaped response: the Budget code node shows `Deepest blocker`, off-path nodes have `opacity-20`, selecting `Path 2` highlights only that path's edges, the list groups the Budget code under `Added by blocking path`.
+- [x] T037 [US2] Extend `apps/api/test/explorer-seed.e2e-spec.ts` with fixtures **N2** and **N4** of api §5 (including deep-equality of `blockers` with `GET /blockers` minus `computedAt`), and a determinism test: 100 consecutive N4 calls produce identical bodies once `computedAt` and `blockers.computedAt` are removed (SC-008).
+- [x] T038 [P] [US2] Add the `Highlight blockers` checkbox to `ExplorerToolbar.tsx` (ui §11): checked → `blockers=true`, unchecked → param removed. Extend its test.
+- [x] T039 [P] [US2] Create `BlockerHighlightPanel.tsx` + test per ui §13, reusing `ExplanationSentence`/`linkTargets` and the label texts used by `pages/entities/BlockersSection.tsx` (import shared helpers if they exist; do not duplicate strings that are already exported). Tests: summary; `Path n` buttons with `aria-pressed`; `Show all paths`; labels for MANUAL hop, unknown state, cycle, depth limit, truncation; no-blocker case shows only the summary.
+- [x] T040 [US2] Wire blockers into `ExplorerPage.tsx`: `selectedPathIndex` state (reset by the keyed remount), `BlockerHighlightPanel` above `ExplorerList` when `response.blockers !== null`, pass `selectedPathIndex` to `computeEmphasis`. Extend `ExplorerPage.test.tsx` with an N4-shaped response: the Budget code node shows `Deepest blocker`, off-path nodes have `opacity-20`, selecting `Path 2` highlights only that path's edges, the list groups the Budget code under `Added by blocking path`.
 
 **Checkpoint**: standard gate green. Manually: quickstart steps 3–5.
 
@@ -152,13 +152,13 @@
 **Goal**: direction and type filters, connectors, expand/collapse, focus mode, Explore from here, shareable links.
 **Independent test**: open the Budget code, apply each control; compare with fixtures N5–N8 and spec US3 scenarios 1–8.
 
-- [ ] T041 [US3] Extend `apps/api/test/explorer-seed.e2e-spec.ts` with fixtures **N5**, **N6** (exact node order and parents), **N7** (equality with `/dependencies?direction=upstream&depth=2`) and **N8** (expansion, ignored expansion, focus in `expand` → 400).
-- [ ] T042 [P] [US3] Add to `ExplorerToolbar.tsx` the Direction radiogroup, Entity types and Relationship types `<details>` checklists per ui §11 (relationship options depend on direction; switching to upstream/downstream removes RELATES_TO). Extend its test: each control writes the expected URL; defaults omitted.
-- [ ] T043 [P] [US3] Create `explorer-actions.ts` exactly as ui §3. Add the expand/collapse button to `EntityNode.tsx` per ui §8 (calls `useExplorerActions().toggleExpand`, `stopPropagation`, `nodrag nopan`, aria-label). In `to-flow.ts` set `canExpand = !isFocus`. Update both tests.
-- [ ] T044 [US3] In `ExplorerPage.tsx`: `expand` state (ui §15 steps 6 and 9), `ExplorerActionsContext.Provider`, `Updating…` text while a refetch with previous data is shown. In `ExplorerList.tsx`, add `Expand`/`Collapse` for the selected non-focus row. Extend tests: expanding sends `expand=<id>` in request order; collapsing removes it; `ignoredExpansions` are dropped from state; changing a setting resets `expand` (remount).
-- [ ] T045 [US3] Focus mode: `focusMode` state in `ExplorerPage.tsx` (off when selection becomes null or an edge), `Focus mode on/off` action for the selected row in `ExplorerList.tsx`, passed to `computeEmphasis`. Extend tests: nodes outside the selected node's neighbors get `opacity-20` and stay rendered.
-- [ ] T046 [US3] Explore from here: action in `ExplorerList.tsx` (selected non-focus row) and in `NodeDetailsPanel.tsx` (non-focus), calling `navigate(`/graph/${id}?${canonicalSearch}`)` (push). Extend tests with a `MemoryRouter`: the new focus loads with the same settings, and history back returns to the previous focus.
-- [ ] T047 [US3] Shareable state test in `ExplorerPage.test.tsx`: rendering `/graph/<id>?direction=downstream&depth=4&entityTypes=Order,Shipment&blockers=true` requests exactly those settings from the API and shows them in the toolbar and the summary; an invalid URL (`depth=9`) shows the validation alert and makes no API request.
+- [x] T041 [US3] Extend `apps/api/test/explorer-seed.e2e-spec.ts` with fixtures **N5**, **N6** (exact node order and parents), **N7** (equality with `/dependencies?direction=upstream&depth=2`) and **N8** (expansion, ignored expansion, focus in `expand` → 400).
+- [x] T042 [P] [US3] Add to `ExplorerToolbar.tsx` the Direction radiogroup, Entity types and Relationship types `<details>` checklists per ui §11 (relationship options depend on direction; switching to upstream/downstream removes RELATES_TO). Extend its test: each control writes the expected URL; defaults omitted.
+- [x] T043 [P] [US3] Create `explorer-actions.ts` exactly as ui §3. Add the expand/collapse button to `EntityNode.tsx` per ui §8 (calls `useExplorerActions().toggleExpand`, `stopPropagation`, `nodrag nopan`, aria-label). In `to-flow.ts` set `canExpand = !isFocus`. Update both tests.
+- [x] T044 [US3] In `ExplorerPage.tsx`: `expand` state (ui §15 steps 6 and 9), `ExplorerActionsContext.Provider`, `Updating…` text while a refetch with previous data is shown. In `ExplorerList.tsx`, add `Expand`/`Collapse` for the selected non-focus row. Extend tests: expanding sends `expand=<id>` in request order; collapsing removes it; `ignoredExpansions` are dropped from state; changing a setting resets `expand` (remount).
+- [x] T045 [US3] Focus mode: `focusMode` state in `ExplorerPage.tsx` (off when selection becomes null or an edge), `Focus mode on/off` action for the selected row in `ExplorerList.tsx`, passed to `computeEmphasis`. Extend tests: nodes outside the selected node's neighbors get `opacity-20` and stay rendered.
+- [x] T046 [US3] Explore from here: action in `ExplorerList.tsx` (selected non-focus row) and in `NodeDetailsPanel.tsx` (non-focus), calling `navigate(`/graph/${id}?${canonicalSearch}`)` (push). Extend tests with a `MemoryRouter`: the new focus loads with the same settings, and history back returns to the previous focus.
+- [x] T047 [US3] Shareable state test in `ExplorerPage.test.tsx`: rendering `/graph/<id>?direction=downstream&depth=4&entityTypes=Order,Shipment&blockers=true` requests exactly those settings from the API and shows them in the toolbar and the summary; an invalid URL (`depth=9`) shows the validation alert and makes no API request.
 
 **Checkpoint**: standard gate green. Manually: quickstart steps 6–8.
 
@@ -169,10 +169,10 @@
 **Goal**: never more than 200 visible entities, a clear "N more" message, smooth interaction.
 **Independent test**: fixture G1 and the 50k performance dataset.
 
-- [ ] T048 [US4] Extend `apps/api/test/explorer.e2e-spec.ts` with fixture **G1** (hub with 500 neighbors → 200 nodes, `omitted` 301, `omittedIsLowerBound` false) and an expansion request on it whose results do not fit (still 200 nodes, `omitted` grows).
-- [ ] T049 [US4] Extend `ExplorerPage.test.tsx` with a 200-node response with `omitted: 4112`: the `role="status"` message reads exactly `Showing 200 of 4312 entities — 4112 more. Refine filters, reduce the step limit, or choose a direction.`; with `omittedIsLowerBound: true` it uses the lower-bound wording of ui §10; graph and list both contain 200 entities.
-- [ ] T050 [US4] Create `apps/api/test/perf-explorer.e2e-spec.ts`, wrapped in `describePerf` like `perf-tracing.e2e-spec.ts` and reusing its dataset builder (50,000 entities, 150,000 relationships). Measure, with 1 warm-up and 20 timed runs each: default neighborhood for 20 entities including the highest-degree one, p95 < 2,000 ms; the same plus one `expand`, p95 < 1,000 ms over the base call's time; `all&depth=4` from the highest-degree entity, logged only (research R13). Run `RUN_PERF=1 pnpm --filter api test:e2e -- perf-explorer` and write the p95s into the quickstart.md timings table. If a budget is missed, stop and report the numbers in `questions.md`; do not add caching or change algorithms.
-- [ ] T051 [US4] Manual SC-004 check (quickstart step 9) on the perf dataset at 200 nodes; record browser, machine and observations in the quickstart.md table. If interaction is not under 100 ms, record it in `questions.md` with a Performance-panel screenshot description.
+- [x] T048 [US4] Extend `apps/api/test/explorer.e2e-spec.ts` with fixture **G1** (hub with 500 neighbors → 200 nodes, `omitted` 301, `omittedIsLowerBound` false) and an expansion request on it whose results do not fit (still 200 nodes, `omitted` grows).
+- [x] T049 [US4] Extend `ExplorerPage.test.tsx` with a 200-node response with `omitted: 4112`: the `role="status"` message reads exactly `Showing 200 of 4312 entities — 4112 more. Refine filters, reduce the step limit, or choose a direction.`; with `omittedIsLowerBound: true` it uses the lower-bound wording of ui §10; graph and list both contain 200 entities.
+- [x] T050 [US4] Create `apps/api/test/perf-explorer.e2e-spec.ts`, wrapped in `describePerf` like `perf-tracing.e2e-spec.ts` and reusing its dataset builder (50,000 entities, 150,000 relationships). Measure, with 1 warm-up and 20 timed runs each: default neighborhood for 20 entities including the highest-degree one, p95 < 2,000 ms; the same plus one `expand`, p95 < 1,000 ms over the base call's time; `all&depth=4` from the highest-degree entity, logged only (research R13). Run `RUN_PERF=1 pnpm --filter api test:e2e -- perf-explorer` and write the p95s into the quickstart.md timings table. If a budget is missed, stop and report the numbers in `questions.md`; do not add caching or change algorithms.
+- [x] T051 [US4] Manual SC-004 check (quickstart step 9) on the perf dataset at 200 nodes; record browser, machine and observations in the quickstart.md table. If interaction is not under 100 ms, record it in `questions.md` with a Performance-panel screenshot description.
 
 **Checkpoint**: standard gate green; perf numbers recorded.
 
@@ -180,14 +180,14 @@
 
 ## Phase 7: Polish and cross-cutting
 
-- [ ] T052 Cross-check against the spec: for every FR-001 to FR-034 and SC-001 to SC-008, name the test or code that covers it in `specs/004-graph-explorer/questions.md` under "Coverage", and list any gap. Run and confirm:
+- [x] T052 Cross-check against the spec: for every FR-001 to FR-034 and SC-001 to SC-008, name the test or code that covers it in `specs/004-graph-explorer/questions.md` under "Coverage", and list any gap. Run and confirm:
   - `grep -rn "WITH RECURSIVE" apps/` → only `prisma-graph.repository.ts` and the existing smoke test;
   - `grep -rn "localeCompare" apps/api/src apps/web/src/pages/explorer` → nothing new;
   - `grep -rnE "dagre|elkjs|d3-" apps/web/package.json` → nothing;
   - `grep -rn "nodeTypes\s*=" apps/web/src` → only the module-level constant in `GraphCanvas.tsx`;
   - no risk, impact or history controls in `pages/explorer/` (FR-032).
-- [ ] T053 Walk the whole of `quickstart.md` by hand and tick each step. Fix behavior that doesn't match, in the code. Edit the quickstart only to correct factual errors.
-- [ ] T054 Final gate: `pnpm lint && pnpm typecheck && pnpm test && pnpm test:e2e && pnpm build`. Confirm: no `TODO`s, dead code or stubs; `git diff main -- '**/package.json'` shows only `@xyflow/react` in `apps/web`; every question in `questions.md` is resolved or explicitly deferred.
+- [x] T053 Walk the whole of `quickstart.md` by hand and tick each step. Fix behavior that doesn't match, in the code. Edit the quickstart only to correct factual errors.
+- [x] T054 Final gate: `pnpm lint && pnpm typecheck && pnpm test && pnpm test:e2e && pnpm build`. Confirm: no `TODO`s, dead code or stubs; `git diff main -- '**/package.json'` shows only `@xyflow/react` in `apps/web`; every question in `questions.md` is resolved or explicitly deferred.
 
 ---
 

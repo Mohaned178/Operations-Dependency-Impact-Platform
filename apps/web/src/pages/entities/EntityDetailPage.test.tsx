@@ -320,6 +320,12 @@ describe('EntityDetailPage', () => {
     expect(await screen.findByText('Raw payload')).toBeInTheDocument();
   });
 
+  it('links to the Graph Explorer for this entity', async () => {
+    renderPage();
+    const link = await screen.findByRole('link', { name: 'Open in Graph Explorer' });
+    expect(link).toHaveAttribute('href', `/graph/${ENTITY_ID}`);
+  });
+
   it('shows the blocker callout in the header and the Root cause and Blockers sections between Current state and Dependencies', async () => {
     const { container } = renderPage();
 

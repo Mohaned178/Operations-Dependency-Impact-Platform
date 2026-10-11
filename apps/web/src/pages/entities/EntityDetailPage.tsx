@@ -56,6 +56,11 @@ export function EntityDetailPage() {
           <StateBadge state={entity.currentState} />
         </div>
         <BlockerCallout entityId={entity.id} />
+        <div>
+          <Link to={`/graph/${entity.id}`} className="text-sm underline">
+            Open in Graph Explorer
+          </Link>
+        </div>
       </header>
 
       <IdentitySection entity={entity} />

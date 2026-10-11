@@ -1,13 +1,16 @@
 import {
   CONFIDENCE_RANK,
+  RelationshipTypeSchema,
   TRACEABLE_RELATIONSHIP_TYPES,
   type Confidence,
   type RelationshipOrigin,
+  type RelationshipType,
 } from '@opsgraph/shared';
 import { enumerateBlockingPaths } from './blocking-paths';
 import { selectCanonicalPaths } from './canonical-paths';
+import { buildUndirectedTraversalEdges, groupEdgeRows } from './edge-groups';
 import { comparePaths } from './path-order';
-import type { InternalPath, TraversalEdge } from './types';
+import type { EdgeRow, InternalPath, TraversalEdge } from './types';
 
 /** Inline PRNG (research R10): no dependency. */
 function mulberry32(seed: number): () => number {
@@ -245,6 +248,102 @@ describe('traversal property (SC-007)', () => {
           expect(path.edges.length).toBeLessThanOrEqual(depth);
           expect(new Set(path.entityIds).size).toBe(path.entityIds.length);
         }
+      }
+    }
+  }, 60_000);
+});
+
+function randomRows(
+  rand: () => number,
+  graphIndex: number,
+  entityCount: number,
+): EdgeRow<RelationshipType>[] {
+  const rowCount = Math.floor(rand() * 25);
+  const rows: EdgeRow<RelationshipType>[] = [];
+  for (let i = 0; i < rowCount; i += 1) {
+    rows.push({
+      id: `r${graphIndex}-${i}`,
+      type:
+        RelationshipTypeSchema.options[
+          Math.floor(rand() * RelationshipTypeSchema.options.length)
+        ] ?? 'RELATES_TO',
+      fromEntityId: `e${Math.floor(rand() * entityCount)}`,
+      toEntityId: `e${Math.floor(rand() * entityCount)}`,
+      origin: ORIGINS[Math.floor(rand() * ORIGINS.length)] ?? 'SOURCE',
+      confidence: CONFIDENCES[Math.floor(rand() * CONFIDENCES.length)] ?? 'HIGH',
+      basis: null,
+      sourceSystem: 'SYS',
+      sourceId: `SRC-${graphIndex}-${i}`,
+      observedAt: new Date('2026-09-01T00:00:00.000Z'),
+      importId: 'import-1',
+    });
+  }
+  return rows;
+}
+
+/** Independent oracle: undirected BFS distances from the start, up to maxDepth. */
+function bfsDistances(
+  startId: string,
+  rows: readonly EdgeRow<RelationshipType>[],
+  maxDepth: number,
+): Map<string, number> {
+  const neighbors = new Map<string, Set<string>>();
+  const link = (a: string, b: string): void => {
+    const set = neighbors.get(a);
+    if (set === undefined) {
+      neighbors.set(a, new Set([b]));
+    } else {
+      set.add(b);
+    }
+  };
+  for (const row of rows) {
+    link(row.fromEntityId, row.toEntityId);
+    link(row.toEntityId, row.fromEntityId);
+  }
+  const distance = new Map<string, number>([[startId, 0]]);
+  let frontier = [startId];
+  for (let d = 1; d <= maxDepth; d += 1) {
+    const next: string[] = [];
+    for (const current of frontier) {
+      for (const neighbor of neighbors.get(current) ?? []) {
+        if (!distance.has(neighbor)) {
+          distance.set(neighbor, d);
+          next.push(neighbor);
+        }
+      }
+    }
+    frontier = next;
+  }
+  return distance;
+}
+
+describe('traversal property: ALL walk (feature 004)', () => {
+  it('terminates, never repeats an entity and agrees with an undirected BFS on 1,000 graphs', () => {
+    const rand = mulberry32(0x5eed0004);
+    for (let g = 0; g < 1000; g += 1) {
+      const entityCount = 2 + Math.floor(rand() * 8);
+      const rows = randomRows(rand, g, entityCount);
+      const maxDepth = 1 + Math.floor(rand() * 4);
+      const startId = `e${Math.floor(rand() * entityCount)}`;
+
+      const edges = buildUndirectedTraversalEdges(groupEdgeRows(rows));
+      const { paths } = selectCanonicalPaths(startId, edges, maxDepth);
+
+      const oracle = bfsDistances(startId, rows, maxDepth);
+      const expectedReached = [...oracle.keys()].filter((id) => id !== startId).sort();
+      expect([...paths.keys()].sort()).toEqual(expectedReached);
+
+      for (const [entityId, path] of paths) {
+        expect(path.entityIds[0]).toBe(startId);
+        expect(path.entityIds.at(-1)).toBe(entityId);
+        expect(new Set(path.entityIds).size).toBe(path.entityIds.length);
+        expect(path.edges.length).toBe(path.entityIds.length - 1);
+        expect(path.edges.length).toBeLessThanOrEqual(maxDepth);
+        expect(path.edges.length).toBeGreaterThanOrEqual(oracle.get(entityId) ?? Infinity);
+        path.edges.forEach((edge, index) => {
+          expect(edge.sourceId).toBe(path.entityIds[index]);
+          expect(edge.targetId).toBe(path.entityIds[index + 1]);
+        });
       }
     }
   }, 60_000);

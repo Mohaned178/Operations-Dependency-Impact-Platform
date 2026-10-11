@@ -2,6 +2,7 @@ export * from './audit';
 export * from './auth';
 export * from './common';
 export * from './evidence-notes';
+export * from './explorer';
 export * from './graph';
 export * from './health';
 export * from './imports';
