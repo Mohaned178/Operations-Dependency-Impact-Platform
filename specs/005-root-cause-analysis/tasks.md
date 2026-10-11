@@ -78,11 +78,11 @@
 
 ### Storage (data-model §1, research R9)
 
-- [ ] T005 In `apps/api/prisma/schema.prisma`, add `EvidenceNoteStance`, `EvidenceNote` and `EvidenceNoteRetraction`, plus the 4 back-relations, exactly as in data-model §1a.
+- [x] T005 In `apps/api/prisma/schema.prisma`, add `EvidenceNoteStance`, `EvidenceNote` and `EvidenceNoteRetraction`, plus the 4 back-relations, exactly as in data-model §1a.
   1. Run `pnpm --filter api prisma migrate dev --create-only --name evidence_notes`.
   2. Append the SQL of data-model §1b, verbatim, to the generated `migration.sql`. Do **not** redefine `forbid_provenance_mutation()`.
   3. Apply it with `pnpm --filter api prisma migrate dev`, then run `prisma generate`.
-- [ ] T006 In `apps/api/test/helpers.ts → resetDb`:
+- [x] T006 In `apps/api/test/helpers.ts → resetDb`:
   - add `ALTER TABLE evidence_notes DISABLE TRIGGER USER` and `ALTER TABLE evidence_note_retractions DISABLE TRIGGER USER` next to the existing ones, with matching `ENABLE` lines;
   - add `evidence_note_retractions, evidence_notes` to the front of the `TRUNCATE` list.
 

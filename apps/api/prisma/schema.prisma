@@ -108,6 +108,12 @@ enum EventEntityRole {
   RELATED
 }
 
+enum EvidenceNoteStance {
+  SUPPORTS
+  DISPUTES
+  CONTEXT
+}
+
 model User {
   id                 String     @id @default(uuid()) @db.Uuid
   email              String     @unique
@@ -123,8 +129,10 @@ model User {
   createdAt          DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt          DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  refreshTokens RefreshToken[]
-  imports       Import[]
+  refreshTokens           RefreshToken[]
+  imports                 Import[]
+  evidenceNotes           EvidenceNote[]           @relation("EvidenceNoteAuthor")
+  evidenceNoteRetractions EvidenceNoteRetraction[] @relation("EvidenceNoteRetractor")
 
   @@map("users")
 }
@@ -179,7 +187,7 @@ model Import {
   fileName      String        @map("file_name")
   byteSize      Int           @map("byte_size")
   receivedAt    DateTime      @map("received_at") @db.Timestamptz(6)
-  counts        Json          // ImportCounts
+  counts        Json // ImportCounts
   fileErrors    Json          @map("file_errors") // string[]
   rowErrors     Json          @map("row_errors") // ImportRowError[]
   correlationId String        @map("correlation_id") @db.Uuid
@@ -210,6 +218,7 @@ model Entity {
   outgoing          Relationship[]     @relation("RelationshipFrom")
   incoming          Relationship[]     @relation("RelationshipTo")
   eventLinks        EventEntity[]
+  evidenceNotes     EvidenceNote[]
 
   @@index([displayName, id])
   @@index([type, displayName, id])
@@ -303,6 +312,7 @@ model Relationship {
   to            Entity         @relation("RelationshipTo", fields: [toEntityId], references: [id], onDelete: Restrict)
   import        Import         @relation(fields: [importId], references: [id], onDelete: Restrict)
   sourceRecords SourceRecord[]
+  evidenceNotes EvidenceNote[]
 
   @@unique([sourceSystem, sourceId])
   @@index([fromEntityId, type])
@@ -342,4 +352,36 @@ model EventEntity {
   @@id([eventId, entityId])
   @@index([entityId])
   @@map("event_entities")
+}
+
+model EvidenceNote {
+  id             String             @id @default(uuid()) @db.Uuid
+  entityId       String?            @map("entity_id") @db.Uuid
+  relationshipId String?            @map("relationship_id") @db.Uuid
+  stance         EvidenceNoteStance
+  text           String
+  reference      String?
+  authorId       String             @map("author_id") @db.Uuid
+  createdAt      DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  entity       Entity?                 @relation(fields: [entityId], references: [id], onDelete: Restrict)
+  relationship Relationship?           @relation(fields: [relationshipId], references: [id], onDelete: Restrict)
+  author       User                    @relation("EvidenceNoteAuthor", fields: [authorId], references: [id], onDelete: Restrict)
+  retraction   EvidenceNoteRetraction?
+
+  @@index([entityId, createdAt(sort: Desc), id(sort: Desc)])
+  @@index([relationshipId, createdAt(sort: Desc), id(sort: Desc)])
+  @@map("evidence_notes")
+}
+
+model EvidenceNoteRetraction {
+  noteId        String   @id @map("note_id") @db.Uuid
+  retractedById String   @map("retracted_by_id") @db.Uuid
+  reason        String
+  retractedAt   DateTime @default(now()) @map("retracted_at") @db.Timestamptz(6)
+
+  note        EvidenceNote @relation(fields: [noteId], references: [id], onDelete: Restrict)
+  retractedBy User         @relation("EvidenceNoteRetractor", fields: [retractedById], references: [id], onDelete: Restrict)
+
+  @@map("evidence_note_retractions")
 }
