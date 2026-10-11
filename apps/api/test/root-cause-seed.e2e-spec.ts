@@ -2,6 +2,8 @@ import type { Server } from 'node:http';
 import type { INestApplication } from '@nestjs/common';
 import {
   BlockersResponseSchema,
+  ErrorResponseSchema,
+  EvidenceNoteDtoSchema,
   RootCauseResponseSchema,
   type BlockersResponse,
   type CausalChainDto,
@@ -642,5 +644,171 @@ describe('Root-cause analysis on the seeded §39 scenario (e2e)', () => {
       },
       120_000,
     );
+  });
+
+  // R7 mutates the database (notes are append-only), so it runs last and in order.
+  describe('R7: evidence notes change the analysis (sequence, against R1)', () => {
+    const SUPPORT_TEXT =
+      'Finance confirmed the budget code was never submitted; requested from account manager on 2026-09-30';
+    const SUPPORT_REFERENCE = 'Call with Finance, ticket FIN-4410';
+    const DISPUTE_TEXT =
+      'Approval record APR-2291 is out of date; Finance says the budget code was supplied on 2026-09-30.';
+    const DISPUTE_EXCERPT =
+      'Approval record APR-2291 is out of date; Finance says the budget code was suppli…';
+    const RETRACT_REASON = 'Confirmed with Finance: the approval record is current.';
+
+    let userB: Awaited<ReturnType<typeof createUser>>;
+    const tokens = {} as Record<'a' | 'b', string>;
+    let relationshipId: string;
+    let supportNote: ReturnType<typeof EvidenceNoteDtoSchema.parse>;
+    let disputeNote: ReturnType<typeof EvidenceNoteDtoSchema.parse>;
+
+    const auditCount = (action: string) => prisma.auditEntry.count({ where: { action } });
+
+    function post(who: 'a' | 'b', path: string, body: Record<string, unknown>) {
+      return request(server).post(path).set('Authorization', `Bearer ${tokens[who]}`).send(body);
+    }
+
+    beforeAll(async () => {
+      const userA = await createUser(prisma, { role: 'ANALYST' });
+      userB = await createUser(prisma, { role: 'ANALYST' });
+      tokens.a = (await login(app, userA.email, TEST_PASSWORD)).accessToken;
+      tokens.b = (await login(app, userB.email, TEST_PASSWORD)).accessToken;
+      const relationship = await prisma.relationship.findFirstOrThrow({
+        where: { type: 'REQUIRES', fromEntityId: ids.apr, toEntityId: ids.br },
+      });
+      relationshipId = relationship.id;
+    });
+
+    it('1. a SUPPORTS note on BR-18492 keeps R1 at HIGH and appears in its evidence', async () => {
+      const created = await auditCount('evidence_note.created');
+      const response = await post('a', '/api/evidence-notes', {
+        target: { kind: 'ENTITY', entityId: ids.br },
+        stance: 'SUPPORTS',
+        text: SUPPORT_TEXT,
+        reference: SUPPORT_REFERENCE,
+      });
+      expect(response.status).toBe(201);
+      supportNote = EvidenceNoteDtoSchema.parse(response.body);
+      expect(supportNote.active).toBe(true);
+      expect(supportNote.reference).toBe(SUPPORT_REFERENCE);
+      expect(await auditCount('evidence_note.created')).toBe(created + 1);
+
+      const body = await analyze(ids.order);
+      const candidate = only(body);
+      expect(candidate.confidence).toBe('HIGH');
+      expect(rulesOf(candidate).filter((rule) => rule.applied).map((rule) => rule.rule)).toEqual([
+        'WEAKEST_LINK',
+      ]);
+      expect(evidenceOf(body, ids.br).notes.items[0]).toMatchObject({
+        id: supportNote.id,
+        rule: 'MANUAL_NOTE',
+        origin: 'MANUAL',
+        stance: 'SUPPORTS',
+        text: SUPPORT_TEXT,
+        active: true,
+      });
+    });
+
+    it('2. a DISPUTES note on the APR-2291 → BR-18492 link lowers R1 and R2 to MEDIUM', async () => {
+      const response = await post('b', '/api/evidence-notes', {
+        target: { kind: 'RELATIONSHIP', relationshipId },
+        stance: 'DISPUTES',
+        text: DISPUTE_TEXT,
+      });
+      expect(response.status).toBe(201);
+      disputeNote = EvidenceNoteDtoSchema.parse(response.body);
+      expect(DISPUTE_TEXT).toHaveLength(97);
+
+      const candidate = only(await analyze(ids.order));
+      expect(candidate.confidence).toBe('MEDIUM');
+      const disputed = rulesOf(candidate)[7];
+      expect(disputed).toMatchObject({
+        rule: 'DISPUTED',
+        applied: true,
+        confidenceAfter: 'MEDIUM',
+        refs: { stepIndexes: [3], relationshipIds: [relationshipId], noteIds: [disputeNote.id] },
+      });
+      // Q4: the contract fixture omits the final period but its template ends the reason with one;
+      // implemented per the template.
+      expect(disputed?.reason).toBe(
+        `Confidence lowered to MEDIUM: 1 active disputing note: ${userB.displayName} on ${disputeNote.createdAt}: "${DISPUTE_EXCERPT}".`,
+      );
+      expect(candidate.explanation.confidence).toHaveLength(2);
+
+      const shipment = only(await analyze(ids.shp));
+      expect(shipment.confidence).toBe('MEDIUM');
+      expect(rulesOf(shipment)[7]?.applied).toBe(true);
+    });
+
+    it('3. analyst A cannot retract analyst B’s note: 403 and one auth.forbidden row', async () => {
+      const forbidden = await auditCount('auth.forbidden');
+      const retracted = await auditCount('evidence_note.retracted');
+      const response = await post('a', `/api/evidence-notes/${disputeNote.id}/retract`, {
+        reason: 'Not mine to retract',
+      });
+      expect(response.status).toBe(403);
+      expect(ErrorResponseSchema.parse(response.body).error.code).toBe('FORBIDDEN');
+      expect(await auditCount('auth.forbidden')).toBe(forbidden + 1);
+      expect(await auditCount('evidence_note.retracted')).toBe(retracted);
+      const stored = await prisma.evidenceNote.findUniqueOrThrow({
+        where: { id: disputeNote.id },
+        include: { retraction: true },
+      });
+      expect(stored.retraction).toBeNull();
+    });
+
+    it('4. B retracts: R1 returns to HIGH and the retracted note stays on the link, inactive', async () => {
+      const retracted = await auditCount('evidence_note.retracted');
+      const response = await post('b', `/api/evidence-notes/${disputeNote.id}/retract`, {
+        reason: RETRACT_REASON,
+      });
+      expect(response.status).toBe(200);
+      const body = EvidenceNoteDtoSchema.parse(response.body);
+      expect(body.active).toBe(false);
+      expect(body.retraction?.reason).toBe(RETRACT_REASON);
+      expect(body.retraction?.retractedBy.id).toBe(userB.id);
+      expect(await auditCount('evidence_note.retracted')).toBe(retracted + 1);
+
+      const audit = await prisma.auditEntry.findFirstOrThrow({
+        where: { action: 'evidence_note.retracted', targetId: disputeNote.id },
+      });
+      expect(audit.before).toMatchObject({ active: true });
+      expect(audit.after).toMatchObject({ active: false });
+
+      const analysis = await analyze(ids.order);
+      const candidate = only(analysis);
+      expect(candidate.confidence).toBe('HIGH');
+      expect(rulesOf(candidate)[7]).toMatchObject({
+        applied: false,
+        reason: 'No active note disputes this chain.',
+      });
+      const relationshipEvidence = analysis.evidence.relationships.find(
+        (entry) => entry.relationshipId === relationshipId,
+      );
+      expect(relationshipEvidence?.notes.items[0]).toMatchObject({
+        id: disputeNote.id,
+        active: false,
+      });
+    });
+
+    it('5. a second retraction returns 200, unchanged, with no new audit row', async () => {
+      const retracted = await auditCount('evidence_note.retracted');
+      const response = await post('b', `/api/evidence-notes/${disputeNote.id}/retract`, {
+        reason: 'A different reason',
+      });
+      expect(response.status).toBe(200);
+      expect(EvidenceNoteDtoSchema.parse(response.body).retraction?.reason).toBe(RETRACT_REASON);
+      expect(await auditCount('evidence_note.retracted')).toBe(retracted);
+    });
+
+    it('6. direct UPDATE and DELETE on the note tables raise an append-only error', async () => {
+      await expect(
+        prisma.$executeRaw`UPDATE evidence_notes SET text = 'x' WHERE id = ${disputeNote.id}::uuid`,
+      ).rejects.toThrow(/append-only/);
+      await expect(
+        prisma.$executeRaw`DELETE FROM evidence_note_retractions WHERE note_id = ${disputeNote.id}::uuid`,
+      ).rejects.toThrow(/append-only/);
+    });
   });
 });

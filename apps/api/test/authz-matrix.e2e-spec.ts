@@ -148,6 +148,32 @@ const PROBES: RouteProbe[] = [
     expected: AUTHENTICATED,
   },
   {
+    name: 'POST /evidence-notes',
+    method: 'post',
+    path: '/api/evidence-notes',
+    body: {},
+    expected: AUTHENTICATED,
+  },
+  {
+    name: 'POST /evidence-notes/:noteId/retract',
+    method: 'post',
+    path: `/api/evidence-notes/${MISSING_ID}/retract`,
+    body: { reason: 'x' },
+    expected: AUTHENTICATED,
+  },
+  {
+    name: 'GET /entities/:id/evidence-notes',
+    method: 'get',
+    path: `/api/entities/${MISSING_ID}/evidence-notes`,
+    expected: AUTHENTICATED,
+  },
+  {
+    name: 'GET /relationships/:id/evidence-notes',
+    method: 'get',
+    path: `/api/relationships/${MISSING_ID}/evidence-notes`,
+    expected: AUTHENTICATED,
+  },
+  {
     name: 'GET /entities/:id/dependencies',
     method: 'get',
     path: `/api/entities/${MISSING_ID}/dependencies?direction=upstream`,
