@@ -585,4 +585,374 @@ describe('Impact analysis on the seeded §39 and §40 scenarios (e2e)', () => {
       300_000,
     );
   });
+
+  // -------------------------------------------------------------------------------------------
+  // Story 3: other starting entities on the §39 scenario (fixtures I6 to I14)
+  // -------------------------------------------------------------------------------------------
+
+  type Counts = [
+    total: number,
+    direct: number,
+    indirect: number,
+    current: number,
+    potential: number,
+    inferredOnly: number,
+    stateUnknown: number,
+  ];
+
+  function countsOf(body: ImpactResponse, type: string): Counts {
+    const category = body.categories.find((entry) => entry.type === type);
+    if (category === undefined) {
+      return [0, 0, 0, 0, 0, 0, 0];
+    }
+    return [
+      category.total,
+      category.direct,
+      category.indirect,
+      category.current,
+      category.potential,
+      category.inferredOnly,
+      category.stateUnknown,
+    ];
+  }
+
+  /** The categories that are not one of the 6 headline ones, which exist only when non-zero. */
+  function otherTypes(body: ImpactResponse): string[] {
+    return body.categories.filter((entry) => !entry.headline).map((entry) => entry.type);
+  }
+
+  function usd(
+    body: ImpactResponse,
+  ): { total: string; current: string; potential: string; inferredOnly: string } {
+    const figure = body.exposure.byCurrency.find((entry) => entry.currency === 'USD');
+    if (figure === undefined) {
+      throw new Error('expected a USD figure');
+    }
+    return {
+      total: figure.total.amount,
+      current: figure.current.amount,
+      potential: figure.potential.amount,
+      inferredOnly: figure.inferredOnly.total.amount,
+    };
+  }
+
+  const PAYMENT = 'Payment PAY-88213';
+  const ORDER_18492 = 'Order #18492';
+  const SHIPMENT_77120 = 'Shipment SHP-77120 (consolidated)';
+
+  describe('I6. Payment PAY-88213 (PENDING)', () => {
+    let body: ImpactResponse;
+
+    beforeAll(async () => {
+      body = await getSummary(PAYMENT);
+    });
+
+    it('counts the affected entities per category', () => {
+      expect(body.startClass).toBe('IMPAIRED');
+      expect(body.countedTotal).toBe(27);
+      expect(countsOf(body, 'Order')).toEqual([17, 1, 16, 17, 0, 0, 0]);
+      expect(countsOf(body, 'Customer')).toEqual([4, 0, 4, 4, 0, 0, 0]);
+      expect(countsOf(body, 'Shipment')).toEqual([1, 1, 0, 1, 0, 0, 0]);
+      expect(countsOf(body, 'SLA')).toEqual([4, 0, 4, 3, 1, 4, 0]);
+      expect(countsOf(body, 'Invoice')).toEqual([1, 0, 1, 1, 0, 0, 0]);
+      expect(countsOf(body, 'Product')).toEqual([0, 0, 0, 0, 0, 0, 0]);
+      expect(countsOf(body, 'PurchaseOrder')).toEqual([0, 0, 0, 0, 0, 0, 0]);
+      expect(otherTypes(body)).toEqual(['Invoice']);
+    });
+
+    it('adds up the exposure and reports the own value separately', () => {
+      expect(usd(body)).toEqual({
+        total: '31400.00',
+        current: '31400.00',
+        potential: '0.00',
+        inferredOnly: '0.00',
+      });
+      expect(body.exposure.byCurrency[0]?.total.orderCount).toBe(17);
+      expect(body.exposure.byCurrency[0]?.current.orderCount).toBe(17);
+      expect(body.exposure.byCurrency[0]?.potential.orderCount).toBe(0);
+      expect(body.startOwnValue).toEqual({ amount: '12480.00', currency: 'USD' });
+    });
+
+    it('writes the exact summary text', () => {
+      expect(body.summary).toEqual([
+        'Payment PAY-88213 is PENDING.',
+        'Currently affected: 17 customer orders, 4 customers, 1 shipment, 3 SLA commitments, 1 invoice. 31,400.00 USD exposed.',
+        'Potentially affected if it continues: 1 SLA commitment.',
+        'Total exposure: 31,400.00 USD across 17 customer orders.',
+        '4 of the affected entities are reached only through inferred or manual links.',
+        "Payment PAY-88213's own value, 12,480.00 USD, is not included.",
+      ]);
+    });
+
+    it('shows the shipment as DIRECT, with a 2-hop primary path and a 1-hop shortest path', async () => {
+      const list = await getList(PAYMENT, { list: 'category', type: 'Shipment', bucket: 'total' });
+      const [shipment] = list.items;
+      expect(list.items).toHaveLength(1);
+      expect(shipment?.entity.displayName).toBe(SHIPMENT_77120);
+      expect(shipment?.directness).toBe('DIRECT');
+      expect(shipment?.distance).toBe(1);
+
+      const primary = shipment?.primaryPath;
+      expect(primary?.hops).toHaveLength(2);
+      expect(primary?.hops[0]?.entity.displayName).toBe(ORDER_18492);
+      expect(primary?.hops.every((hop) => hop.effectiveOrigin === 'SOURCE')).toBe(true);
+      expect(primary?.hops.every((hop) => hop.effectiveConfidence === 'HIGH')).toBe(true);
+
+      const shortest = shipment?.shortestPath;
+      expect(shortest?.hops).toHaveLength(1);
+      expect(shortest?.hops[0]?.relationshipType).toBe('BLOCKS');
+      expect(shortest?.hops[0]?.effectiveOrigin).toBe('MANUAL');
+      expect(shortest?.hops[0]?.effectiveConfidence).toBe('MEDIUM');
+    });
+
+    it('reaches each of the other 16 orders over 2 paths, 3 hops long', async () => {
+      const all = await getAll(PAYMENT, { list: 'category', type: 'Order', bucket: 'total' }, 50);
+      const others = all.items.filter((item) => item.entity.displayName !== ORDER_18492);
+      expect(others).toHaveLength(16);
+      for (const item of others) {
+        expect(item.pathCount).toBe(2);
+        expect(item.distance).toBe(2);
+        expect(item.primaryPath?.hops).toHaveLength(3);
+        expect(item.shortestPath?.hops).toHaveLength(2);
+      }
+    });
+  });
+
+  describe('I7. Budget code for Order #18492 (MISSING)', () => {
+    it('reaches the approval first and everything behind it', async () => {
+      const body = await getSummary('Budget code for Order #18492');
+      expect(body.startClass).toBe('IMPAIRED');
+      expect(body.countedTotal).toBe(29);
+      expect(countsOf(body, 'Order')).toEqual([17, 0, 17, 17, 0, 0, 0]);
+      expect(countsOf(body, 'Customer')).toEqual([4, 0, 4, 4, 0, 0, 0]);
+      expect(countsOf(body, 'Shipment')).toEqual([1, 0, 1, 1, 0, 0, 0]);
+      expect(countsOf(body, 'SLA')[0]).toBe(4);
+      expect(countsOf(body, 'SLA')[3]).toBe(3);
+      expect(countsOf(body, 'Approval')).toEqual([1, 1, 0, 1, 0, 0, 0]);
+      expect(countsOf(body, 'Invoice')).toEqual([1, 0, 1, 1, 0, 0, 0]);
+      expect(countsOf(body, 'Payment')).toEqual([1, 0, 1, 1, 0, 0, 0]);
+      expect(otherTypes(body)).toEqual(['Approval', 'Invoice', 'Payment']);
+      expect(usd(body)).toMatchObject({ total: '31400.00', current: '31400.00', potential: '0.00' });
+      expect(body.summary[1]).toBe(
+        'Currently affected: 17 customer orders, 4 customers, 1 shipment, 3 SLA commitments, 1 approval, 1 invoice, 1 payment. 31,400.00 USD exposed.',
+      );
+    });
+
+    it('has the finance approval as its only direct dependent', async () => {
+      const body = await getSummary('Budget code for Order #18492');
+      const direct = body.categories.filter((category) => category.direct > 0);
+      expect(direct.map((category) => [category.type, category.direct])).toEqual([['Approval', 1]]);
+      const list = await getList('Budget code for Order #18492', {
+        list: 'category',
+        type: 'Approval',
+        bucket: 'direct',
+      });
+      expect(orderNames(list.items)).toEqual(['Finance approval APR-2291']);
+    });
+  });
+
+  describe('I8. Order #18492 (BLOCKED)', () => {
+    let body: ImpactResponse;
+
+    beforeAll(async () => {
+      body = await getSummary(ORDER_18492);
+    });
+
+    it('counts the affected entities and the exposure', () => {
+      expect(countsOf(body, 'Order')).toEqual([16, 0, 16, 16, 0, 0, 0]);
+      expect(countsOf(body, 'Customer')).toEqual([4, 0, 4, 4, 0, 0, 0]);
+      expect(countsOf(body, 'Shipment')).toEqual([1, 1, 0, 1, 0, 0, 0]);
+      expect(countsOf(body, 'SLA')).toEqual([4, 0, 4, 3, 1, 4, 0]);
+      expect(countsOf(body, 'Invoice')).toEqual([1, 1, 0, 1, 0, 0, 0]);
+      expect(usd(body)).toEqual({
+        total: '18920.00',
+        current: '18920.00',
+        potential: '0.00',
+        inferredOnly: '0.00',
+      });
+      expect(body.startOwnValue).toEqual({ amount: '12480.00', currency: 'USD' });
+    });
+
+    it('lists the invoice and the shipment as the direct dependents', () => {
+      const direct = body.categories.filter((category) => category.direct > 0);
+      expect(direct.map((category) => category.type).sort()).toEqual(['Invoice', 'Shipment']);
+    });
+
+    it('writes the exact summary text', () => {
+      expect(body.summary).toEqual([
+        'Order #18492 is BLOCKED.',
+        'Currently affected: 16 customer orders, 4 customers, 1 shipment, 3 SLA commitments, 1 invoice. 18,920.00 USD exposed.',
+        'Potentially affected if it continues: 1 SLA commitment.',
+        'Total exposure: 18,920.00 USD across 16 customer orders.',
+        '4 of the affected entities are reached only through inferred or manual links.',
+        "Order #18492's own value, 12,480.00 USD, is not included.",
+      ]);
+    });
+  });
+
+  describe('I9. Warehouse WH-EAST-02 (ACTIVE)', () => {
+    const EAST = 'East Distribution Center 02';
+    let body: ImpactResponse;
+
+    beforeAll(async () => {
+      body = await getSummary(EAST);
+    });
+
+    it('treats everything as potential and nothing as current', () => {
+      expect(body.startClass).toBe('UNIMPAIRED');
+      expect(countsOf(body, 'Order')).toEqual([17, 17, 0, 0, 17, 0, 0]);
+      expect(countsOf(body, 'Shipment')).toEqual([1, 1, 0, 0, 1, 0, 0]);
+      expect(countsOf(body, 'Invoice')).toEqual([1, 0, 1, 0, 1, 0, 0]);
+      expect(countsOf(body, 'SLA')).toEqual([4, 0, 4, 0, 4, 4, 0]);
+      expect(countsOf(body, 'Customer')).toEqual([4, 0, 4, 0, 4, 0, 0]);
+      expect(body.categories.every((category) => category.current === 0)).toBe(true);
+      expect(usd(body)).toEqual({
+        total: '31400.00',
+        current: '0.00',
+        potential: '31400.00',
+        inferredOnly: '0.00',
+      });
+    });
+
+    it('writes the exact summary text', () => {
+      expect(body.summary).toEqual([
+        'East Distribution Center 02 is ACTIVE.',
+        'If East Distribution Center 02 became unavailable: 17 customer orders, 4 customers, 1 shipment, 4 SLA commitments, 1 invoice. 31,400.00 USD exposed.',
+        '4 of the affected entities are reached only through inferred or manual links.',
+      ]);
+    });
+
+    it('flags exactly 22 entities as impaired for another reason, found through the lists', async () => {
+      const flagged: AffectedEntityDto[] = [];
+      for (const category of body.categories) {
+        if (category.total === 0) continue;
+        const all = await getAll(EAST, { list: 'category', type: category.type, bucket: 'total' }, 50);
+        flagged.push(...all.items.filter((item) => item.flags.otherCause));
+      }
+      expect(flagged).toHaveLength(22);
+
+      const byType = (type: string) => flagged.filter((item) => item.entity.type === type);
+      expect(byType('Order')).toHaveLength(17);
+      expect(orderNames(byType('Shipment'))).toEqual([SHIPMENT_77120]);
+      expect(orderNames(byType('Invoice'))).toEqual(['Invoice INV-55120']);
+      expect(byType('SLA')).toHaveLength(3);
+      expect(byType('SLA').every((item) => item.entity.currentState === 'AT_RISK')).toBe(true);
+      expect(byType('Customer')).toHaveLength(0);
+    });
+  });
+
+  describe('I10. Warehouse WH-WEST-01 (ACTIVE), with not-counted entities', () => {
+    const WEST = 'West Distribution Center 01';
+
+    it('counts one order, one shipment and one customer, and leaves two entities out', async () => {
+      const body = await getSummary(WEST);
+      expect(body.countedTotal).toBe(3);
+      expect(countsOf(body, 'Order')).toEqual([1, 1, 0, 0, 1, 0, 0]);
+      expect(countsOf(body, 'Shipment')).toEqual([1, 1, 0, 0, 1, 0, 0]);
+      expect(countsOf(body, 'Customer')).toEqual([1, 0, 1, 0, 1, 0, 0]);
+      expect(body.notCounted).toEqual({
+        total: 2,
+        byType: [
+          { type: 'Order', count: 1 },
+          { type: 'Shipment', count: 1 },
+        ],
+      });
+      expect(usd(body)).toMatchObject({ total: '875.00', current: '0.00', potential: '875.00' });
+      expect(body.exposure.byCurrency[0]?.potential.orderCount).toBe(1);
+      expect(body.summary).toEqual([
+        'West Distribution Center 01 is ACTIVE.',
+        'If West Distribution Center 01 became unavailable: 1 customer order, 1 customer, 1 shipment. 875.00 USD exposed.',
+        'Not counted: 2 completed or cancelled entities.',
+      ]);
+    });
+
+    it('names the entities involved', async () => {
+      const orders = await getList(WEST, { list: 'category', type: 'Order', bucket: 'total' });
+      expect(orderNames(orders.items)).toEqual(['Order #18531']);
+      const customers = await getList(WEST, { list: 'category', type: 'Customer', bucket: 'total' });
+      expect(orderNames(customers.items)).toEqual(['Initech Supplies']);
+      const left = await getList(WEST, { list: 'notCounted' });
+      expect(new Set(orderNames(left.items))).toEqual(new Set(['Order #18530', 'Shipment SHP-77098']));
+      expect(left.items.every((item) => item.notCountedReason === 'TERMINAL')).toBe(true);
+    });
+  });
+
+  describe('I11 to I13. Suppliers Northwind Steel and Contoso Metals', () => {
+    it('I11: Northwind Steel puts 31,400.00 USD at potential risk', async () => {
+      const body = await getSummary('Northwind Steel');
+      expect(body.startClass).toBe('UNIMPAIRED');
+      expect(countsOf(body, 'Product')).toEqual([1, 1, 0, 0, 1, 0, 0]);
+      expect(countsOf(body, 'Order')[0]).toBe(17);
+      expect(countsOf(body, 'Customer')[0]).toBe(4);
+      expect(countsOf(body, 'Shipment')[0]).toBe(1);
+      expect(countsOf(body, 'SLA')[0]).toBe(4);
+      expect(countsOf(body, 'SLA')[5]).toBe(4);
+      expect(countsOf(body, 'Invoice')[0]).toBe(1);
+      expect(body.categories.every((category) => category.current === 0)).toBe(true);
+      expect(usd(body)).toMatchObject({ total: '31400.00', current: '0.00', potential: '31400.00' });
+      expect(body.summary).toEqual([
+        'Northwind Steel is ACTIVE.',
+        'If Northwind Steel became unavailable: 1 product, 17 customer orders, 4 customers, 1 shipment, 4 SLA commitments, 1 invoice. 31,400.00 USD exposed.',
+        '4 of the affected entities are reached only through inferred or manual links.',
+      ]);
+    });
+
+    it('I12: Contoso Metals, linked only by an inferred relationship, is inferred all the way', async () => {
+      const northwind = await getSummary('Northwind Steel');
+      const body = await getSummary('Contoso Metals');
+      for (const category of body.categories) {
+        const reference = northwind.categories.find((entry) => entry.type === category.type);
+        expect(category.total).toBe(reference?.total);
+        expect(category.inferredOnly).toBe(category.total);
+      }
+      expect(usd(body).inferredOnly).toBe('31400.00');
+      expect(body.summary[0]).toBe(
+        'Contoso Metals is ACTIVE, and everything it affects is reached only through inferred or manual links.',
+      );
+      expect(body.summary.some((line) => line.includes('of the affected entities'))).toBe(false);
+    });
+
+    it('I13: Northwind Steel at depth 3 stops after the customer-facing chain and says so', async () => {
+      const body = await getSummary('Northwind Steel', 3);
+      expect(body.query.depth).toBe(3);
+      expect(body.countedTotal).toBe(5);
+      expect(countsOf(body, 'Product')[0]).toBe(1);
+      expect(countsOf(body, 'Order')[0]).toBe(1);
+      expect(countsOf(body, 'Shipment')[0]).toBe(1);
+      expect(countsOf(body, 'Invoice')[0]).toBe(1);
+      expect(countsOf(body, 'Customer')[0]).toBe(1);
+      expect(usd(body)).toMatchObject({ total: '12480.00', current: '0.00', potential: '12480.00' });
+      expect(body.limits).toEqual({ depthLimit: true, explorationLimit: false, lowerBound: true });
+      expect(body.summary.at(-1)).toBe(
+        'Impact continues beyond 3 steps; these figures are lower bounds.',
+      );
+
+      const orders = await getList('Northwind Steel', {
+        list: 'category',
+        type: 'Order',
+        bucket: 'total',
+        depth: 3,
+      });
+      expect(orderNames(orders.items)).toEqual([ORDER_18492]);
+      const customers = await getList('Northwind Steel', {
+        list: 'category',
+        type: 'Customer',
+        bucket: 'total',
+        depth: 3,
+      });
+      expect(orderNames(customers.items)).toEqual(['Acme Corp']);
+    });
+  });
+
+  describe('I14. Invoice INV-55120, which nothing depends on', () => {
+    it('affects nothing and still shows its own value', async () => {
+      const body = await getSummary('Invoice INV-55120');
+      expect(body.countedTotal).toBe(0);
+      expect(body.categories.every((category) => category.total === 0)).toBe(true);
+      expect(body.categories).toHaveLength(6);
+      expect(body.startOwnValue).toEqual({ amount: '12480.00', currency: 'USD' });
+      expect(body.exposure).toEqual({ byCurrency: [], valueUnknownCount: 0 });
+      expect(body.summary).toEqual(['Invoice INV-55120 is PENDING.', 'Nothing is affected within 6 steps.']);
+    });
+  });
 });

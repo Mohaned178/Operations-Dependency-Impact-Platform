@@ -332,9 +332,9 @@
 
 **Independent test**: fixtures I6 to I14 pass against the seeded §39 scenario.
 
-- [ ] T034 [US3] Extend `apps/api/test/impact-seed.e2e-spec.ts` with fixtures **I6** (Payment PAY-88213), **I7** (Budget code), **I8** (Order #18492) and **I9** (Warehouse WH-EAST-02). Assert the categories, exposure, `startOwnValue`, summary lines, the I6 shipment's DIRECT classification with its 2-hop primary path and 1-hop shortest path, the 16 orders' `pathCount = 2`, and I9's 22 `otherCause` flags. The flags are collected through the lists API.
-- [ ] T035 [US3] Extend `apps/api/test/impact-seed.e2e-spec.ts` with fixtures **I10** (WH-WEST-01, not counted), **I11** (Northwind Steel), **I12** (Contoso Metals, all inferred), **I13** (Northwind Steel at depth 3, lower bounds) and **I14** (Invoice INV-55120, nothing affected).
-- [ ] T036 [US3] Create `apps/api/test/impact.e2e-spec.ts`, importing small graphs through the import API per test (follow `tracing.e2e-spec.ts` conventions). Cover:
+- [x] T034 [US3] Extend `apps/api/test/impact-seed.e2e-spec.ts` with fixtures **I6** (Payment PAY-88213), **I7** (Budget code), **I8** (Order #18492) and **I9** (Warehouse WH-EAST-02). Assert the categories, exposure, `startOwnValue`, summary lines, the I6 shipment's DIRECT classification with its 2-hop primary path and 1-hop shortest path, the 16 orders' `pathCount = 2`, and I9's 22 `otherCause` flags. The flags are collected through the lists API.
+- [x] T035 [US3] Extend `apps/api/test/impact-seed.e2e-spec.ts` with fixtures **I10** (WH-WEST-01, not counted), **I11** (Northwind Steel), **I12** (Contoso Metals, all inferred), **I13** (Northwind Steel at depth 3, lower bounds) and **I14** (Invoice INV-55120, nothing affected).
+- [x] T036 [US3] Create `apps/api/test/impact.e2e-spec.ts`, importing small graphs through the import API per test (follow `tracing.e2e-spec.ts` conventions). Cover:
   - **UNKNOWN start**: everything is potential, and the summary says "has an unknown state";
   - **UNKNOWN in a chain**: it is counted as potential with `stateUnknown`, and it breaks the live chain;
   - **CANCELLED in a chain**: it is not counted, and nothing behind it is reached;
@@ -348,7 +348,7 @@
   Then the validation table in contracts/api.md § Validation and access: every row is asserted, including 404 on all 3 routes and 400 for a malformed `targetId`.
 
   Finally, assert that no route writes an audit row: compare the `audit_entries` count before and after.
-- [ ] T037 [US3] In `apps/api/test/authz-matrix.e2e-spec.ts`, add 3 `AUTHENTICATED` probes: `GET /api/entities/:id/impact`, `GET /api/entities/:id/impact/items?list=valueUnknown` and `GET /api/entities/:id/impact/items/:targetId`. Use the same id-placeholder approach as the existing tracing probes.
+- [x] T037 [US3] In `apps/api/test/authz-matrix.e2e-spec.ts`, add 3 `AUTHENTICATED` probes: `GET /api/entities/:id/impact`, `GET /api/entities/:id/impact/items?list=valueUnknown` and `GET /api/entities/:id/impact/items/:targetId`. Use the same id-placeholder approach as the existing tracing probes.
 
 **Checkpoint (US3)**: run the standard gate, then commit.
 
