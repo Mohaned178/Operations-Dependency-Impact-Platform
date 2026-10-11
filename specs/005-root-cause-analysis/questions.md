@@ -39,3 +39,9 @@ plan.md and data-model §4 call the roles function `assignRoles`; tasks.md T013/
 - **Gap**: `computeConfidence` reads `notes.items`, which the evidence reader caps at the 50 newest notes per target, retracted ones included (research R4). An old active DISPUTES note behind 50 newer SUPPORTS or retracted notes would be missed, and DISPUTED would not apply.
 - **Done**: implemented exactly as research R4/R6 describe. This is not an implementation error.
 - **Needed**: if it matters, T018 should also return the active DISPUTES notes uncapped (or a separate list) for rule 8. That changes the evidence bundle shape, so it needs your decision.
+
+## Q6. T022 "a GOVERNS and a DEFINES into one step" cannot be built through the importer — RESOLVED, confirm
+
+- **Conflict**: `RELATIONSHIP_RULES` (enforced by the import planner) only allows GOVERNS into an Order and DEFINES into an SLA or BudgetRequirement, so no entity can be the `to` end of both through an import.
+- **Done**: `root-cause.e2e-spec.ts` imports two DEFINES into one BudgetRequirement and inserts the GOVERNS row directly with Prisma (bypassing the planner). It asserts the requirement sources are ordered by `(type, displayName, id)`: DEFINES Alpha, DEFINES Beta, then GOVERNS Aaa.
+- **Needed**: nothing, unless you prefer the task text to be reworded.

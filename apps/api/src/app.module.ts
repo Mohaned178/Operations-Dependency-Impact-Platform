@@ -8,6 +8,7 @@ import { GraphModule } from './graph/graph.module';
 import { HealthModule } from './health/health.module';
 import { IngestionModule } from './ingestion/ingestion.module';
 import { PrismaModule } from './prisma/prisma.module';
+import { RootCauseModule } from './root-cause/root-cause.module';
 import { TracingModule } from './tracing/tracing.module';
 import { UsersModule } from './users/users.module';
 
@@ -22,6 +23,7 @@ import { UsersModule } from './users/users.module';
     GraphModule,
     IngestionModule,
     TracingModule,
+    RootCauseModule,
   ],
   providers: [{ provide: APP_FILTER, useClass: AllExceptionsFilter }],
 })

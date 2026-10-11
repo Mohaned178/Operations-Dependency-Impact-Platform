@@ -194,7 +194,7 @@
 
 ### Backend
 
-- [ ] T018 [US1] Create `apps/api/src/root-cause/evidence.reader.ts`: an `@Injectable() EvidenceReader` with `load(req: EvidenceRequest): Promise<EvidenceBundle>` (data-model §3b, research R4). It runs one query per row of the R4 table, batched over all ids. Raw SQL uses `::uuid[]` casts, and `COLLATE "C"` inside window `ORDER BY`. Every returned list is re-sorted in TypeScript with `compareCodeUnits`.
+- [x] T018 [US1] Create `apps/api/src/root-cause/evidence.reader.ts`: an `@Injectable() EvidenceReader` with `load(req: EvidenceRequest): Promise<EvidenceBundle>` (data-model §3b, research R4). It runs one query per row of the R4 table, batched over all ids. Raw SQL uses `::uuid[]` casts, and `COLLATE "C"` inside window `ORDER BY`. Every returned list is re-sorted in TypeScript with `compareCodeUnits`.
   1. **State records**:
      - the current observation plus the latest from each other source system, both joined to `source_records` for `SourceRecordDto` (`rawPayload` included);
      - the current record goes first with `current: true`, and the others follow sorted by `sourceSystem` with `current: false`.
@@ -214,7 +214,7 @@
   6. **Attributes** for `rootCauseEntityIds`.
 
   Every requested entity id and relationship id gets an entry, even when it is empty. Empty inputs make no queries.
-- [ ] T019 [US1] Create `apps/api/src/root-cause/root-cause.service.ts`: `analyze(id: string, query: RootCauseQuery): Promise<RootCauseResponse>`, exactly as data-model §4 and plan KDN 2–4 describe:
+- [x] T019 [US1] Create `apps/api/src/root-cause/root-cause.service.ts`: `analyze(id: string, query: RootCauseQuery): Promise<RootCauseResponse>`, exactly as data-model §4 and plan KDN 2–4 describe:
   - Read `computedAt` once.
   - Call `tracing.blockers` (`relationshipTypes: []`, `entityTypes: []`).
   - Status rules are in contracts/api.md.
@@ -229,13 +229,13 @@
   - Then `orderCandidates`. The headline needs the final candidate count, so compute headlines after grouping.
   - Build `summarizeRootCause`, then the `evidence.entities` and `evidence.relationships` arrays in first-appearance order (data-model §4.6).
   - Echo `query.evaluatedAt` as an ISO string.
-- [ ] T020 [US1] Create `root-cause.controller.ts`: `@Controller('entities')` with `@Get(':id/root-cause')`, using `ParseUUIDPipe` and `ZodValidationPipe(RootCauseQuerySchema)`. Create `root-cause.module.ts`, importing `TracingModule`, `GraphModule` and `PrismaModule`, with providers `RootCauseService` and `EvidenceReader`. Register `RootCauseModule` in `apps/api/src/app.module.ts`.
-- [ ] T021 [US1] Create `apps/api/test/root-cause-seed.e2e-spec.ts`. Seed as `tracing-seed.e2e-spec.ts` does, and sign in as an ANALYST. Parse every response with `RootCauseResponseSchema`. Use `evaluatedAt=2026-09-29T16:00:00Z` and look up ids with `entityIdByKey`. Assert **every line** of fixtures R1, R2, R3, R4 and R8 in contracts/api.md.
+- [x] T020 [US1] Create `root-cause.controller.ts`: `@Controller('entities')` with `@Get(':id/root-cause')`, using `ParseUUIDPipe` and `ZodValidationPipe(RootCauseQuerySchema)`. Create `root-cause.module.ts`, importing `TracingModule`, `GraphModule` and `PrismaModule`, with providers `RootCauseService` and `EvidenceReader`. Register `RootCauseModule` in `apps/api/src/app.module.ts`.
+- [x] T021 [US1] Create `apps/api/test/root-cause-seed.e2e-spec.ts`. Seed as `tracing-seed.e2e-spec.ts` does, and sign in as an ANALYST. Parse every response with `RootCauseResponseSchema`. Use `evaluatedAt=2026-09-29T16:00:00Z` and look up ids with `entityIdByKey`. Assert **every line** of fixtures R1, R2, R3, R4 and R8 in contracts/api.md.
 
   Add the SC-004 test: for Order #18492, Shipment SHP-77120 and the Acme SLA, 100 sequential calls with the same `evaluatedAt` produce responses that are deep-equal after deleting `computedAt`.
 
   Add the SC-002 check: the analyses of Order #18492, SHP-77120 and all 4 delivery SLAs name `Budget Code Missing`. The SLA keys are in the seed scenario. The Umbrella SLA is ACTIVE, but it still depends on SHP-77120.
-- [ ] T022 [US1] Create `apps/api/test/root-cause.e2e-spec.ts`. Build small graphs with `runImport`, using JSON entity, relationship and event rows; the shapes are in `tracing.e2e-spec.ts`. Cover US1 behaviour:
+- [x] T022 [US1] Create `apps/api/test/root-cause.e2e-spec.ts`. Build small graphs with `runImport`, using JSON entity, relationship and event rows; the shapes are in `tracing.e2e-spec.ts`. Cover US1 behaviour:
   - **validation**: `depth` 0, 11 and `abc`, and `evaluatedAt=yesterday` all give 400 with the right detail path; a malformed id gives 400; an unknown id gives 404; no token gives 401;
   - **evidence rules**:
     - an entity with 25 events returns 20 items, newest first, with `total 25`;
@@ -243,7 +243,7 @@
     - a GOVERNS and a DEFINES into one step both appear as requirement sources, sorted by type;
     - a relationship evidence `record` is the latest of its 2 observations;
   - `GET /root-cause` writes no `audit_entries` rows: count them before and after.
-- [ ] T023 [US1] In `apps/api/test/authz-matrix.e2e-spec.ts`, add an AUTHENTICATED probe for `GET /api/entities/:id/root-cause`, using `MISSING_ID` like the other entity probes.
+- [x] T023 [US1] In `apps/api/test/authz-matrix.e2e-spec.ts`, add an AUTHENTICATED probe for `GET /api/entities/:id/root-cause`, using `MISSING_ID` like the other entity probes.
 
 ### Web (`apps/web/src/pages/entities/`, research R11)
 
