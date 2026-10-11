@@ -286,3 +286,75 @@ describe('summarizeBlockers (contracts/api.md F1–F4, F10)', () => {
     );
   });
 });
+
+describe('explainBlockingPath HEDGED mood (root-cause contracts/api.md § Chain sentences)', () => {
+  it('writes F2 explanation[0] with "may be blocked because"', () => {
+    const path = {
+      hops: [
+        hop('REQUIRES', 'FORWARD', payment),
+        hop('REQUIRES', 'FORWARD', approval),
+        hop('REQUIRES', 'FORWARD', budget),
+      ],
+    };
+    expect(explainBlockingPath(order, path, 'HEDGED')[0]).toBe(
+      'Order #18492 may be blocked because it requires Payment PAY-88213, which is PENDING.',
+    );
+  });
+
+  it('writes F3 paths[0].explanation[0] with "may be at risk because"', () => {
+    const path = {
+      hops: [
+        hop('DEPENDS_ON', 'FORWARD', shipment, {
+          origin: 'INFERRED',
+          confidence: 'MEDIUM',
+          basis: INFERRED_BASIS,
+        }),
+      ],
+    };
+    const [first] = explainBlockingPath(sla, path, 'HEDGED');
+    expect(first?.startsWith('Acme Corp delivery SLA may be at risk because')).toBe(true);
+  });
+
+  it('changes only the subject clause of each sentence', () => {
+    const path = {
+      hops: [
+        hop('DEPENDS_ON', 'FORWARD', order),
+        hop('REQUIRES', 'FORWARD', payment),
+        hop('REQUIRES', 'FORWARD', approval),
+      ],
+    };
+    const assertive = explainBlockingPath(shipment, path);
+    const hedged = explainBlockingPath(shipment, path, 'HEDGED');
+    expect(hedged[0]).toBe(
+      'Shipment SHP-77120 (consolidated) may be delayed because it depends on Order #18492, which is BLOCKED.',
+    );
+    expect(hedged).toHaveLength(assertive.length);
+    expect(assertive[0]).toBe(
+      'Shipment SHP-77120 (consolidated) is delayed because it depends on Order #18492, which is BLOCKED.',
+    );
+    expect(hedged.slice(1)).toEqual(
+      assertive.slice(1).map((sentence) => sentence.replace(' is ', ' may be ')),
+    );
+  });
+
+  it('is identical in both moods for INDETERMINATE subjects', () => {
+    const unknown = entity('Mystery Record', 'UNKNOWN');
+    const path = {
+      hops: [hop('REQUIRES', 'FORWARD', unknown), hop('REQUIRES', 'FORWARD', budget)],
+    };
+    expect(explainBlockingPath(order, path, 'HEDGED').slice(1)).toEqual(
+      explainBlockingPath(order, path).slice(1),
+    );
+    const indeterminateStart = { hops: [hop('REQUIRES', 'FORWARD', budget)] };
+    expect(explainBlockingPath(unknown, indeterminateStart, 'HEDGED')).toEqual(
+      explainBlockingPath(unknown, indeterminateStart),
+    );
+  });
+
+  it('is identical in both moods for SATISFIED subjects that are not AT_RISK', () => {
+    const path = { hops: [hop('REQUIRES', 'FORWARD', payment)] };
+    expect(explainBlockingPath(warehouse, path, 'HEDGED')).toEqual(
+      explainBlockingPath(warehouse, path),
+    );
+  });
+});

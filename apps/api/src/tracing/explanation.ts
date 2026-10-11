@@ -10,16 +10,20 @@ function steps(count: number): string {
   return `${count} step${count === 1 ? '' : 's'}`;
 }
 
-function subjectClause(entity: TracedEntityDto): string {
+/** HEDGED softens only the UNSATISFIED and AT_RISK subject clauses (root-cause research R8). */
+export type ExplanationMood = 'ASSERTIVE' | 'HEDGED';
+
+function subjectClause(entity: TracedEntityDto, mood: ExplanationMood): string {
   const { displayName } = entity;
+  const verb = mood === 'HEDGED' ? 'may be' : 'is';
   switch (entity.state.classification) {
     case 'UNSATISFIED':
-      return `${displayName} is ${label(entity)} because`;
+      return `${displayName} ${verb} ${label(entity)} because`;
     case 'INDETERMINATE':
       return `${displayName} has an unknown state, and`;
     case 'SATISFIED':
       return entity.currentState === 'AT_RISK'
-        ? `${displayName} is at risk because`
+        ? `${displayName} ${verb} at risk because`
         : `${displayName} is ${label(entity)}, but`;
   }
 }
@@ -41,13 +45,17 @@ function qualifier(hop: HopDto): string {
 }
 
 /** One sentence per hop of a blocking path. */
-export function explainBlockingPath(start: TracedEntityDto, path: Pick<PathDto, 'hops'>): string[] {
+export function explainBlockingPath(
+  start: TracedEntityDto,
+  path: Pick<PathDto, 'hops'>,
+  mood: ExplanationMood = 'ASSERTIVE',
+): string[] {
   return path.hops.map((hop, index) => {
     const before = index === 0 ? start : path.hops[index - 1]?.entity;
     if (before === undefined) {
       throw new Error('explainBlockingPath: hop without a preceding entity');
     }
-    const subject = subjectClause(before);
+    const subject = subjectClause(before, mood);
     const reached = hop.entity;
     const object = objectClause(reached);
     const qualified = qualifier(hop);
