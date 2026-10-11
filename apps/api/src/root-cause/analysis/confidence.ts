@@ -133,7 +133,7 @@ export function computeConfidence(input: ConfidenceInput): ConfidenceResult {
     ),
   );
 
-  // 2. UNKNOWN_STATE: any step, the start included.
+  // 2. UNKNOWN_STATE fires on any step, the start included.
   const unknownSteps = steps.flatMap((step, index) =>
     step.currentState === 'UNKNOWN' ? [{ index, name: step.displayName }] : [],
   );

@@ -55,3 +55,10 @@ plan.md and data-model §4 call the roles function `assignRoles`; tasks.md T013/
 - **Resolution (T037)**: contracts/api.md already fixes the order as the ISO string (milliseconds), then the uuid, both by code units. `EvidenceNotesService.list` therefore orders and compares the keyset on `date_trunc('milliseconds', created_at)`, then `id`, in raw SQL, and the cursor stays `{createdAt (ms ISO), id}`. `evidence-notes.e2e-spec.ts` raw-inserts two notes at `.123456` and `.123200` (the larger id first) and pages with `limit=1`: nothing is skipped or repeated.
 - **Also for T045** (resolved): `CausalChainView` now passes `linkRelationshipId` (the hop's first assertion id) to `StepEvidence`, next to the existing `relationshipLabel`.
 - **Original note, T045**: `StepEvidence` currently receives only `relationships`, not the hop, so offering "the link" as a note target needs the hop (or its label) passed down. `StepEvidence` already takes an optional `relationshipLabel`.
+
+## Q8. Intermittent failure in `entities.e2e-spec.ts` (feature 002), seen once in Phase 6 — NOT FIXED, for the orchestrator
+
+- **Observed**: in one of five full e2e runs on an otherwise quiet machine, `Entities (e2e) › returns the timeline in chronological order with events before state changes` failed. It passed in the three runs of that file alone and in the next full run. The assertion text was not captured.
+- **Hypothesis (unconfirmed)**: `toTimelineEvent` in `apps/api/src/graph/timeline.service.ts` sorts an event's entities by role only (the comparator returns 0 within a role), so the two RELATED entities keep the database's order from an unordered `event_entities` include. The test expects `Acme Corp` before `Contract CON-3982`. Entity ids are random per run, so that order is not guaranteed.
+- **Not touched**: this is feature 002 code and test, outside 005. A fix would add a deterministic tie-break to the sort (for example by display name, then id with `compareCodeUnits`).
+- **Earlier in Phase 5**: 5-second timeouts in unrelated suites during one load-affected run were a different, load-related problem; those suites were green on the quiet reruns.

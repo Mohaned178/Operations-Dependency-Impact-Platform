@@ -662,7 +662,7 @@ describe('Root-cause analysis on built graphs (e2e)', () => {
       );
       // The importer only accepts GOVERNS into an Order (RELATIONSHIP_RULES), so a GOVERNS into
       // the same step is inserted directly to prove the ordering across types.
-      const anyImport = await prisma.import.findFirstOrThrow();
+      const seededImport = await prisma.import.findFirstOrThrow();
       await prisma.relationship.create({
         data: {
           id: randomUUID(),
@@ -674,7 +674,7 @@ describe('Root-cause analysis on built graphs (e2e)', () => {
           sourceSystem: 'OPSGRAPH',
           sourceId: 'rel-GOVERNS-c-aaa-r',
           observedAt: new Date(T1),
-          importId: anyImport.id,
+          importId: seededImport.id,
         },
       });
 

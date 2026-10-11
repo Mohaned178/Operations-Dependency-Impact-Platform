@@ -404,13 +404,13 @@
 
 ## Phase 6: Polish and cross-cutting
 
-- [ ] T046 Create `apps/api/test/perf-root-cause.e2e-spec.ts` (`describePerf`, `RUN_PERF=1` only). Reuse the dataset builder and the 6-hop blocking chain from `perf-tracing.e2e-spec.ts`; import or copy its setup helper, as that file allows. Run `GET /root-cause` 20 times for the 6-hop start entity, and assert p95 < 1,500 ms (SC-003). Run it locally and record the p95 in the `quickstart.md` § 4 table. If it fails, follow research R13 (check the indexes with `EXPLAIN`) and write the findings to `questions.md`, rather than adding caching.
-- [ ] T047 Run the repository-wide checks and fix any hit:
+- [x] T046 Create `apps/api/test/perf-root-cause.e2e-spec.ts` (`describePerf`, `RUN_PERF=1` only). Reuse the dataset builder and the 6-hop blocking chain from `perf-tracing.e2e-spec.ts`; import or copy its setup helper, as that file allows. Run `GET /root-cause` 20 times for the 6-hop start entity, and assert p95 < 1,500 ms (SC-003). Run it locally and record the p95 in the `quickstart.md` § 4 table. If it fails, follow research R13 (check the indexes with `EXPLAIN`) and write the findings to `questions.md`, rather than adding caching.
+- [x] T047 Run the repository-wide checks and fix any hit:
   - `git grep -n "WITH RECURSIVE" -- apps/api/src` returns only `prisma-graph.repository.ts`;
   - `git grep -n "localeCompare\|: any\|as any\|TODO" -- apps packages` returns no new hits;
   - `git grep -n "new Date()\|Date.now()" -- apps/api/src/root-cause/analysis` returns nothing;
   - `git diff main -- '**/package.json' pnpm-lock.yaml` adds no dependencies.
-- [ ] T048 Run the full standard gate plus `pnpm build`. Then, with the dev DB re-seeded, walk all of `quickstart.md` §2 and §3 at 1366×768 and confirm every expected output. Tick the remaining boxes and commit.
+- [x] T048 Run the full standard gate plus `pnpm build`. Then, with the dev DB re-seeded, walk all of `quickstart.md` §2 and §3 at 1366×768 and confirm every expected output. Tick the remaining boxes and commit.
 
 ---
 
