@@ -70,8 +70,11 @@ async function main(): Promise<void> {
     logger: ['error', 'warn'],
   });
   try {
-    const report = await app.get(SeedService).seedScenario39();
-    console.log(report === null ? '§39 scenario already present' : '§39 scenario seeded');
+    const seedService = app.get(SeedService);
+    const report39 = await seedService.seedScenario39();
+    console.log(report39 === null ? '§39 scenario already present' : '§39 scenario seeded');
+    const report40 = await seedService.seedScenario40();
+    console.log(report40 === null ? '§40 scenario already present' : '§40 scenario seeded');
   } finally {
     await app.close();
   }

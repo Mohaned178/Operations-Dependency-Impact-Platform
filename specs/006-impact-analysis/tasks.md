@@ -238,8 +238,8 @@
 
 ### Seed (research R11, seed-scenario-40.md)
 
-- [ ] T021 [US1] Create `apps/api/src/ingestion/seed/scenario-40.ts`, exporting `buildScenario40Document()` that produces **exactly** the rows of seed-scenario-40.md, in its order: 47 entities, 97 relationships and 9 events. Use the conventions section for primary systems, relationship `sourceId`s and `observedAt`s. Model it on `scenario-39.ts` helpers, with typed fixture arrays and small builder functions.
-- [ ] T022 [US1] Create `apps/api/src/ingestion/seed/scenario-40.spec.ts`, implementing seed-scenario-40.md § Required tests, item 1:
+- [x] T021 [US1] Create `apps/api/src/ingestion/seed/scenario-40.ts`, exporting `buildScenario40Document()` that produces **exactly** the rows of seed-scenario-40.md, in its order: 47 entities, 97 relationships and 9 events. Use the conventions section for primary systems, relationship `sourceId`s and `observedAt`s. Model it on `scenario-39.ts` helpers, with typed fixture arrays and small builder functions.
+- [x] T022 [US1] Create `apps/api/src/ingestion/seed/scenario-40.spec.ts`, implementing seed-scenario-40.md § Required tests, item 1:
   - every row passes its shared row schema;
   - the counts are 47, 97 and 9;
   - every relationship satisfies `RELATIONSHIP_RULES`;
@@ -256,7 +256,7 @@
     - the path counts SO-20401 = 3, SO-20402 = 5, SO-20404 = 6, SO-20408 = 3 and SO-20411 = 1.
 
   The walk is test code over the document only (FR-031). It must not import anything from `apps/api/src/graph`.
-- [ ] T023 [US1] In `apps/api/src/ingestion/seed/seed.service.ts`, add `seedScenario40()`. Mirror `seedScenario39()`: `fileName: 'scenario-40.json'`, and the error message names "§40". In `apps/api/prisma/seed.ts`, call it after `seedScenario39()` and log `§40 scenario seeded` or `§40 scenario already present`.
+- [x] T023 [US1] In `apps/api/src/ingestion/seed/seed.service.ts`, add `seedScenario40()`. Mirror `seedScenario39()`: `fileName: 'scenario-40.json'`, and the error message names "§40". In `apps/api/prisma/seed.ts`, call it after `seedScenario39()` and log `§40 scenario seeded` or `§40 scenario already present`.
 
   In `apps/api/test/seed.e2e-spec.ts`, add the seed-scenario-40.md § Required tests item 2 block:
   - 47 more entities and 97 more relationships;

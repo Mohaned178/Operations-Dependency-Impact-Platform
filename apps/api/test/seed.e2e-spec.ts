@@ -184,3 +184,114 @@ describe('SeedService (e2e)', () => {
     expect(confidences.map((row) => row.confidence).sort()).toEqual(['HIGH', 'LOW', 'MEDIUM']);
   });
 });
+
+describe('SeedService.seedScenario40 (e2e)', () => {
+  let app: INestApplication;
+  let prisma: PrismaService;
+  let seed: SeedService;
+
+  beforeAll(async () => {
+    app = await createTestApp();
+    prisma = app.get(PrismaService);
+    seed = app.get(SeedService);
+  });
+
+  beforeEach(async () => {
+    await resetDb(prisma);
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  async function counts(): Promise<{
+    entities: number;
+    relationships: number;
+    events: number;
+    sourceRecords: number;
+    audits: number;
+  }> {
+    const [entities, relationships, events, sourceRecords, audits] = await Promise.all([
+      prisma.entity.count(),
+      prisma.relationship.count(),
+      prisma.event.count(),
+      prisma.sourceRecord.count(),
+      prisma.auditEntry.count(),
+    ]);
+    return { entities, relationships, events, sourceRecords, audits };
+  }
+
+  it('adds 47 entities and 97 relationships on top of the §39 scenario', async () => {
+    expect((await seed.seedScenario39())?.outcome).toBe('APPLIED');
+    const before = await counts();
+
+    const report = await seed.seedScenario40();
+    expect(report?.outcome).toBe('APPLIED');
+    expect(report?.trigger).toBe('SEED');
+
+    const after = await counts();
+    expect(after.entities - before.entities).toBe(47);
+    expect(after.relationships - before.relationships).toBe(97);
+    expect(after.events - before.events).toBe(9);
+  });
+
+  it('is idempotent: a second run writes no rows and no audit entries', async () => {
+    await seed.seedScenario40();
+    const before = await counts();
+
+    expect(await seed.seedScenario40()).toBeNull();
+    expect(await counts()).toEqual(before);
+  });
+
+  it('keeps provenance complete', async () => {
+    await seed.seedScenario40();
+
+    const missing = await prisma.$queryRaw<Array<{ table_name: string; missing: bigint }>>`
+      SELECT 'source_records' AS table_name, count(*) AS missing
+        FROM source_records
+        WHERE source_system IS NULL OR source_id IS NULL OR observed_at IS NULL OR import_id IS NULL
+      UNION ALL
+      SELECT 'state_observations', count(*)
+        FROM state_observations
+        WHERE source_system IS NULL OR source_id IS NULL OR observed_at IS NULL OR import_id IS NULL
+      UNION ALL
+      SELECT 'relationships', count(*)
+        FROM relationships
+        WHERE source_system IS NULL OR source_id IS NULL OR observed_at IS NULL OR import_id IS NULL
+      UNION ALL
+      SELECT 'events', count(*)
+        FROM events
+        WHERE source_system IS NULL OR source_id IS NULL OR observed_at IS NULL OR import_id IS NULL
+      ORDER BY table_name
+    `;
+    expect(missing).toHaveLength(4);
+    for (const row of missing) {
+      expect(row.missing).toBe(0n);
+    }
+
+    const inferred = await prisma.relationship.findMany({
+      where: { origin: 'INFERRED' },
+      select: { sourceSystem: true, confidence: true, basis: true },
+    });
+    expect(inferred).toHaveLength(2);
+    expect(inferred.every((row) => row.sourceSystem === 'InferenceRules' && row.basis !== null)).toBe(true);
+  });
+
+  it('gives the same final counts whichever scenario is seeded first', async () => {
+    await seed.seedScenario39();
+    await seed.seedScenario40();
+    const thirtyNineFirst = await counts();
+
+    await resetDb(prisma);
+    await seed.seedScenario40();
+    await seed.seedScenario39();
+    const fortyFirst = await counts();
+
+    expect(fortyFirst.entities).toBe(thirtyNineFirst.entities);
+    expect(fortyFirst.relationships).toBe(thirtyNineFirst.relationships);
+    expect(fortyFirst.events).toBe(thirtyNineFirst.events);
+    expect(fortyFirst.sourceRecords).toBe(thirtyNineFirst.sourceRecords);
+    expect(thirtyNineFirst.entities).toBe(44 + 47);
+    expect(thirtyNineFirst.relationships).toBe(102 + 97);
+  });
+});
