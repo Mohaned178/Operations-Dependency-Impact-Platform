@@ -91,6 +91,40 @@ describe('mergeCustomers', () => {
     expect(merged[0]?.attributions).toHaveLength(1);
   });
 
+  it('clears otherCause when a current attribution upgrades a reached customer to CURRENT', () => {
+    const order = ref('Order', 'SO-1', 'BLOCKED');
+    const customer = ref('Customer', 'Acme', 'SUSPENDED');
+    const otherCause = { stateUnknown: false, otherCause: true, inferredOnly: false };
+    const result = mergeCustomers(
+      [
+        affected(order, { classification: 'CURRENT' }),
+        affected(customer, { distance: 3, classification: 'POTENTIAL', flags: otherCause }),
+      ],
+      [attribution(order.id, customer)],
+      start.id,
+    );
+    const merged = result.find((item) => item.entity.id === customer.id);
+    expect(merged?.classification).toBe('CURRENT');
+    expect(merged?.flags.otherCause).toBe(false);
+  });
+
+  it('keeps otherCause when only potential attributions reach the customer', () => {
+    const order = ref('Order', 'SO-1');
+    const customer = ref('Customer', 'Acme', 'SUSPENDED');
+    const otherCause = { stateUnknown: false, otherCause: true, inferredOnly: false };
+    const result = mergeCustomers(
+      [
+        affected(order, { classification: 'POTENTIAL' }),
+        affected(customer, { distance: 3, classification: 'POTENTIAL', flags: otherCause }),
+      ],
+      [attribution(order.id, customer)],
+      start.id,
+    );
+    const merged = result.find((item) => item.entity.id === customer.id);
+    expect(merged?.classification).toBe('POTENTIAL');
+    expect(merged?.flags.otherCause).toBe(true);
+  });
+
   it('ignores attributions of NOT_COUNTED entities', () => {
     const done = ref('Order', 'SO-1', 'COMPLETED');
     const customer = ref('Customer', 'Acme');

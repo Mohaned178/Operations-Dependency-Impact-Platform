@@ -58,9 +58,12 @@ function Figure({
           />
         </p>
       ) : null}
-      {figure.range !== null ? (
+      {figure.disagreementOrderCount > 0 ? (
         <p>
-          {`Source values disagree on ${figure.disagreementOrderCount} ${orderNoun(figure.disagreementOrderCount)}: exposure is between ${formatMoney(figure.range.low, figure.currency)} and ${formatMoney(figure.range.high, figure.currency)}.`}
+          {`Source values disagree on ${figure.disagreementOrderCount} ${orderNoun(figure.disagreementOrderCount)}` +
+            (figure.range === null
+              ? '.'
+              : `: exposure is between ${formatMoney(figure.range.low, figure.currency)} and ${formatMoney(figure.range.high, figure.currency)}.`)}
         </p>
       ) : null}
     </div>

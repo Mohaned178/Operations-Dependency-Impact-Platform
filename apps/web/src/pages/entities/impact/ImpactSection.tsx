@@ -106,7 +106,9 @@ function ImpactContent({
       <ImpactTable categories={data.categories} onOpen={onOpen} />
       <ExposureFigures exposure={data.exposure} notCounted={data.notCounted} onOpen={onOpen} />
 
-      {list !== null ? (
+      {/* While the summary is the previous depth's placeholder, its counts do not match the new
+          depth's list, so the list waits for the new summary. */}
+      {list !== null && !updating ? (
         <ImpactList
           key={JSON.stringify(list)}
           entityId={entityId}

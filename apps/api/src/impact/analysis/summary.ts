@@ -171,8 +171,10 @@ export function buildSummary(input: SummaryInput): string[] {
   // 9
   const disagreeing = sum(figures.map((figure) => figure.disagreementOrderCount));
   if (disagreeing > 0) {
+    const ranges = rangeText(figures);
     lines.push(
-      `${disagreeing} ${orderNoun(disagreeing)} ${hasHave(disagreeing)} values that disagree between sources; exposure could range from ${rangeText(figures)}.`,
+      `${disagreeing} ${orderNoun(disagreeing)} ${hasHave(disagreeing)} values that disagree between sources` +
+        (ranges === '' ? '.' : `; exposure could range from ${ranges}.`),
     );
   }
 

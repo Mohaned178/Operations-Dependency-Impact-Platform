@@ -464,6 +464,27 @@ describe('buildSummary: wording', () => {
     );
   });
 
+  it('line 9 without a range clause when no currency has a range', () => {
+    const disagreeing = (count: number) =>
+      buildSummary(
+        input({
+          countedTotal: count,
+          categories: categories({ Order: [count, 0, count, count, 0, 0, 0] }),
+          exposure: exposure([
+            figure('USD', {
+              total: ['100.00', count],
+              current: ['100.00', count],
+              potential: ['0.00', 0],
+              disagreements: count,
+            }),
+          ]),
+        }),
+      );
+    expect(disagreeing(1)).toContain('1 customer order has values that disagree between sources.');
+    expect(disagreeing(2)).toContain('2 customer orders have values that disagree between sources.');
+    expect(disagreeing(2).some((line) => line.includes('could range'))).toBe(false);
+  });
+
   it('line 10 is not emitted when nothing is counted', () => {
     const lines = buildSummary(
       input({ countedTotal: 0, exposure: exposure([], { own: ['12480.00', 'USD'] }) }),

@@ -132,8 +132,9 @@ export function computeExposure(
         potential: accumulator.potential,
         inferredOnly: accumulator.inferredOnly,
         disagreementOrderCount: accumulator.disagreementOrderCount,
+        // No range when the disagreements are only about the currency (low equals high).
         range:
-          accumulator.disagreementOrderCount > 0
+          accumulator.disagreementOrderCount > 0 && accumulator.low !== accumulator.high
             ? { low: accumulator.low, high: accumulator.high }
             : null,
       }),

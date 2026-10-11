@@ -172,8 +172,26 @@ describe('computeExposure', () => {
     expect(orderValueFlags(mixedValue)).toEqual({ disagreement: true, currencyMismatch: true });
     expect(result.orders.get(mixed.entity.id)?.currencyMismatch).toBe(true);
     const figure = result.byCurrency[0];
-    expect(figure?.range).toEqual({ low: parseAmount('100.00'), high: parseAmount('100.00') });
+    // The conflict stays visible, but a currency-only disagreement gives no range (low = high).
+    expect(figure?.disagreementOrderCount).toBe(1);
+    expect(figure?.range).toBeNull();
     expect(result.byCurrency).toHaveLength(1);
+  });
+
+  it('keeps the range when a currency-only disagreement sits beside an amount disagreement', () => {
+    const mixed = order('Mixed', { classification: 'POTENTIAL' });
+    const disputed = order('Disputed', { classification: 'CURRENT' });
+    const result = computeExposure(
+      [mixed, disputed],
+      new Map([
+        [mixed.entity.id, value('100.00', 'USD', [['OMS', '100.00'], ['ERP', '90.00', 'EUR']])],
+        [disputed.entity.id, value('50.00', 'USD', [['OMS', '50.00'], ['ERP', '60.00']])],
+      ]),
+      START.id,
+    );
+    const figure = result.byCurrency[0];
+    expect(figure?.disagreementOrderCount).toBe(2);
+    expect(figure?.range).toEqual({ low: parseAmount('150.00'), high: parseAmount('160.00') });
   });
 
   it('does not call equal values from several sources a disagreement', () => {

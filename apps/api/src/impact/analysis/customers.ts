@@ -59,13 +59,16 @@ export function mergeCustomers(
       return item;
     }
     const sorted = [...group].sort(compareAttributed);
+    const currentByAttribution = group.some(
+      (entry) => entry.attributed.classification === 'CURRENT',
+    );
     return {
       ...item,
-      classification: group.some((entry) => entry.attributed.classification === 'CURRENT')
-        ? 'CURRENT'
-        : item.classification,
+      classification: currentByAttribution ? 'CURRENT' : item.classification,
       flags: {
         ...item.flags,
+        // A customer made current by a live attribution is impacted by the start, not another cause.
+        otherCause: currentByAttribution ? false : item.flags.otherCause,
         inferredOnly:
           item.flags.inferredOnly && group.every((entry) => entry.attributed.flags.inferredOnly),
       },

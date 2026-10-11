@@ -75,6 +75,35 @@ describe('ExposureFigures', () => {
     expect(screen.getByText(/are left out of exposure\./)).toBeInTheDocument();
   });
 
+  it('names a disagreement without a range when the sources only differ in currency', () => {
+    render(
+      <ExposureFigures
+        exposure={{
+          byCurrency: [
+            {
+              currency: 'USD',
+              total: { amount: '100.00', orderCount: 1 },
+              current: { amount: '100.00', orderCount: 1 },
+              potential: { amount: '0.00', orderCount: 0 },
+              inferredOnly: {
+                total: { amount: '0.00', orderCount: 0 },
+                current: { amount: '0.00', orderCount: 0 },
+                potential: { amount: '0.00', orderCount: 0 },
+              },
+              disagreementOrderCount: 1,
+              range: null,
+            },
+          ],
+          valueUnknownCount: 0,
+        }}
+        notCounted={{ total: 0, byType: [] }}
+        onOpen={vi.fn()}
+      />,
+    );
+    expect(screen.getByText('Source values disagree on 1 customer order.')).toBeInTheDocument();
+    expect(screen.queryByText(/between/)).toBeNull();
+  });
+
   it('shows a share without orders as plain text', () => {
     render(
       <ExposureFigures

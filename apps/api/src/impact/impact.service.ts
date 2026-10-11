@@ -247,14 +247,13 @@ export class ImpactService {
         .map((item) => item.entity.id);
     const countedOrders = countedIds('Order');
 
-    const attributions = await this.graph.findAttributedCustomers({
-      orderIds: countedOrders,
-      slaIds: countedIds('SLA'),
-    });
+    // Independent reads: the attributions add only customers, never orders. The start's own value
+    // is read too (Order, Payment and Invoice starts have one).
+    const [attributions, values] = await Promise.all([
+      this.graph.findAttributedCustomers({ orderIds: countedOrders, slaIds: countedIds('SLA') }),
+      this.orderValues.load([...countedOrders, id]),
+    ]);
     const affected = mergeCustomers(classified, attributions, id);
-
-    // The start's own value is read too (Order, Payment and Invoice starts have one).
-    const values = await this.orderValues.load([...countedOrders, id]);
     const exposure = computeExposure(affected, values, id);
 
     return { computedAt, trace, affected, values, exposure };

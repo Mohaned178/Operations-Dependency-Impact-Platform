@@ -699,7 +699,11 @@ describe('GraphRepository.traceImpact (e2e)', () => {
   const done: ImpactNode = { type: 'Shipment', sourceId: 'DONE', state: 'COMPLETED' };
   const afterDone: ImpactNode = { type: 'Shipment', sourceId: 'AFTER-DONE', state: 'ACTIVE' };
   const inferred: ImpactNode = { type: 'Shipment', sourceId: 'INF', state: 'ACTIVE' };
-  const nodes = [sup, p1, sh1, sh2, sh3, sh5, done, afterDone, inferred];
+  // A separate chain whose only entity past depth 1 is COMPLETED.
+  const chainStart: ImpactNode = { type: 'Shipment', sourceId: 'CHAIN-START', state: 'BLOCKED' };
+  const chainMid: ImpactNode = { type: 'Shipment', sourceId: 'CHAIN-MID', state: 'WAITING' };
+  const chainEnd: ImpactNode = { type: 'Shipment', sourceId: 'CHAIN-END', state: 'COMPLETED' };
+  const nodes = [sup, p1, sh1, sh2, sh3, sh5, done, afterDone, inferred, chainStart, chainMid, chainEnd];
 
   let app: INestApplication;
   let prisma: PrismaService;
@@ -724,6 +728,8 @@ describe('GraphRepository.traceImpact (e2e)', () => {
           impactRelationship('DEPENDS_ON', done, sup),
           impactRelationship('DEPENDS_ON', afterDone, done),
           impactRelationship('DEPENDS_ON', inferred, sup, { origin: 'INFERRED', confidence: 'LOW' }),
+          impactRelationship('DEPENDS_ON', chainMid, chainStart),
+          impactRelationship('DEPENDS_ON', chainEnd, chainMid),
         ],
       }),
     });
@@ -757,6 +763,16 @@ describe('GraphRepository.traceImpact (e2e)', () => {
     const deep = await repository.traceImpact({ startId: await idOf(sup), maxDepth: 6 });
     expect(deep?.depthLimitReached).toBe(false);
     expect(deep?.explorationLimitReached).toBe(false);
+  });
+
+  it('does not flag a depth cut when the only entity past the depth is COMPLETED', async () => {
+    const trace = await repository.traceImpact({ startId: await idOf(chainStart), maxDepth: 1 });
+    expect(trace?.reached.map((row) => row.entity.displayName)).toEqual(['CHAIN-MID']);
+    expect(trace?.depthLimitReached).toBe(false);
+
+    const full = await repository.traceImpact({ startId: await idOf(chainStart), maxDepth: 2 });
+    expect(full?.reached.map((row) => row.entity.displayName)).toEqual(['CHAIN-MID', 'CHAIN-END']);
+    expect(full?.depthLimitReached).toBe(false);
   });
 
   it('reports distances, live paths and sourced reach for the hand-built graph', async () => {

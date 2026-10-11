@@ -165,6 +165,30 @@ describe('ImpactSection', () => {
     expect(within(notice as HTMLElement).getByRole('button', { name: 'Refresh' })).toBeInTheDocument();
   });
 
+  it('hides an opened list while the new depth loads, so it is never compared with the old summary', async () => {
+    let resolveDepth3: (value: unknown) => void = () => undefined;
+    const depth3 = new Promise((resolve) => {
+      resolveDepth3 = resolve;
+    });
+    apiFetchMock.mockImplementation((path: string) =>
+      path === `/entities/${FAB_ID}/impact?depth=3` ? depth3 : answer(path),
+    );
+    renderSection(FAB_ID, `/entities/${FAB_ID}?ilist=category.Order.current`);
+    expect(await screen.findByRole('heading', { name: 'Customer orders — current (6)' })).toBeInTheDocument();
+
+    await userEvent.selectOptions(screen.getByRole('combobox', { name: /Depth/ }), '3');
+    expect(await screen.findByText('Updating…')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: /Customer orders — current/ })).toBeNull();
+    const itemUrls = () =>
+      apiFetchMock.mock.calls.map((call) => String(call[0])).filter((url) => url.includes('/impact/items'));
+    expect(itemUrls().some((url) => url.includes('depth=3'))).toBe(false);
+
+    resolveDepth3(I1_SUMMARY);
+    expect(await screen.findByRole('heading', { name: 'Customer orders — current (6)' })).toBeInTheDocument();
+    expect(itemUrls().some((url) => url.includes('depth=3'))).toBe(true);
+    expect(screen.queryByText(/The data has changed/)).toBeNull();
+  });
+
   it('shows its own error state without throwing', async () => {
     apiFetchMock.mockRejectedValue(new Error('down'));
     renderSection();

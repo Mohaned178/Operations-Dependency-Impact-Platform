@@ -815,7 +815,11 @@ export class PrismaGraphRepository implements GraphRepository {
 
     const others = reached.filter((row) => row.depth > 0);
     const within = others.filter((row) => row.depth <= maxDepth).sort(compareReached);
-    const beyondDepth = others.some((row) => row.depth === maxDepthPlusOne);
+    // A terminal entity past the depth is never counted, so it alone does not hit the depth limit.
+    const beyondDepth = others.some(
+      (row) =>
+        row.depth === maxDepthPlusOne && !TERMINAL_STATES.includes(row.entity.currentState),
+    );
     const explorationLimitReached = within.length > TRACING_LIMITS.maxReachedEntities;
     const kept = explorationLimitReached
       ? within.slice(0, TRACING_LIMITS.maxReachedEntities)
