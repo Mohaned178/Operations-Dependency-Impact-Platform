@@ -296,26 +296,26 @@
 
 **Independent test**: for Fabrikam, open every non-zero cell and exposure figure. Each list's `total` equals its number. Exposure lists add up to `sum`. Every item's path starts at Fabrikam and ends at the item.
 
-- [ ] T029 [US2] In `apps/api/src/impact/impact.service.ts`, add `list()` (data-model §4c):
+- [x] T029 [US2] In `apps/api/src/impact/impact.service.ts`, add `list()` (data-model §4c):
   1. Run `selectList`, `compareForList` and `paginate`.
   2. Call `trace.paths(pageIds)` for non-customer items.
   3. Make **one** `StateEvidenceReader.load` call over the start, every hop target of every primary, shortest and attribution-preview link path on the page (KDN 8).
   4. Set `sum` for exposure lists. A currency with no figure gives `total 0`, `items []` and `sum '0.00'`.
   5. Map with `toAffectedEntityDto`.
-- [ ] T030 [US2] In `apps/api/src/impact/impact.service.ts`, add `item()` (data-model §4c):
+- [x] T030 [US2] In `apps/api/src/impact/impact.service.ts`, add `item()` (data-model §4c):
   - a target not in `affected` gives `Errors.notFound('Affected entity')`;
   - `alternativePaths` per contracts/api.md § Field rules: found plus shortest, minus primary, top 20 by `comparePaths`;
   - customer attributions: up to 200, each with the attributed entity's `primaryPath` and its `link`;
   - one evidence load.
-- [ ] T031 [US2] In `apps/api/src/impact/impact.controller.ts`, add:
+- [x] T031 [US2] In `apps/api/src/impact/impact.controller.ts`, add:
   - `@Get(':id/impact/items')`, with `ZodValidationPipe(ImpactListQuerySchema)`;
   - `@Get(':id/impact/items/:targetId')`, with `ParseUUIDPipe` on both ids and `ImpactQuerySchema`.
 
   Declare the `items/:targetId` route after `items`.
-- [ ] T032 [US2] Extend `apps/api/test/impact-seed.e2e-spec.ts` with:
+- [x] T032 [US2] Extend `apps/api/test/impact-seed.e2e-spec.ts` with:
   - **Fixtures I2, I3 and I4**, asserted literally: item order, classifications, distances, path counts, `shortestPath` null for SO-20401, the flags, `weakest`, attribution counts and link hop counts, the not-counted list, the SO-20404 detail with 5 alternatives, and **404** for every control entity and for the start;
   - **Fixture I5** (list part): each I2 list is identical across 100 calls.
-- [ ] T033 [US2] Extend `apps/api/test/impact-seed.e2e-spec.ts` with a **list invariants** test (KDN 7). For Fabrikam, Payment PAY-88213 and Warehouse WH-EAST-02, loop over **every** non-zero category cell (each bucket), every exposure figure share (`total`, `current`, `potential`, `inferredOnly`), `valueUnknown` and `notCounted`. Fetch every page with `limit=7`, so pagination is exercised. Assert:
+- [x] T033 [US2] Extend `apps/api/test/impact-seed.e2e-spec.ts` with a **list invariants** test (KDN 7). For Fabrikam, Payment PAY-88213 and Warehouse WH-EAST-02, loop over **every** non-zero category cell (each bucket), every exposure figure share (`total`, `current`, `potential`, `inferredOnly`), `valueUnknown` and `notCounted`. Fetch every page with `limit=7`, so pagination is exercised. Assert:
   - the concatenated length equals the summary number;
   - there are no duplicate ids;
   - every non-customer item's `primaryPath` starts with a hop whose `fromEntityId` or `toEntityId` is the start and ends at the item;
