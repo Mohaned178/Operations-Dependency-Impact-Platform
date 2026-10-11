@@ -70,4 +70,6 @@ RUN_PERF=1 pnpm --filter api test:e2e -- perf-root-cause   # record p95 below
 
 | Measurement (50k entities / 150k relationships, 6-hop chain, 20 runs) | Target | Recorded |
 |---|---|---|
-| `GET /root-cause` p95 | < 1.5 s (SC-003) | _fill in_ |
+| `GET /root-cause` p95 | < 1.5 s (SC-003) | 55 ms (runs 30–69 ms; 2026-10-11, local Docker Postgres 16) |
+
+The dataset is the `perf-tracing` graph plus the evidence tables: one state observation and source record per entity, one source record per relationship, one event per entity, and 25 extra events on each chain entity (so the 20-event cap is exercised). The index check in research R13 was not needed because the budget was met with a wide margin.
