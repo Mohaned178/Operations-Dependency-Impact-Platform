@@ -11,6 +11,7 @@ import { MemoryRouter, Route, Routes } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../../lib/api-client';
 import { EntityDetailPage } from './EntityDetailPage';
+import { R4_NOT_BLOCKED } from './root-cause-test-data';
 import { F1_BLOCKERS, sentence } from './tracing-test-data';
 
 const { apiFetchMock } = vi.hoisted(() => ({ apiFetchMock: vi.fn() }));
@@ -209,53 +210,59 @@ const SOURCE_RECORDS: SourceRecordListResponse = {
   nextCursor: null,
 };
 
+/** Answers each request of the page with its valid response; unknown paths reject. */
+function answerHappyPath(path: string): Promise<unknown> {
+  if (path === `/entities/${ENTITY_ID}`) {
+    return Promise.resolve(ENTITY);
+  }
+  if (path.startsWith(`/entities/${ENTITY_ID}/neighbors`)) {
+    return Promise.resolve(NEIGHBORS);
+  }
+  if (path.startsWith(`/entities/${ENTITY_ID}/timeline`)) {
+    return Promise.resolve(TIMELINE);
+  }
+  if (path.startsWith(`/entities/${ENTITY_ID}/states`)) {
+    return Promise.resolve(STATES);
+  }
+  if (path.startsWith(`/entities/${ENTITY_ID}/source-records`)) {
+    return Promise.resolve(SOURCE_RECORDS);
+  }
+  if (path === `/entities/${ENTITY_ID}/blockers`) {
+    return Promise.resolve(F1_BLOCKERS);
+  }
+  if (path === `/entities/${ENTITY_ID}/root-cause`) {
+    return Promise.resolve(R4_NOT_BLOCKED);
+  }
+  if (path.startsWith(`/entities/${ENTITY_ID}/dependencies`)) {
+    return Promise.resolve({
+      query: {
+        entityId: ENTITY_ID,
+        kind: 'upstream',
+        depth: 6,
+        relationshipTypes: ['REQUIRES'],
+        entityTypes: [],
+      },
+      computedAt: '2026-10-06T09:00:00.000Z',
+      start: {
+        id: ENTITY_ID,
+        type: 'Order',
+        displayName: 'Order #18492',
+        currentState: 'BLOCKED',
+        state: { classification: 'UNSATISFIED', observation: null, latestBySource: [] },
+      },
+      truncation: { depthLimit: false, explorationLimit: false, pathLimit: false },
+      totalReached: 0,
+      items: [],
+      nextCursor: null,
+      cycleClosingHops: [],
+      cycleClosingHopCount: 0,
+    });
+  }
+  return Promise.reject(new Error(`Unexpected path ${path}`));
+}
+
 function mockHappyPath(): void {
-  apiFetchMock.mockImplementation((path: string) => {
-    if (path === `/entities/${ENTITY_ID}`) {
-      return Promise.resolve(ENTITY);
-    }
-    if (path.startsWith(`/entities/${ENTITY_ID}/neighbors`)) {
-      return Promise.resolve(NEIGHBORS);
-    }
-    if (path.startsWith(`/entities/${ENTITY_ID}/timeline`)) {
-      return Promise.resolve(TIMELINE);
-    }
-    if (path.startsWith(`/entities/${ENTITY_ID}/states`)) {
-      return Promise.resolve(STATES);
-    }
-    if (path.startsWith(`/entities/${ENTITY_ID}/source-records`)) {
-      return Promise.resolve(SOURCE_RECORDS);
-    }
-    if (path === `/entities/${ENTITY_ID}/blockers`) {
-      return Promise.resolve(F1_BLOCKERS);
-    }
-    if (path.startsWith(`/entities/${ENTITY_ID}/dependencies`)) {
-      return Promise.resolve({
-        query: {
-          entityId: ENTITY_ID,
-          kind: 'upstream',
-          depth: 6,
-          relationshipTypes: ['REQUIRES'],
-          entityTypes: [],
-        },
-        computedAt: '2026-10-06T09:00:00.000Z',
-        start: {
-          id: ENTITY_ID,
-          type: 'Order',
-          displayName: 'Order #18492',
-          currentState: 'BLOCKED',
-          state: { classification: 'UNSATISFIED', observation: null, latestBySource: [] },
-        },
-        truncation: { depthLimit: false, explorationLimit: false, pathLimit: false },
-        totalReached: 0,
-        items: [],
-        nextCursor: null,
-        cycleClosingHops: [],
-        cycleClosingHopCount: 0,
-      });
-    }
-    return Promise.reject(new Error(`Unexpected path ${path}`));
-  });
+  apiFetchMock.mockImplementation(answerHappyPath);
 }
 
 /** The Relationships section, so assertions do not match the same names in Blockers. */
@@ -313,14 +320,16 @@ describe('EntityDetailPage', () => {
     expect(await screen.findByText('Raw payload')).toBeInTheDocument();
   });
 
-  it('shows the blocker callout in the header and the Blockers section between Current state and Relationships', async () => {
+  it('shows the blocker callout in the header and the Root cause and Blockers sections between Current state and Dependencies', async () => {
     const { container } = renderPage();
 
     const callout = await screen.findByRole('note');
     expect(within(callout).getByText(F1_BLOCKERS.summary)).toBeInTheDocument();
     expect(
       within(callout).getByText(
-        sentence('Order #18492 is blocked because it requires Payment PAY-88213, which is PENDING.'),
+        sentence(
+          'Order #18492 is blocked because it requires Payment PAY-88213, which is PENDING.',
+        ),
       ),
     ).toBeInTheDocument();
     expect(callout.closest('header')).not.toBeNull();
@@ -331,6 +340,7 @@ describe('EntityDetailPage', () => {
     expect(headings).toEqual([
       'Identity',
       'Current state',
+      'Root cause',
       'Blockers',
       'Dependencies',
       'Relationships',
@@ -350,6 +360,9 @@ describe('EntityDetailPage', () => {
 
   it('shows one failing section without blanking the others', async () => {
     apiFetchMock.mockImplementation((path: string) => {
+      if (path === `/entities/${ENTITY_ID}/root-cause`) {
+        return Promise.resolve(R4_NOT_BLOCKED);
+      }
       if (path.startsWith(`/entities/${ENTITY_ID}/neighbors`)) {
         return Promise.reject(new Error('down'));
       }
@@ -402,6 +415,9 @@ describe('EntityDetailPage', () => {
 
   it('shows the Blockers error while Identity, Dependencies and Relationships still render', async () => {
     apiFetchMock.mockImplementation((path: string) => {
+      if (path === `/entities/${ENTITY_ID}/root-cause`) {
+        return Promise.resolve(R4_NOT_BLOCKED);
+      }
       if (path === `/entities/${ENTITY_ID}/blockers`) {
         return Promise.reject(new Error('down'));
       }
@@ -453,6 +469,27 @@ describe('EntityDetailPage', () => {
     expect(
       await within(await relationshipsSection()).findByText('Payment PAY-88213'),
     ).toBeInTheDocument();
+  });
+
+  it('keeps Identity and Blockers rendered when the root-cause request fails', async () => {
+    apiFetchMock.mockImplementation((path: string) =>
+      path === `/entities/${ENTITY_ID}/root-cause`
+        ? Promise.reject(new Error('down'))
+        : answerHappyPath(path),
+    );
+
+    renderPage();
+
+    expect(await screen.findByRole('heading', { name: 'Identity' })).toBeInTheDocument();
+    expect(await screen.findByText('12,480.00 USD')).toBeInTheDocument();
+
+    const blockersSection = (await screen.findByRole('heading', { name: 'Blockers' })).closest(
+      'section',
+    );
+    if (blockersSection === null) {
+      throw new Error('Blockers section not found');
+    }
+    expect(await within(blockersSection).findByText(F1_BLOCKERS.summary)).toBeInTheDocument();
   });
 
   it('shows "Entity not found" for a 404', async () => {

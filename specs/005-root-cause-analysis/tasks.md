@@ -247,22 +247,22 @@
 
 ### Web (`apps/web/src/pages/entities/`, research R11)
 
-- [ ] T024 [P] [US1] Create `root-cause-test-data.ts` with typed `RootCauseResponse` constants:
+- [x] T024 [P] [US1] Create `root-cause-test-data.ts` with typed `RootCauseResponse` constants:
   - `R1_ORDER` (the R1 shape);
   - `R2_SHIPMENT` (with 1 alternative chain);
   - `R4_NOT_BLOCKED`;
   - `R5_UNEXPLAINED`.
 
   Each must parse with `RootCauseResponseSchema`; assert this in the first component test. Reuse entity and hop samples from `tracing-test-data.ts` where they fit.
-- [ ] T025 [P] [US1] Create `useRootCause.ts`: `useRootCause(entityId)` is a `useQuery` with key `['entities', entityId, 'root-cause']`, and `apiFetch('/entities/${id}/root-cause', { schema: RootCauseResponseSchema })`.
-- [ ] T026 [P] [US1] Create `StepEvidence.tsx`, which renders one step's evidence from `EntityEvidenceDto` plus, when the step has a hop, its `RelationshipEvidenceDto`s. Groups are headed **State records**, **Relationship records**, **Requirement sources**, **Events (n of total)** and **Notes**. Every item shows its source system, source id and observed time (`formatTimestamp`), and `OriginBadge` for non-SOURCE items. A requirement source shows its relationship (`Contract CON-3982 DEFINES Budget code…`) and its attributes as key: value lines. Leave the Notes group showing only the list for now: a read-only list of text, stance and author, marked "retracted" when inactive. US3 replaces it. Create `StepEvidence.test.tsx` (BR-18492 evidence from R1 shows the clause and "Events (1 of 1)").
-- [ ] T027 [US1] Create `CausalChainView.tsx`:
+- [x] T025 [P] [US1] Create `useRootCause.ts`: `useRootCause(entityId)` is a `useQuery` with key `['entities', entityId, 'root-cause']`, and `apiFetch('/entities/${id}/root-cause', { schema: RootCauseResponseSchema })`.
+- [x] T026 [P] [US1] Create `StepEvidence.tsx`, which renders one step's evidence from `EntityEvidenceDto` plus, when the step has a hop, its `RelationshipEvidenceDto`s. Groups are headed **State records**, **Relationship records**, **Requirement sources**, **Events (n of total)** and **Notes**. Every item shows its source system, source id and observed time (`formatTimestamp`), and `OriginBadge` for non-SOURCE items. A requirement source shows its relationship (`Contract CON-3982 DEFINES Budget code…`) and its attributes as key: value lines. Leave the Notes group showing only the list for now: a read-only list of text, stance and author, marked "retracted" when inactive. US3 replaces it. Create `StepEvidence.test.tsx` (BR-18492 evidence from R1 shows the clause and "Events (1 of 1)").
+- [x] T027 [US1] Create `CausalChainView.tsx`:
   - an ordered list of steps;
   - each step shows its `RoleBadge` (text labels: Symptom, Immediate Blocker, Upstream Cause, Root Cause; multiple roles show multiple badges), the entity link (`/entities/:id`), `StateBadge`, "possible" when `possible`, and the linking relationship as recorded with `OriginBadge` and its confidence;
   - a disclosure button per step reveals `StepEvidence`.
 
   Create `CausalChainView.test.tsx` covering R1's 4 steps and roles, an R8-like step with 2 badges, and expanding a step to show its evidence.
-- [ ] T028 [US1] Create `RootCauseCandidate.tsx`. It renders:
+- [x] T028 [US1] Create `RootCauseCandidate.tsx`. It renders:
   - the `headline`;
   - the `explanation.chain` sentences through `ExplanationSentence`, with link targets built from the chain's step entities. If `linkTargets` only accepts a start and a path, add an overload that takes `TracedEntityDto[]`, without changing existing callers;
   - `explanation.confidence` and `explanation.evidence`;
@@ -270,7 +270,7 @@
   - a collapsed "Alternative chains (n)" disclosure, with one `CausalChainView` each.
 
   Create `RootCauseCandidate.test.tsx` covering R1 (headline, 3 sentences, evidence sentence) and R2 (the alternative chain is collapsed by default, and expanding it shows "manually recorded").
-- [ ] T029 [US1] Create `RootCauseSection.tsx` (`<section id="root-cause">`, heading `Root cause`, using `useRootCause`):
+- [x] T029 [US1] Create `RootCauseSection.tsx` (`<section id="root-cause">`, heading `Root cause`, using `useRootCause`):
   - **loading**: a loading line;
   - **error**: its own `role="alert"` line, without throwing;
   - **NOT_BLOCKED**: a single line containing the `summary`;
@@ -278,7 +278,7 @@
   - **ROOT_CAUSES_FOUND**: the `summary`, then one `RootCauseCandidate` per candidate.
 
   Create `RootCauseSection.test.tsx` covering all four states, using `apiFetchMock` as in `BlockerCallout.test.tsx`.
-- [ ] T030 [US1] Update `BlockerCallout.tsx` (research R11):
+- [x] T030 [US1] Update `BlockerCallout.tsx` (research R11):
   - use `useRootCause` and `useBlockers`;
   - when there are candidates, render the root-cause `summary`, the first candidate's `headline` and its chain sentences, and a link `#root-cause` ("See root cause");
   - then, when blockers exist, the 003 blocker `summary` and the link `#blockers`;
@@ -288,7 +288,7 @@
   - R1 together with F2 shows the headline and no duplicate explanation;
   - a mismatching-chain case shows both explanations;
   - a failed root-cause query still shows the blocker summary.
-- [ ] T031 [US1] In `EntityDetailPage.tsx`, render `<RootCauseSection entityId={entity.id} />` between `CurrentStateSection` and `BlockersSection`. In `EntityDetailPage.test.tsx`:
+- [x] T031 [US1] In `EntityDetailPage.tsx`, render `<RootCauseSection entityId={entity.id} />` between `CurrentStateSection` and `BlockersSection`. In `EntityDetailPage.test.tsx`:
   - add a mock answer for `/root-cause`;
   - update the heading-order test to Identity, Current state, Root cause, Blockers, Dependencies, Relationships, Timeline, Source records;
   - keep the FR-032 assertion (no risk, exception, impact or investigation headings);
