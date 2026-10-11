@@ -141,7 +141,7 @@
   - ordering with a MEDIUM X and a HIGH Y gives Y first;
   - equal confidence keeps `primaryIndex` order;
   - `[]` gives `[]`.
-- [ ] T015 Create `explanation.ts` (root-cause), with pure functions exactly as specified in contracts/api.md § Explanation text:
+- [x] T015 Create `explanation.ts` (root-cause), with pure functions exactly as specified in contracts/api.md § Explanation text:
   - `headline(candidate fields, candidateCount, depth)`;
   - one reason builder per rule: `weakestLinkReason`, `unknownStateReason`, `cycleReason`, `searchLimitReason`, `staleReason`, `disagreementReason`, `corroborationReason`, `disputedReason`. Each takes the data it names and returns the applied or not-applied sentence;
   - `evidenceSentence(keyEvidence, eventCount)`;
@@ -157,7 +157,7 @@
   - an R7-shaped disputed reason with a 97-character text, giving the exact 80-character excerpt plus `…`;
   - the headline variants: LOW, more than one candidate, `(state unknown)`, `(circular dependency)`, `(deepest cause found within 6 steps)`, and all three suffixes together in order;
   - the summary variants: 1 LOW candidate and k = 2.
-- [ ] T016 Create `confidence.ts`: `computeConfidence(input: ConfidenceInput): ConfidenceResult`. It follows research R6 exactly, using the reason builders from T015.
+- [x] T016 Create `confidence.ts`: `computeConfidence(input: ConfidenceInput): ConfidenceResult`. It follows research R6 exactly, using the reason builders from T015.
   - It always returns 8 outcomes, in `CONFIDENCE_RULES` order.
   - Each outcome carries `confidenceAfter` and sorted `refs` (contracts/api.md § Refs).
   - `lower()` floors at LOW.
@@ -177,7 +177,7 @@
   - rule 8 with a retracted DISPUTES note (ignored), and with SUPPORTS and CONTEXT notes (ignored);
   - HIGH with rules 5, 6, 7 and 8 all firing gives LOW, with each firing once;
   - the full R1 input gives HIGH and exactly the 8 R1 reasons.
-- [ ] T017 [P] Create `key-evidence.ts`:
+- [x] T017 [P] Create `key-evidence.ts`:
   - `keyEvidence(chain: CausalChainDto, entityEvidence): KeyEvidenceItemDto[]`, following contracts/api.md § Key evidence: chain order, state records then requirement-source state records, de-duplicated by `sourceRecordId`, skipping null state records;
   - `eventCount(chain, entityEvidence): number`: the distinct event ids over the steps' `events.items`.
 

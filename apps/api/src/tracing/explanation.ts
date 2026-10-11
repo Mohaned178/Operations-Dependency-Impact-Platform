@@ -6,7 +6,7 @@ function label(entity: TracedEntityDto): string {
   return entity.currentState.toLowerCase().replaceAll('_', ' ');
 }
 
-function steps(count: number): string {
+export function steps(count: number): string {
   return `${count} step${count === 1 ? '' : 's'}`;
 }
 

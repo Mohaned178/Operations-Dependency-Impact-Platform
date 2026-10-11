@@ -16,6 +16,8 @@ export interface ConfidenceInput {
   /** From BlockersResponse.deepestBlockers. */
   deepest: BlockerDto;
   truncation: TruncationDto;
+  /** The query depth, for the SEARCH_LIMIT reasons ("within 6 steps"). */
+  depth: number;
   evaluatedAt: Date;
   /** Evidence for every entity on the chain, start included. */
   entityEvidence: ReadonlyMap<string, EntityEvidenceDto>;
