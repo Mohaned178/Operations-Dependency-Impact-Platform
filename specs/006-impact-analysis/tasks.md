@@ -40,7 +40,7 @@
 
 ## Phase 1: Setup
 
-- [ ] T001 On branch `006-impact-analysis`, confirm the baseline is green before any change. With `docker compose up -d db` running, run the standard gate plus `pnpm build`. If anything fails, stop and record it in `specs/006-impact-analysis/questions.md`. Do not fix 003 code in this feature. The untracked `specs/004-graph-explorer/` folder is unrelated: do not touch or commit it.
+- [x] T001 On branch `006-impact-analysis`, confirm the baseline is green before any change. With `docker compose up -d db` running, run the standard gate plus `pnpm build`. If anything fails, stop and record it in `specs/006-impact-analysis/questions.md`. Do not fix 003 code in this feature. The untracked `specs/004-graph-explorer/` folder is unrelated: do not touch or commit it.
 
 ---
 
