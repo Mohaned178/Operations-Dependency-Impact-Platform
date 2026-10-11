@@ -13,7 +13,6 @@ import {
   type JsonValue,
   type OperationalState,
   type RelationshipImportRowInput,
-  type TraceableRelationshipType,
 } from '@opsgraph/shared';
 import type { ImportSnapshot } from '../planning/import-plan';
 import { planImport } from '../planning/import-planner';
@@ -73,7 +72,7 @@ function analyze(document: ImportDocument) {
   const relationships: RelationshipImportRowInput[] = document.relationships ?? [];
   for (const row of relationships) {
     if (row.type === 'RELATES_TO') continue;
-    const direction = DEPENDENCY_DIRECTION[row.type as TraceableRelationshipType];
+    const direction = DEPENDENCY_DIRECTION[row.type];
     const from = nodeKey(keyRefOf(row.from));
     const to = nodeKey(keyRefOf(row.to));
     const edge: Edge =
