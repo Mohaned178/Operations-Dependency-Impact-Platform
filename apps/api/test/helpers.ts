@@ -38,10 +38,14 @@ export async function resetDb(prisma: PrismaService): Promise<void> {
   await prisma.$executeRaw`ALTER TABLE audit_entries DISABLE TRIGGER USER`;
   await prisma.$executeRaw`ALTER TABLE source_records DISABLE TRIGGER USER`;
   await prisma.$executeRaw`ALTER TABLE state_observations DISABLE TRIGGER USER`;
-  await prisma.$executeRaw`TRUNCATE users, refresh_tokens, imports, entities, entity_identifiers, source_records, state_observations, relationships, events, event_entities CASCADE`;
+  await prisma.$executeRaw`ALTER TABLE evidence_notes DISABLE TRIGGER USER`;
+  await prisma.$executeRaw`ALTER TABLE evidence_note_retractions DISABLE TRIGGER USER`;
+  await prisma.$executeRaw`TRUNCATE evidence_note_retractions, evidence_notes, users, refresh_tokens, imports, entities, entity_identifiers, source_records, state_observations, relationships, events, event_entities CASCADE`;
   await prisma.$executeRaw`DELETE FROM audit_entries`;
   await prisma.$executeRaw`ALTER TABLE source_records ENABLE TRIGGER USER`;
   await prisma.$executeRaw`ALTER TABLE state_observations ENABLE TRIGGER USER`;
+  await prisma.$executeRaw`ALTER TABLE evidence_notes ENABLE TRIGGER USER`;
+  await prisma.$executeRaw`ALTER TABLE evidence_note_retractions ENABLE TRIGGER USER`;
   await prisma.$executeRaw`ALTER TABLE audit_entries ENABLE TRIGGER USER`;
 }
 

@@ -1,7 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import type { INestApplication } from '@nestjs/common';
-import type { EntityType } from '@opsgraph/shared';
+import {
+  RelationshipTypeSchema,
+  TRACEABLE_RELATIONSHIP_TYPES,
+  type EntityType,
+} from '@opsgraph/shared';
 import { GRAPH_REPOSITORY, type GraphRepository } from '../src/graph/graph.repository';
+import { SeedService } from '../src/ingestion/seed/seed.service';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { createTestApp, entityIdByKey, resetDb, runImport } from './helpers';
 
@@ -434,5 +439,212 @@ describe('Recursive CTE smoke test on a 3-node cycle (research R3)', () => {
       depthByKey.set(sourceId, row.depth);
     }
     expect(Object.fromEntries(depthByKey)).toEqual({ A: 0, B: 1, C: 2 });
+  });
+});
+
+describe('GraphRepository neighborhood on the seeded �39 scenario (e2e)', () => {
+  let app: INestApplication;
+  let repository: GraphRepository;
+  let orderId: string;
+  let budgetId: string;
+
+  beforeAll(async () => {
+    app = await createTestApp();
+    const prisma = app.get(PrismaService);
+    repository = app.get<GraphRepository>(GRAPH_REPOSITORY);
+    await resetDb(prisma);
+    const report = await app.get(SeedService).seedScenario39();
+    expect(report?.outcome).toBe('APPLIED');
+    orderId = await entityIdByKey(prisma, 'Order', 'OMS', '18492');
+    budgetId = await entityIdByKey(prisma, 'BudgetRequirement', 'FinanceApprovals', 'BR-18492');
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  async function neighborhoodIds(startId: string) {
+    const trace = await repository.traceNeighborhood({
+      startId,
+      walk: 'ALL',
+      maxDepth: 2,
+      relationshipTypes: RelationshipTypeSchema.options,
+    });
+    if (trace === null) {
+      throw new Error('expected a neighborhood');
+    }
+    return trace;
+  }
+
+  describe.each([
+    ['UPSTREAM', 'Order #18492'],
+    ['DOWNSTREAM', 'Order #18492'],
+    ['UPSTREAM', 'Budget code'],
+    ['DOWNSTREAM', 'Budget code'],
+  ] as const)('%s walk from %s', (walk, label) => {
+    it.each([1, 2, 3, 4])('matches traceDependencies at depth %i', async (depth) => {
+      const startId = label === 'Budget code' ? budgetId : orderId;
+      const neighborhood = await repository.traceNeighborhood({
+        startId,
+        walk,
+        maxDepth: depth,
+        relationshipTypes: TRACEABLE_RELATIONSHIP_TYPES,
+      });
+      const dependencies = await repository.traceDependencies({
+        startId,
+        direction: walk,
+        maxDepth: depth,
+        relationshipTypes: TRACEABLE_RELATIONSHIP_TYPES,
+      });
+      expect(neighborhood).not.toBeNull();
+      expect(dependencies).not.toBeNull();
+      expect(neighborhood?.start.id).toBe(startId);
+      expect(neighborhood?.reached.map((r) => [r.entity.id, r.distance])).toEqual(
+        dependencies?.reached.map((r) => [r.entity.id, r.distance]),
+      );
+      expect(neighborhood?.reached.map((r) => r.pathEntityIds)).toEqual(
+        dependencies?.reached.map((r) => [startId, ...r.path.hops.map((h) => h.target.id)]),
+      );
+      expect(neighborhood?.reached.map((r) => r.pathEdgeKeys)).toEqual(
+        dependencies?.reached.map((r) => r.path.hops.map((h) => h.key)),
+      );
+    });
+  });
+
+  it('reaches 31 entities for ALL at depth 2 from Order #18492 (fixture N1)', async () => {
+    const trace = await neighborhoodIds(orderId);
+    expect(trace.reached).toHaveLength(31);
+    expect(trace.explorationLimitReached).toBe(false);
+    expect(trace.reached.filter((r) => r.distance === 1)).toHaveLength(7);
+    expect(trace.reached.filter((r) => r.distance === 2)).toHaveLength(24);
+    for (const reached of trace.reached) {
+      expect(reached.pathEntityIds[0]).toBe(orderId);
+      expect(reached.pathEntityIds.at(-1)).toBe(reached.entity.id);
+      expect(reached.pathEdgeKeys).toHaveLength(reached.pathEntityIds.length - 1);
+      expect(reached.pathEdgeKeys.length).toBeGreaterThanOrEqual(reached.distance);
+    }
+  });
+
+  it('returns null for a nonexistent start entity', async () => {
+    await expect(
+      repository.traceNeighborhood({
+        startId: randomUUID(),
+        walk: 'ALL',
+        maxDepth: 2,
+        relationshipTypes: RelationshipTypeSchema.options,
+      }),
+    ).resolves.toBeNull();
+  });
+
+  it('refuses RELATES_TO for a directed walk', async () => {
+    await expect(
+      repository.traceNeighborhood({
+        startId: orderId,
+        walk: 'UPSTREAM',
+        maxDepth: 1,
+        relationshipTypes: ['RELATES_TO'],
+      }),
+    ).rejects.toThrow('RELATES_TO');
+  });
+
+  it('finds 60 relationship groups among the N1 entities, sorted by key (fixture N1)', async () => {
+    const trace = await neighborhoodIds(orderId);
+    const ids = [trace.start.id, ...trace.reached.map((r) => r.entity.id)];
+    expect(ids).toHaveLength(32);
+    const groups = await repository.findRelationshipsAmong(ids, RelationshipTypeSchema.options);
+    expect(groups).toHaveLength(60);
+    const keys = groups.map((g) => g.key);
+    expect(keys).toEqual([...keys].sort());
+    const idSet = new Set(ids);
+    for (const group of groups) {
+      expect(idSet.has(group.fromEntityId)).toBe(true);
+      expect(idSet.has(group.toEntityId)).toBe(true);
+      expect(group.assertions.length).toBeGreaterThanOrEqual(1);
+    }
+  });
+
+  it('returns no groups for empty ids or empty types', async () => {
+    await expect(
+      repository.findRelationshipsAmong([], RelationshipTypeSchema.options),
+    ).resolves.toEqual([]);
+    await expect(repository.findRelationshipsAmong([orderId], [])).resolves.toEqual([]);
+  });
+});
+
+describe('GraphRepository.findIncomingRelationships on the seeded §39 scenario (e2e)', () => {
+  const CLAUSE = 'Orders above 10,000.00 USD require finance approval with a budget code';
+  let app: INestApplication;
+  let prisma: PrismaService;
+  let repository: GraphRepository;
+  let orderId: string;
+  let budgetId: string;
+  let contractId: string;
+
+  beforeAll(async () => {
+    app = await createTestApp();
+    prisma = app.get(PrismaService);
+    repository = app.get<GraphRepository>(GRAPH_REPOSITORY);
+
+    await resetDb(prisma);
+    const report = await app.get(SeedService).seedScenario39();
+    expect(report?.outcome).toBe('APPLIED');
+
+    orderId = await entityIdByKey(prisma, 'Order', 'OMS', '18492');
+    budgetId = await entityIdByKey(prisma, 'BudgetRequirement', 'FinanceApprovals', 'BR-18492');
+    contractId = await entityIdByKey(prisma, 'Contract', 'ContractMgmt', 'CON-3982');
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  it('returns [] for an empty id list or an empty type list', async () => {
+    expect(await repository.findIncomingRelationships([], ['DEFINES'])).toEqual([]);
+    expect(await repository.findIncomingRelationships([orderId], [])).toEqual([]);
+  });
+
+  it('returns the DEFINES relationship into BR-18492 with the contract and its clause', async () => {
+    const rows = await repository.findIncomingRelationships([budgetId], ['DEFINES', 'GOVERNS']);
+    expect(rows).toHaveLength(1);
+    const [row] = rows;
+    expect(row?.targetEntityId).toBe(budgetId);
+    expect(row?.relationship.type).toBe('DEFINES');
+    expect(row?.relationship.direction).toBe('IN');
+    expect(row?.source.id).toBe(contractId);
+    expect(row?.source.displayName).toBe('Contract CON-3982');
+    expect(row?.source.attributes['clause']).toBe(CLAUSE);
+  });
+
+  it('returns the GOVERNS relationship into Order #18492 from CON-3982', async () => {
+    const rows = await repository.findIncomingRelationships([orderId], ['DEFINES', 'GOVERNS']);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.relationship.type).toBe('GOVERNS');
+    expect(rows[0]?.source.id).toBe(contractId);
+  });
+
+  it('returns rows for several targets together, ordered by targetEntityId', async () => {
+    const rows = await repository.findIncomingRelationships(
+      [orderId, budgetId],
+      ['DEFINES', 'GOVERNS'],
+    );
+    expect(rows).toHaveLength(2);
+    expect(rows.map((row) => row.targetEntityId)).toEqual([orderId, budgetId].sort());
+  });
+
+  it('does not return PLACED relationships when only DEFINES and GOVERNS are requested', async () => {
+    const placed = await repository.findNeighbors({
+      entityId: orderId,
+      direction: 'IN',
+      relationshipTypes: ['PLACED'],
+      limit: 10,
+    });
+    expect(placed.items).toHaveLength(1);
+
+    const rows = await repository.findIncomingRelationships([orderId], ['DEFINES', 'GOVERNS']);
+    expect(rows.some((row) => row.relationship.type === 'PLACED')).toBe(false);
+
+    const placedRows = await repository.findIncomingRelationships([orderId], ['PLACED']);
+    expect(placedRows).toHaveLength(1);
+    expect(placedRows[0]?.relationship.type).toBe('PLACED');
   });
 });

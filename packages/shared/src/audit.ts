@@ -26,6 +26,8 @@ export const AUDIT_ACTIONS = {
   RELATIONSHIP_OBSERVED: 'relationship.observed',
   EVENT_CREATED: 'event.created',
   EVENT_OBSERVED: 'event.observed',
+  EVIDENCE_NOTE_CREATED: 'evidence_note.created',
+  EVIDENCE_NOTE_RETRACTED: 'evidence_note.retracted',
 } as const;
 export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS];
 

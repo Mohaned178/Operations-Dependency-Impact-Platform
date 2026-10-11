@@ -6,6 +6,8 @@ import { ChangePasswordPage } from './pages/ChangePasswordPage';
 import { ComingSoonPage } from './pages/ComingSoonPage';
 import { EntityDetailPage } from './pages/entities/EntityDetailPage';
 import { EntityListPage } from './pages/entities/EntityListPage';
+import { ExplorerPage } from './pages/explorer/ExplorerPage';
+import { ExplorerPickerPage } from './pages/explorer/ExplorerPickerPage';
 import { HomePage } from './pages/HomePage';
 import { LoginPage } from './pages/LoginPage';
 import { NotFoundPage } from './pages/NotFoundPage';
@@ -27,7 +29,8 @@ export const router = createBrowserRouter([
           { path: 'entities', element: <EntityListPage /> },
           { path: 'entities/:id', element: <EntityDetailPage /> },
           { path: 'investigations', element: <ComingSoonPage /> },
-          { path: 'graph', element: <ComingSoonPage /> },
+          { path: 'graph', element: <ExplorerPickerPage /> },
+          { path: 'graph/:id', element: <ExplorerPage /> },
           { path: 'exceptions', element: <ComingSoonPage /> },
           {
             path: 'admin',

@@ -2,6 +2,7 @@ import type {
   BlockerRelationshipType,
   Confidence,
   EntityType,
+  JsonValue,
   OperationalState,
   RelationshipOrigin,
   RelationshipType,
@@ -151,11 +152,77 @@ export interface BlockerTrace {
   cycleClosingHopCount: number;
 }
 
+export interface IncomingRelationshipRow {
+  /** Direction is always 'IN'. */
+  relationship: NeighborRelationship;
+  /** The relationship's `to` end: one of the requested entity ids. */
+  targetEntityId: string;
+  /** The `from` end, with its attributes (needed for requirement-source evidence). */
+  source: GraphEntityRef & { attributes: Record<string, JsonValue> };
+}
+
+export type NeighborhoodWalk = 'ALL' | 'UPSTREAM' | 'DOWNSTREAM';
+
+export interface NeighborhoodTraceQuery {
+  startId: string;
+  walk: NeighborhoodWalk;
+  /** Already validated 1..4 (expansions use 1). */
+  maxDepth: number;
+  /** Non-empty. Never contains RELATES_TO unless walk is 'ALL' (the service guarantees it). */
+  relationshipTypes: readonly RelationshipType[];
+}
+
+export interface NeighborhoodReached {
+  entity: GraphEntityRef;
+  /** CTE minimum depth, 1..maxDepth. */
+  distance: number;
+  /** Canonical path ids: [startId, ..., entity.id]. */
+  pathEntityIds: string[];
+  /** Canonical path edge keys; pathEdgeKeys[i] connects pathEntityIds[i] and pathEntityIds[i + 1]. */
+  pathEdgeKeys: string[];
+  weakestConfidence: Confidence;
+  nonSourceHops: number;
+}
+
+export interface NeighborhoodTrace {
+  start: GraphEntityRef;
+  /** At most 10,000; sorted (distance, type, displayName, id) like DependencyTrace.reached. */
+  reached: NeighborhoodReached[];
+  explorationLimitReached: boolean;
+}
+
+/** One (type, from, to) group of relationship assertions, as recorded. */
+export interface RelationshipGroup {
+  /** Smallest relationship id of the group (same rule as TraversalHop.key). */
+  key: string;
+  type: RelationshipType;
+  fromEntityId: string;
+  toEntityId: string;
+  effectiveOrigin: RelationshipOrigin;
+  effectiveConfidence: Confidence;
+  assertions: HopAssertion[];
+}
+
 export interface GraphRepository {
   findNeighbors(query: NeighborQuery): Promise<NeighborPage>;
   countNeighbors(entityId: string): Promise<number>;
+  /**
+   * One hop, no recursion: every relationship of the given types whose `to` end is in entityIds.
+   * Returns [] for an empty id list or type list without querying.
+   */
+  findIncomingRelationships(
+    entityIds: readonly string[],
+    types: readonly RelationshipType[],
+  ): Promise<IncomingRelationshipRow[]>;
   /** Returns null when the start entity does not exist. */
   traceDependencies(query: DependencyTraceQuery): Promise<DependencyTrace | null>;
   /** Returns null when the start entity does not exist. */
   traceBlockers(query: BlockerTraceQuery): Promise<BlockerTrace | null>;
+  /** Returns null when the start entity does not exist. */
+  traceNeighborhood(query: NeighborhoodTraceQuery): Promise<NeighborhoodTrace | null>;
+  /** Every relationship group whose two ends are both in `entityIds` and whose type is in `types`. */
+  findRelationshipsAmong(
+    entityIds: readonly string[],
+    types: readonly RelationshipType[],
+  ): Promise<RelationshipGroup[]>;
 }

@@ -83,7 +83,7 @@ export const ORIGIN_RANK: Record<RelationshipOrigin, number> = {
 };
 
 /** "A,B,,A" → ["A","B"] in schema option order. Absent or "" → []. Each item is validated. */
-function commaList<T extends [string, ...string[]]>(item: z.ZodEnum<T>) {
+export function commaList<T extends [string, ...string[]]>(item: z.ZodEnum<T>) {
   return z
     .string()
     .optional()
