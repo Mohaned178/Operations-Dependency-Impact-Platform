@@ -131,4 +131,54 @@ describe('StepEvidence', () => {
     ).toBeInTheDocument();
     expect(screen.queryByText('retracted')).not.toBeInTheDocument();
   });
+
+  it('labels the latest record of another source "Other source", not an earlier observation', () => {
+    const order = R1_ORDER.evidence.entities.find(
+      (entity) => entity.entityId === R1_ORDER.query.entityId,
+    );
+    if (order === undefined) {
+      throw new Error('expected Order #18492 evidence');
+    }
+    render(<StepEvidence evidence={order} />);
+
+    expect(screen.getByText('Current state')).toBeInTheDocument();
+    expect(screen.getByText('Other source')).toBeInTheDocument();
+    expect(screen.queryByText('Earlier observation')).toBeNull();
+  });
+
+  it('names a relationship by the hop as recorded instead of its id', () => {
+    const budget = R1_ORDER.evidence.entities.find((entity) => entity.entityId === BR_ID);
+    const relationship = R1_ORDER.evidence.relationships.at(-1);
+    if (budget === undefined || relationship === undefined) {
+      throw new Error('expected BR-18492 evidence and a relationship');
+    }
+    render(
+      <StepEvidence
+        evidence={budget}
+        relationships={[relationship]}
+        relationshipLabel="Finance approval APR-2291 REQUIRES Budget code for Order #18492"
+      />,
+    );
+
+    expect(
+      screen.getByText('Finance approval APR-2291 REQUIRES Budget code for Order #18492'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/^Relationship [0-9a-f-]{36}$/)).toBeNull();
+  });
+
+  it('shows how many requirement sources were returned when the list is capped', () => {
+    const budget = R1_ORDER.evidence.entities.find((entity) => entity.entityId === BR_ID);
+    if (budget === undefined) {
+      throw new Error('expected BR-18492 evidence');
+    }
+    const capped: EntityEvidenceDto = {
+      ...budget,
+      requirementSources: { ...budget.requirementSources, total: 25 },
+    };
+    render(<StepEvidence evidence={capped} />);
+
+    expect(
+      screen.getByRole('heading', { name: 'Requirement sources (1 of 25)' }),
+    ).toBeInTheDocument();
+  });
 });

@@ -45,3 +45,9 @@ plan.md and data-model §4 call the roles function `assignRoles`; tasks.md T013/
 - **Conflict**: `RELATIONSHIP_RULES` (enforced by the import planner) only allows GOVERNS into an Order and DEFINES into an SLA or BudgetRequirement, so no entity can be the `to` end of both through an import.
 - **Done**: `root-cause.e2e-spec.ts` imports two DEFINES into one BudgetRequirement and inserts the GOVERNS row directly with Prisma (bypassing the planner). It asserts the requirement sources are ordered by `(type, displayName, id)`: DEFINES Alpha, DEFINES Beta, then GOVERNS Aaa.
 - **Needed**: nothing, unless you prefer the task text to be reworded.
+
+## Q7. Note cursor precision for Phase 5 (T036–T037) — OPEN, decide before Phase 5
+
+- **Risk**: `created_at` is `timestamptz(6)` (microseconds), but DTOs and TypeScript comparisons use ISO strings truncated to milliseconds (`evidence-note.mapper.ts`, `evidence.reader.ts`). A note-list cursor built from `{createdAt, id}` as a millisecond ISO string could skip a row: page 1 ends at `.123456` (cursor `.123Z`), and a next note at `.123200` with a smaller id is neither `< .123` nor `= .123`.
+- **Needed**: the T037 list query should compare at millisecond precision (for example `date_trunc('milliseconds', created_at)`) or encode the full value in the cursor. Please confirm which.
+- **Also for T045**: `StepEvidence` currently receives only `relationships`, not the hop, so offering "the link" as a note target needs the hop (or its label) passed down. `StepEvidence` already takes an optional `relationshipLabel`.

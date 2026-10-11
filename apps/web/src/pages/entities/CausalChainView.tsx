@@ -123,6 +123,7 @@ function CausalStepItem({ step, previous, evidence }: CausalStepItemProps) {
               evidence={entityEvidence}
               relationships={relationships}
               entityName={name}
+              relationshipLabel={recorded ?? undefined}
             />
           )}
         </div>

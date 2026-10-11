@@ -117,6 +117,12 @@ describe('Root-cause analysis on the seeded §39 scenario (e2e)', () => {
     return candidate.confidenceRules;
   }
 
+  /** contracts/api.md: unless stated otherwise the echoed evaluatedAt is pinned and truncation is false. */
+  function expectDefaults(body: RootCauseResponse, entityId: string): void {
+    expect(body.query).toEqual({ entityId, depth: 6, evaluatedAt: EVALUATED_AT_ECHO });
+    expect(body.truncation).toEqual({ depthLimit: false, explorationLimit: false, pathLimit: false });
+  }
+
   const RULE_ORDER = [
     'WEAKEST_LINK',
     'UNKNOWN_STATE',
@@ -315,6 +321,7 @@ describe('Root-cause analysis on the seeded §39 scenario (e2e)', () => {
     });
 
     it('names the same root cause with HIGH confidence', () => {
+      expectDefaults(body, ids.shp);
       expect(body.summary).toBe(
         'Shipment SHP-77120 (consolidated) is DELAYED. 1 root cause found: Budget Code Missing (HIGH).',
       );
@@ -330,10 +337,14 @@ describe('Root-cause analysis on the seeded §39 scenario (e2e)', () => {
         { index: 3, id: ids.apr, roles: ['UPSTREAM_CAUSE'] },
         { index: 4, id: ids.br, roles: ['ROOT_CAUSE'] },
       ]);
-      expect(candidate.primaryChain.sentences).toEqual(blockers.paths[0]?.explanation);
-      expect(candidate.primaryChain.sentences[0]).toBe(
+      const f1Primary = [
         'Shipment SHP-77120 (consolidated) is delayed because it depends on Order #18492, which is BLOCKED.',
-      );
+        'Order #18492 is blocked because it requires Payment PAY-88213, which is PENDING.',
+        'Payment PAY-88213 is pending because it requires Finance approval APR-2291, which is BLOCKED.',
+        'Finance approval APR-2291 is blocked because it requires Budget code for Order #18492, which is MISSING.',
+      ];
+      expect(candidate.primaryChain.sentences).toEqual(f1Primary);
+      expect(blockers.paths[0]?.explanation).toEqual(f1Primary);
     });
 
     it('has exactly one alternative chain through the manual BLOCKS link', () => {
@@ -355,7 +366,13 @@ describe('Root-cause analysis on the seeded §39 scenario (e2e)', () => {
         effectiveConfidence: 'MEDIUM',
       });
       expect(alternative.weakestConfidence).toBe('MEDIUM');
-      expect(alternative.sentences).toEqual(blockers.paths[1]?.explanation);
+      const f1Alternative = [
+        'Shipment SHP-77120 (consolidated) is delayed because Payment PAY-88213, which is PENDING, blocks it (manually recorded, medium confidence: "Recorded by ops analyst: carrier will not book the consolidated load until payment clears").',
+        'Payment PAY-88213 is pending because it requires Finance approval APR-2291, which is BLOCKED.',
+        'Finance approval APR-2291 is blocked because it requires Budget code for Order #18492, which is MISSING.',
+      ];
+      expect(alternative.sentences).toEqual(f1Alternative);
+      expect(blockers.paths[1]?.explanation).toEqual(f1Alternative);
     });
 
     it('writes the weakest-link reason, the same disagreement as R1 and the evidence sentence', () => {
@@ -372,7 +389,7 @@ describe('Root-cause analysis on the seeded §39 scenario (e2e)', () => {
       const manual = body.evidence.relationships.filter((entry) => entry.origin === 'MANUAL');
       expect(manual).toHaveLength(1);
       expect(manual[0]).toMatchObject({ confidence: 'MEDIUM', rule: 'RELATIONSHIP_RECORD' });
-      expect(manual[0]?.record).not.toBeNull();
+      expect(manual[0]?.record?.sourceSystem).toBe('ManualEntry');
     });
   });
 
@@ -388,6 +405,7 @@ describe('Root-cause analysis on the seeded §39 scenario (e2e)', () => {
     });
 
     it('is MEDIUM because the SLA link is inferred', () => {
+      expectDefaults(body, ids.sla);
       expect(body.summary).toBe(
         'Acme Corp delivery SLA is AT_RISK. 1 root cause found: Budget Code Missing (MEDIUM).',
       );
@@ -434,6 +452,7 @@ describe('Root-cause analysis on the seeded §39 scenario (e2e)', () => {
   describe('R4: Warehouse WH-EAST-02', () => {
     it('is NOT_BLOCKED with no candidates and no evidence', async () => {
       const body = await analyze(ids.wh);
+      expectDefaults(body, ids.wh);
       expect(body.status).toBe('NOT_BLOCKED');
       expect(body.candidates).toEqual([]);
       expect(body.evidence).toEqual({ entities: [], relationships: [] });
@@ -446,6 +465,7 @@ describe('Root-cause analysis on the seeded §39 scenario (e2e)', () => {
   describe('R8: role assignment on short chains', () => {
     it('Finance approval APR-2291: BR-18492 is both the immediate blocker and the root cause', async () => {
       const body = await analyze(ids.apr);
+      expectDefaults(body, ids.apr);
       const candidate = only(body);
       expect(body.summary).toBe(
         'Finance approval APR-2291 is BLOCKED. 1 root cause found: Budget Code Missing (HIGH).',
@@ -458,6 +478,7 @@ describe('Root-cause analysis on the seeded §39 scenario (e2e)', () => {
 
     it('Payment PAY-88213: no UPSTREAM_CAUSE step', async () => {
       const body = await analyze(ids.pay);
+      expectDefaults(body, ids.pay);
       const candidate = only(body);
       expect(stepsOf(candidate.primaryChain)).toEqual([
         { index: 0, id: ids.pay, roles: ['SYMPTOM'] },

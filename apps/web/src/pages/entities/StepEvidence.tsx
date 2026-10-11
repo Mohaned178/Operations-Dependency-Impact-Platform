@@ -16,6 +16,8 @@ export interface StepEvidenceProps {
   relationships?: RelationshipEvidenceDto[];
   /** Name of the entity the evidence is about, used in requirement-source lines. */
   entityName?: string;
+  /** The hop as recorded, e.g. `Order #18492 REQUIRES Payment PAY-88213`, naming the relationships. */
+  relationshipLabel?: string;
 }
 
 /** One step's evidence, grouped as in FR-011. Notes are read-only until the note form lands. */
@@ -23,6 +25,7 @@ export function StepEvidence({
   evidence,
   relationships = [],
   entityName = 'this entity',
+  relationshipLabel,
 }: StepEvidenceProps) {
   const notes: NoteEvidenceDto[] = [
     ...evidence.notes.items,
@@ -42,12 +45,23 @@ export function StepEvidence({
       <Group title="Relationship records" isEmpty={relationships.length === 0}>
         <ul className="flex flex-col gap-2">
           {relationships.map((relationship) => (
-            <RelationshipItem key={relationship.relationshipId} relationship={relationship} />
+            <RelationshipItem
+              key={relationship.relationshipId}
+              relationship={relationship}
+              label={relationshipLabel}
+            />
           ))}
         </ul>
       </Group>
 
-      <Group title="Requirement sources" isEmpty={evidence.requirementSources.items.length === 0}>
+      <Group
+        title={
+          evidence.requirementSources.total > evidence.requirementSources.items.length
+            ? `Requirement sources (${evidence.requirementSources.items.length} of ${evidence.requirementSources.total})`
+            : 'Requirement sources'
+        }
+        isEmpty={evidence.requirementSources.items.length === 0}
+      >
         <ul className="flex flex-col gap-2">
           {evidence.requirementSources.items.map((source) => (
             <RequirementSourceItem
@@ -106,7 +120,7 @@ function StateRecordItem({ record }: { record: StateRecordEvidenceDto }) {
     <li className="flex flex-col gap-1">
       <span className="flex flex-wrap items-center gap-2">
         <StateBadge state={observation.state} />
-        <span>{record.current ? 'Current state' : 'Earlier observation'}</span>
+        <span>{record.current ? 'Current state' : 'Other source'}</span>
       </span>
       <span className="text-slate-500">
         {sourceLine(sourceRecord.sourceSystem, sourceRecord.sourceId, sourceRecord.observedAt)}
@@ -115,12 +129,17 @@ function StateRecordItem({ record }: { record: StateRecordEvidenceDto }) {
   );
 }
 
-function RelationshipItem({ relationship }: { relationship: RelationshipEvidenceDto }) {
+interface RelationshipItemProps {
+  relationship: RelationshipEvidenceDto;
+  label: string | undefined;
+}
+
+function RelationshipItem({ relationship, label }: RelationshipItemProps) {
   const { record } = relationship;
   return (
     <li className="flex flex-col gap-1">
       <span className="flex flex-wrap items-center gap-2">
-        <span>{`Relationship ${relationship.relationshipId}`}</span>
+        <span>{label ?? `Relationship ${relationship.relationshipId}`}</span>
         {relationship.origin === 'SOURCE' ? null : (
           <OriginBadge origin={relationship.origin} confidence={relationship.confidence} />
         )}
