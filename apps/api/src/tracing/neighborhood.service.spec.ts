@@ -119,6 +119,8 @@ function setup(): Fixture {
     traceNeighborhood,
     findRelationshipsAmong,
     findIncomingRelationships: jest.fn(),
+    traceImpact: jest.fn(),
+    findAttributedCustomers: jest.fn(),
   };
   const blockers = jest.fn();
   const load = jest.fn((ids: readonly string[]) => {

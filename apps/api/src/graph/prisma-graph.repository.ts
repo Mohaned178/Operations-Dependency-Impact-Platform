@@ -10,22 +10,31 @@ import type {
   TraceableRelationshipType,
 } from '@opsgraph/shared';
 import {
+  CONFIDENCE_RANK,
+  IMPACT_LIMITS,
   JsonValueSchema,
   RelationshipTypeSchema,
   SATISFIED_STATES,
+  TERMINAL_STATES,
   TRACEABLE_RELATIONSHIP_TYPES,
   TRACING_LIMITS,
 } from '@opsgraph/shared';
 import { decodeCursor, encodeCursor } from '../common/pagination/cursor';
 import { PrismaService } from '../prisma/prisma.service';
 import type {
+  AttributionQuery,
   BlockerTrace,
   BlockerTraceQuery,
+  CustomerAttribution,
   CycleClosingHop,
   DependencyTrace,
   DependencyTraceQuery,
   GraphEntityRef,
   GraphRepository,
+  ImpactPathSet,
+  ImpactReachedEntity,
+  ImpactTrace,
+  ImpactTraceQuery,
   IncomingRelationshipRow,
   NeighborPage,
   NeighborQuery,
@@ -39,7 +48,8 @@ import type {
 import { enumerateBlockingPaths } from './traversal/blocking-paths';
 import { selectCanonicalPaths } from './traversal/canonical-paths';
 import { buildUndirectedTraversalEdges, groupEdgeRows } from './traversal/edge-groups';
-import { compareCodeUnits } from './traversal/path-order';
+import { computeImpactSelections, enumerateImpactPaths } from './traversal/impact-paths';
+import { compareCodeUnits, comparePaths } from './traversal/path-order';
 import { buildTraversalEdges } from './traversal/traversal-edges';
 import type { EdgeRow, InternalPath, TraversalEdge } from './traversal/types';
 import { walkTypes } from './traversal/walk-types';
@@ -89,6 +99,13 @@ interface RawEdgeRow {
   source_id: string;
   observed_at: Date;
   import_id: string;
+}
+
+interface RawAttributionEntityRow {
+  id: string;
+  type: EntityType;
+  display_name: string;
+  current_state: OperationalState;
 }
 
 interface ReachedEntityRow {
@@ -191,6 +208,27 @@ function toCycleClosingHops(edges: readonly TraversalEdge[]): {
         .sort(compareCodeUnits),
     })),
     total: sorted.length,
+  };
+}
+
+function weakestOf(edges: readonly TraversalEdge[]): Confidence {
+  let weakest: Confidence = 'HIGH';
+  for (const edge of edges) {
+    if (CONFIDENCE_RANK[edge.effectiveConfidence] < CONFIDENCE_RANK[weakest]) {
+      weakest = edge.effectiveConfidence;
+    }
+  }
+  return weakest;
+}
+
+function linkPath(attributedId: string, edges: readonly TraversalEdge[]): InternalPath {
+  return {
+    entityIds: [attributedId, ...edges.map((edge) => edge.targetId)],
+    edges: [...edges],
+    weakestConfidence: weakestOf(edges),
+    nonSourceHops: edges.filter((edge) => edge.nonSource).length,
+    continuesBeyondDepth: false,
+    endsInCycle: false,
   };
 }
 
@@ -512,6 +550,284 @@ export class PrismaGraphRepository implements GraphRepository {
       return [];
     }
     return groupEdgeRows(await this.loadEdgeRows(entityIds, types));
+  }
+
+  async traceImpact(query: ImpactTraceQuery): Promise<ImpactTrace | null> {
+    const reachable = await this.impactReachable(query.startId, query.maxDepth);
+    if (reachable === null) {
+      return null;
+    }
+
+    const rows = await this.loadEdgeRows(reachable.entities.keys(), TRACEABLE_RELATIONSHIP_TYPES);
+    const edges = buildTraversalEdges(rows.filter(isTraceableRow), 'DOWNSTREAM');
+
+    const stateById = new Map<string, OperationalState>();
+    for (const entity of reachable.entities.values()) {
+      stateById.set(entity.id, entity.currentState);
+    }
+    // Entities that were only probed one step past maxDepth carry that distance (data-model 3c).
+    const distanceById = new Map<string, number>();
+    for (const id of reachable.entities.keys()) {
+      distanceById.set(id, query.maxDepth + 1);
+    }
+    distanceById.set(reachable.start.id, 0);
+    for (const row of reachable.within) {
+      distanceById.set(row.entity.id, row.depth);
+    }
+
+    const selection = computeImpactSelections(
+      reachable.start.id,
+      edges,
+      stateById,
+      distanceById,
+      query.maxDepth,
+    );
+    const cycleClosing = toCycleClosingHops(selection.cycleClosing);
+
+    const reached = reachable.within.map((row): ImpactReachedEntity => {
+      const canonical = selection.canonical.get(row.entity.id);
+      const shortest = selection.shortest.get(row.entity.id);
+      if (canonical === undefined || shortest === undefined) {
+        throw new Error(
+          `traversal invariant: no canonical or shortest path for reached entity ${row.entity.id}`,
+        );
+      }
+      const live = selection.live.get(row.entity.id);
+      return {
+        entity: row.entity,
+        distance: row.depth,
+        canonicalPath: toTraversalPath(canonical, reachable.entities),
+        livePath: live === undefined ? null : toTraversalPath(live, reachable.entities),
+        shortestPath: toTraversalPath(shortest, reachable.entities),
+        sourcedReach: selection.sourced.has(row.entity.id),
+      };
+    });
+
+    return {
+      start: reachable.start,
+      reached,
+      depthLimitReached: reachable.beyondDepth,
+      explorationLimitReached: reachable.explorationLimitReached,
+      cycleClosingHops: cycleClosing.hops,
+      cycleClosingHopCount: cycleClosing.total,
+      paths: (targetIds) => {
+        const enumerated = enumerateImpactPaths(
+          reachable.start.id,
+          selection.filteredEdges,
+          distanceById,
+          targetIds,
+          query.maxDepth,
+          IMPACT_LIMITS.maxEnumeratedPaths,
+          IMPACT_LIMITS.pathSearchBudget,
+        );
+        const result = new Map<string, ImpactPathSet>();
+        for (const [id, set] of enumerated) {
+          result.set(id, {
+            found: set.found.map((path) => toTraversalPath(path, reachable.entities)),
+            morePaths: set.morePaths,
+          });
+        }
+        return result;
+      },
+    };
+  }
+
+  async findAttributedCustomers(query: AttributionQuery): Promise<CustomerAttribution[]> {
+    if (query.orderIds.length === 0 && query.slaIds.length === 0) {
+      return [];
+    }
+    const orderIds = [...query.orderIds];
+    const slaIds = [...query.slaIds];
+
+    const raw = await this.prisma.$queryRaw<RawEdgeRow[]>`
+      SELECT r.id::text AS id, r.type::text AS type, r.from_entity_id::text AS from_entity_id,
+             r.to_entity_id::text AS to_entity_id, r.origin::text AS origin,
+             r.confidence::text AS confidence, r.basis AS basis, r.source_system AS source_system,
+             r.source_id AS source_id, r.observed_at AS observed_at, r.import_id::text AS import_id
+      FROM relationships r
+      WHERE r.type = 'PLACED' AND r.to_entity_id = ANY(${orderIds}::uuid[])
+      UNION ALL
+      SELECT d.id::text, d.type::text, d.from_entity_id::text, d.to_entity_id::text,
+             d.origin::text, d.confidence::text, d.basis, d.source_system, d.source_id,
+             d.observed_at, d.import_id::text
+      FROM relationships d
+      WHERE d.type = 'DEFINES' AND d.to_entity_id = ANY(${slaIds}::uuid[])
+      UNION ALL
+      SELECT h.id::text, h.type::text, h.from_entity_id::text, h.to_entity_id::text,
+             h.origin::text, h.confidence::text, h.basis, h.source_system, h.source_id,
+             h.observed_at, h.import_id::text
+      FROM relationships d
+      JOIN relationships h ON h.type = 'HAS' AND h.to_entity_id = d.from_entity_id
+      WHERE d.type = 'DEFINES' AND d.to_entity_id = ANY(${slaIds}::uuid[])`;
+
+    // A contract that defines several of the requested SLAs returns its HAS rows once per SLA.
+    const unique = new Map<string, RawEdgeRow>();
+    for (const row of raw) {
+      unique.set(row.id, row);
+    }
+    const edges = buildTraversalEdges(
+      [...unique.values()].map(toEdgeRow).filter(isTraceableRow),
+      'UPSTREAM',
+    );
+    const placedByOrder = new Map<string, TraversalEdge[]>();
+    const definesBySla = new Map<string, TraversalEdge[]>();
+    const hasByContract = new Map<string, TraversalEdge[]>();
+    const push = (map: Map<string, TraversalEdge[]>, edge: TraversalEdge): void => {
+      const list = map.get(edge.sourceId);
+      if (list === undefined) {
+        map.set(edge.sourceId, [edge]);
+      } else {
+        list.push(edge);
+      }
+    };
+    for (const edge of edges) {
+      if (edge.type === 'PLACED') {
+        push(placedByOrder, edge);
+      } else if (edge.type === 'DEFINES') {
+        push(definesBySla, edge);
+      } else if (edge.type === 'HAS') {
+        push(hasByContract, edge);
+      }
+    }
+
+    const best = new Map<string, InternalPath>();
+    const keep = (link: InternalPath): void => {
+      const attributedId = link.entityIds.at(0);
+      const customerId = link.entityIds.at(-1);
+      if (attributedId === undefined || customerId === undefined) {
+        throw new Error('traversal invariant: empty attribution link');
+      }
+      const pairKey = JSON.stringify([attributedId, customerId]);
+      const existing = best.get(pairKey);
+      if (existing === undefined || comparePaths(link, existing) < 0) {
+        best.set(pairKey, link);
+      }
+    };
+    for (const orderId of orderIds) {
+      for (const placed of placedByOrder.get(orderId) ?? []) {
+        keep(linkPath(orderId, [placed]));
+      }
+    }
+    for (const slaId of slaIds) {
+      for (const defines of definesBySla.get(slaId) ?? []) {
+        for (const has of hasByContract.get(defines.targetId) ?? []) {
+          keep(linkPath(slaId, [defines, has]));
+        }
+      }
+    }
+    if (best.size === 0) {
+      return [];
+    }
+
+    const linkedIds = new Set<string>();
+    for (const link of best.values()) {
+      for (const id of link.entityIds.slice(1)) {
+        linkedIds.add(id);
+      }
+    }
+    const entityRows = await this.prisma.$queryRaw<RawAttributionEntityRow[]>`
+      SELECT id::text AS id, type::text AS type, display_name, current_state::text AS current_state
+      FROM entities
+      WHERE id = ANY(${[...linkedIds]}::uuid[])`;
+    const entities = new Map<string, GraphEntityRef>(
+      entityRows.map((row) => [
+        row.id,
+        {
+          id: row.id,
+          type: row.type,
+          displayName: row.display_name,
+          currentState: row.current_state,
+        },
+      ]),
+    );
+
+    return [...best.values()]
+      .map((link): CustomerAttribution => {
+        const attributedEntityId = link.entityIds.at(0);
+        const customerId = link.entityIds.at(-1);
+        const customer = customerId === undefined ? undefined : entities.get(customerId);
+        if (attributedEntityId === undefined || customer === undefined) {
+          throw new Error('traversal invariant: attributed customer was not loaded');
+        }
+        return { attributedEntityId, customer, link: toTraversalPath(link, entities) };
+      })
+      .sort(
+        (a, b) =>
+          compareCodeUnits(a.attributedEntityId, b.attributedEntityId) ||
+          compareCodeUnits(a.customer.id, b.customer.id),
+      );
+  }
+
+  /**
+   * Research R2: like reachableEntities, but a terminal entity (COMPLETED or CANCELLED) is kept in
+   * the result and never expanded. The start row is always expandable. The post-processing is a
+   * copy of reachableEntities on purpose (the 003 query stays untouched).
+   */
+  private async impactReachable(startId: string, maxDepth: number): Promise<ReachableSet | null> {
+    const { followFromTypes, followToTypes } = walkTypes(
+      'DOWNSTREAM',
+      TRACEABLE_RELATIONSHIP_TYPES,
+    );
+    const terminalStates = [...TERMINAL_STATES];
+    const maxDepthPlusOne = maxDepth + 1;
+
+    const rows = await this.prisma.$queryRaw<RawReachedRow[]>`
+      WITH RECURSIVE walk(entity_id, depth, expandable) AS (
+        SELECT ${startId}::uuid, 0, true
+        UNION
+        SELECT step.next_id, w.depth + 1,
+               (n.current_state <> ALL(${terminalStates}::"OperationalState"[]))
+        FROM walk w
+        CROSS JOIN LATERAL (
+          SELECT r.to_entity_id AS next_id
+          FROM relationships r
+          WHERE r.from_entity_id = w.entity_id
+            AND r.type = ANY(${followFromTypes}::"RelationshipType"[])
+          UNION ALL
+          SELECT r.from_entity_id AS next_id
+          FROM relationships r
+          WHERE r.to_entity_id = w.entity_id
+            AND r.type = ANY(${followToTypes}::"RelationshipType"[])
+        ) step
+        JOIN entities n ON n.id = step.next_id
+        WHERE w.depth < ${maxDepthPlusOne}
+          AND w.expandable
+      )
+      SELECT e.id::text AS id, e.type::text AS type, e.display_name AS display_name,
+             e.current_state::text AS current_state, m.depth AS depth
+      FROM (SELECT entity_id, min(depth)::int AS depth FROM walk GROUP BY entity_id) m
+      JOIN entities e ON e.id = m.entity_id`;
+
+    const reached: ReachedEntityRow[] = rows.map((row) => ({
+      entity: {
+        id: row.id,
+        type: row.type,
+        displayName: row.display_name,
+        currentState: row.current_state,
+      },
+      depth: row.depth,
+    }));
+
+    const start = reached.find((row) => row.depth === 0);
+    if (start === undefined) {
+      return null;
+    }
+
+    const others = reached.filter((row) => row.depth > 0);
+    const within = others.filter((row) => row.depth <= maxDepth).sort(compareReached);
+    const beyondDepth = others.some((row) => row.depth === maxDepthPlusOne);
+    const explorationLimitReached = within.length > TRACING_LIMITS.maxReachedEntities;
+    const kept = explorationLimitReached
+      ? within.slice(0, TRACING_LIMITS.maxReachedEntities)
+      : within;
+
+    const connected = explorationLimitReached ? kept : others;
+    const entities = new Map<string, GraphEntityRef>([[start.entity.id, start.entity]]);
+    for (const row of connected) {
+      entities.set(row.entity.id, row.entity);
+    }
+
+    return { start: start.entity, within: kept, beyondDepth, explorationLimitReached, entities };
   }
 
   /**

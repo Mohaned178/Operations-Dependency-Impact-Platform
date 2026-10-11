@@ -144,12 +144,12 @@
 
 ### Repository (research R2/R5, data-model §3a–§3c, §3e)
 
-- [ ] T011 In `apps/api/src/graph/graph.repository.ts`, add `ImpactTraceQuery`, `ImpactReachedEntity`, `ImpactPathSet`, `ImpactTrace`, `AttributionQuery`, `CustomerAttribution`, and the two `GraphRepository` methods `traceImpact` and `findAttributedCustomers`, exactly as in data-model §3a.
-- [ ] T012 In `apps/api/src/graph/prisma-graph.repository.ts`:
+- [x] T011 In `apps/api/src/graph/graph.repository.ts`, add `ImpactTraceQuery`, `ImpactReachedEntity`, `ImpactPathSet`, `ImpactTrace`, `AttributionQuery`, `CustomerAttribution`, and the two `GraphRepository` methods `traceImpact` and `findAttributedCustomers`, exactly as in data-model §3a.
+- [x] T012 In `apps/api/src/graph/prisma-graph.repository.ts`:
   - **`impactReachable`** (private): the SQL in data-model §3b, with the post-processing copied from `reachableEntities` (KDN 3);
   - **`traceImpact`**: data-model §3c. Map every `InternalPath` through the existing `toTraversalPath`. `paths()` maps `enumerateImpactPaths` results the same way;
   - **`findAttributedCustomers`**: data-model §3e, using the SQL as given. Load the customer and contract refs with one `SELECT … FROM entities WHERE id = ANY(...)`. Group the assertions with `buildTraversalEdges(rows, 'UPSTREAM')` and assemble the 1-hop or 2-hop `link` paths. Keep the best path per (attributed, customer) pair with `comparePaths`, then sort by (attributedEntityId, customer.id). Empty inputs return `[]` without querying.
-- [ ] T013 Extend `apps/api/test/graph-repository.e2e-spec.ts` with a `traceImpact` block and a `findAttributedCustomers` block. Import small graphs through the existing test import helpers. Cover:
+- [x] T013 Extend `apps/api/test/graph-repository.e2e-spec.ts` with a `traceImpact` block and a `findAttributedCustomers` block. Import small graphs through the existing test import helpers. Cover:
   - **null start**: an unknown start returns `null`;
   - **terminal**: a COMPLETED order is reached but not expanded;
   - **depth**: `maxDepth` is respected and `depthLimitReached` is set;
