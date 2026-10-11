@@ -11,6 +11,7 @@ import { MemoryRouter, Route, Routes } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../../lib/api-client';
 import { EntityDetailPage } from './EntityDetailPage';
+import { I14_SUMMARY } from './impact/impact-test-data';
 import { R4_NOT_BLOCKED } from './root-cause-test-data';
 import { F1_BLOCKERS, sentence } from './tracing-test-data';
 
@@ -233,6 +234,9 @@ function answerHappyPath(path: string): Promise<unknown> {
   if (path === `/entities/${ENTITY_ID}/root-cause`) {
     return Promise.resolve(R4_NOT_BLOCKED);
   }
+  if (path.startsWith(`/entities/${ENTITY_ID}/impact`)) {
+    return Promise.resolve(I14_SUMMARY);
+  }
   if (path.startsWith(`/entities/${ENTITY_ID}/dependencies`)) {
     return Promise.resolve({
       query: {
@@ -348,15 +352,16 @@ describe('EntityDetailPage', () => {
       'Current state',
       'Root cause',
       'Blockers',
+      'Impact',
       'Dependencies',
       'Relationships',
       'Timeline',
       'Source records',
     ]);
 
-    // FR-032: no risks, exceptions, impact or investigations sections, not even placeholders.
+    // FR-032: no risks, exceptions or investigations sections, not even placeholders.
     expect(
-      screen.queryAllByRole('heading', { name: /risk|exception|impact|investigation/i }),
+      screen.queryAllByRole('heading', { name: /risk|exception|investigation/i }),
     ).toEqual([]);
 
     // FR-031: tracing views are text and structured lists, never a graph diagram.
@@ -383,6 +388,9 @@ describe('EntityDetailPage', () => {
       }
       if (path === `/entities/${ENTITY_ID}/blockers`) {
         return Promise.resolve(F1_BLOCKERS);
+      }
+      if (path.startsWith(`/entities/${ENTITY_ID}/impact`)) {
+        return Promise.resolve(I14_SUMMARY);
       }
       if (path.startsWith(`/entities/${ENTITY_ID}/dependencies`)) {
         return Promise.resolve({
@@ -426,6 +434,9 @@ describe('EntityDetailPage', () => {
       }
       if (path === `/entities/${ENTITY_ID}/blockers`) {
         return Promise.reject(new Error('down'));
+      }
+      if (path.startsWith(`/entities/${ENTITY_ID}/impact`)) {
+        return Promise.resolve(I14_SUMMARY);
       }
       if (path === `/entities/${ENTITY_ID}`) {
         return Promise.resolve(ENTITY);
@@ -514,6 +525,51 @@ describe('EntityDetailPage', () => {
     expect(await relationships.findByText('Source · HIGH')).toBeInTheDocument();
     expect(relationships.getByText('Inferred · LOW')).toBeInTheDocument();
     expect(relationships.getByText('Inferred · LOW').textContent).not.toContain('Source');
+  });
+
+  it('puts the Impact section between Blockers and Dependencies, with its own anchor', async () => {
+    const { container } = renderPage();
+    await screen.findByRole('heading', { name: 'Impact' });
+
+    const order = ['Blockers', 'Impact', 'Dependencies'].map((name) => {
+      const heading = screen.getByRole('heading', { level: 2, name });
+      return heading.closest('section');
+    });
+    const sections = Array.from(container.querySelectorAll('section > h2')).map((h) => h.closest('section'));
+    const positions = order.map((section) => sections.indexOf(section));
+    expect(positions).toEqual([...positions].sort((x, y) => x - y));
+    expect(positions.every((position) => position >= 0)).toBe(true);
+    expect(container.querySelector('section#impact')).toBe(order[1]);
+  });
+
+  it('keeps every other section when the impact query fails', async () => {
+    apiFetchMock.mockImplementation((path: string) =>
+      path.startsWith(`/entities/${ENTITY_ID}/impact`)
+        ? Promise.reject(new Error('down'))
+        : answerHappyPath(path),
+    );
+    renderPage();
+
+    expect(await screen.findByText('Unable to load impact.')).toBeInTheDocument();
+    const headings = (await screen.findAllByRole('heading', { level: 2 })).map(
+      (heading) => heading.textContent,
+    );
+    expect(headings).toEqual([
+      'Identity',
+      'Current state',
+      'Root cause',
+      'Blockers',
+      'Impact',
+      'Dependencies',
+      'Relationships',
+      'Timeline',
+      'Source records',
+    ]);
+    expect(screen.getByText('12,480.00 USD')).toBeInTheDocument();
+    expect(await screen.findByText('order.created')).toBeInTheDocument();
+    expect(
+      await within(await relationshipsSection()).findByText('Payment PAY-88213'),
+    ).toBeInTheDocument();
   });
 
   it('keeps the raw payload behind a details element', async () => {

@@ -360,7 +360,7 @@
 
 **Independent test**: spec Story 4, scenarios 1 to 6, via component tests and the quickstart §3 manual walk-through.
 
-- [ ] T038 [P] [US4] Create `apps/web/src/pages/entities/impact/impact-params.ts` and `impact-params.test.ts` (research R13):
+- [x] T038 [P] [US4] Create `apps/web/src/pages/entities/impact/impact-params.ts` and `impact-params.test.ts` (research R13):
   - **Functions**: `parseImpactParams(sp) → { depth, list: ImpactListSelector | null }`, and `writeImpactParams(current, next)`.
   - **URL keys**: `idepth` and `ilist`.
   - **`ilist` forms**: `category.<Type>.<bucket>`, `exposure.<CUR>.<bucket>`, `valueUnknown`, `notCounted` and `notCounted.<Type>`.
@@ -371,23 +371,23 @@
     - provide a `toImpactListQueryString(depth, selector, cursor?, limit=50)` helper.
 
   The tests cover a round trip for every selector form, invalid input, and preserving the Dependencies params.
-- [ ] T039 [P] [US4] Create the hooks `useImpact.ts`, `useImpactList.ts` and `useImpactItem.ts` in `apps/web/src/pages/entities/impact/`. Use the query keys in research R13 and parse every response through `apiFetch` with its shared schema. `useImpactList` uses `useInfiniteQuery` with `nextCursor`. `useImpactItem` is enabled only while a row is expanded.
+- [x] T039 [P] [US4] Create the hooks `useImpact.ts`, `useImpactList.ts` and `useImpactItem.ts` in `apps/web/src/pages/entities/impact/`. Use the query keys in research R13 and parse every response through `apiFetch` with its shared schema. `useImpactList` uses `useInfiniteQuery` with `nextCursor`. `useImpactItem` is enabled only while a row is expanded.
 
   Create `impact-test-data.ts`, holding response fixtures shaped like I1, I2 (current orders) and I14, parsed through the shared schemas at module load.
-- [ ] T040 [P] [US4] Create `ImpactTable.tsx` (+ `.test.tsx`):
+- [x] T040 [P] [US4] Create `ImpactTable.tsx` (+ `.test.tsx`):
   - **Table**: an HTML `<table>` with a caption. Columns in order: Category, Current, Potential, Total, Direct, Indirect, Only inferred, State unknown.
   - **Rows**: one per category, using `label`.
   - **Buttons**: every non-zero number is a `<button>` with an accessible name like `"6 customer orders, current"`, calling `onOpen(selector)`. Zero is plain text.
 
   The tests cover rendering I1, opening a cell, and plain zeros.
-- [ ] T041 [P] [US4] Create `ExposureFigures.tsx` (+ `.test.tsx`):
+- [x] T041 [P] [US4] Create `ExposureFigures.tsx` (+ `.test.tsx`):
   - **Per currency**: total, current and potential as buttons (`exposure.<CUR>.<bucket>`), using `formatMoney` from `apps/web/src/lib/format.ts`;
   - **Inferred-only share**: a button when non-zero;
   - **Range**: when present, "between X and Y";
   - **Left-out notes**: value-unknown (a button for `valueUnknown`) and not-counted (a button for `notCounted`).
 
   The tests cover I1 and a fixture with a range and value-unknown orders.
-- [ ] T042 [P] [US4] Create `AffectedEntityRow.tsx` and `AffectedEntityDetail.tsx` (+ tests):
+- [x] T042 [P] [US4] Create `AffectedEntityRow.tsx` and `AffectedEntityDetail.tsx` (+ tests):
   - **Row**:
     - a link to the entity's Entity 360 page (`/entities/:id`) and its `StateBadge`;
     - a classification badge (text "Current", "Potential" or "Not counted (completed or cancelled)");
@@ -397,7 +397,7 @@
     - the primary path through the existing `PathView`, the shortest path labeled "Shortest path" when present, and attribution previews for customers;
     - an expand button.
   - **Detail**: loaded through `useImpactItem`. It renders alternative paths and all attributions, each with its link path and primary path. It has its own loading and error state.
-- [ ] T043 [US4] Create `ImpactList.tsx` (+ `.test.tsx`):
+- [x] T043 [US4] Create `ImpactList.tsx` (+ `.test.tsx`):
   - a heading from the selector, for example "Customer orders — current (6)";
   - rows, and "Load more" while `nextCursor` is set;
   - for exposure lists, a total row equal to `sum`;
@@ -405,7 +405,7 @@
   - the **data-changed notice** (research R13) when `total` differs from the summary number for the same selector, with a Refresh button that invalidates `['entities', id, 'impact']`.
 
   The tests cover rendering I2, load more, and the data-changed notice.
-- [ ] T044 [US4] Create `ImpactSection.tsx` (+ `.test.tsx`), as a `<section id="impact">` with heading "Impact":
+- [x] T044 [US4] Create `ImpactSection.tsx` (+ `.test.tsx`), as a `<section id="impact">` with heading "Impact":
   - the summary lines, the first one bold;
   - a depth `<select>` (1–10) bound to `idepth`;
   - `ImpactTable`, `ExposureFigures`, and `ImpactList` when `ilist` is set;
@@ -414,7 +414,7 @@
   - entity names in the summary are not linked (they are plain sentences), but every list row links.
 
   The tests cover I1 rendering, the I14 single line, depth change updating the URL, opening a cell setting `ilist`, and the error state.
-- [ ] T045 [US4] In `apps/web/src/pages/entities/EntityDetailPage.tsx`, render `<ImpactSection entityId={entity.id} />` between `<BlockersSection>` and `<DependenciesSection>` (KDN 12). In `EntityDetailPage.test.tsx`, assert that the Blockers, Impact and Dependencies headings appear in that order, and that a failing impact query still renders the other sections.
+- [x] T045 [US4] In `apps/web/src/pages/entities/EntityDetailPage.tsx`, render `<ImpactSection entityId={entity.id} />` between `<BlockersSection>` and `<DependenciesSection>` (KDN 12). In `EntityDetailPage.test.tsx`, assert that the Blockers, Impact and Dependencies headings appear in that order, and that a failing impact query still renders the other sections.
 
 **Checkpoint (US4)**: run the standard gate. Then walk through quickstart.md §3 steps 1 to 8 by hand with `pnpm dev`. Then commit.
 

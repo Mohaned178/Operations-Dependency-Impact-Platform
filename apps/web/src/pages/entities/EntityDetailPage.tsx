@@ -7,6 +7,7 @@ import { BlockersSection } from './BlockersSection';
 import { CurrentStateSection } from './CurrentStateSection';
 import { DependenciesSection } from './DependenciesSection';
 import { IdentitySection } from './IdentitySection';
+import { ImpactSection } from './impact/ImpactSection';
 import { RelationshipsSection } from './RelationshipsSection';
 import { RootCauseSection } from './RootCauseSection';
 import { SourceRecordsSection } from './SourceRecordsSection';
@@ -67,6 +68,7 @@ export function EntityDetailPage() {
       <CurrentStateSection entity={entity} />
       <RootCauseSection entityId={entity.id} />
       <BlockersSection entityId={entity.id} />
+      <ImpactSection entityId={entity.id} />
       <DependenciesSection entityId={entity.id} />
       <RelationshipsSection entityId={entity.id} />
       <TimelineSection entityId={entity.id} />
