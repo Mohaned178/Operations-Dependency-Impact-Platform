@@ -268,21 +268,21 @@
 
 ### API: summary (data-model §4a/§4c, contracts/api.md)
 
-- [ ] T024 [US1] In `apps/api/src/tracing/tracing.module.ts`, add `exports: [StateEvidenceReader]`.
+- [x] T024 [US1] In `apps/api/src/tracing/tracing.module.ts`, add `exports: [StateEvidenceReader]`.
 
   Create `apps/api/src/impact/order-value.reader.ts` (`OrderValueReader`, data-model §4a, both SQL statements as given). Empty input returns an empty map with no query. Invalid strings are dropped (current becomes `null`).
-- [ ] T025 [US1] Create `apps/api/src/impact/impact.mapper.ts`, with pure mapping functions:
+- [x] T025 [US1] Create `apps/api/src/impact/impact.mapper.ts`, with pure mapping functions:
   - **`toCategoryDtos`, `toExposureDto`, `toNotCountedDto`**: format bigint amounts with `formatAmount`;
   - **`toAffectedEntityDto(affected, opts)`**:
     - `weakest` is computed per contracts/api.md § Field rules;
     - `value`: `disagreement` and `currencyMismatch` per research R6;
     - attribution previews: the first 5;
     - paths go through `toPathDto` and `toTracedEntityDto` from `apps/api/src/tracing/tracing.mapper.ts`.
-- [ ] T026 [US1] Create `apps/api/src/impact/impact.service.ts` with the private `analyze()` and the public `summary()`, exactly as in data-model §4c. `computedAt` is read once. A missing start gives `Errors.notFound('Entity')`. Evidence is loaded for the start only. `summary` comes from `buildSummary`, and `countedTotal` counts every counted entity, customers included.
-- [ ] T027 [US1] Create `apps/api/src/impact/impact.controller.ts`, with `@Controller('entities')` and `@Get(':id/impact')`: `ParseUUIDPipe` on `id`, then `ZodValidationPipe(ImpactQuerySchema)`, then `ImpactService.summary`.
+- [x] T026 [US1] Create `apps/api/src/impact/impact.service.ts` with the private `analyze()` and the public `summary()`, exactly as in data-model §4c. `computedAt` is read once. A missing start gives `Errors.notFound('Entity')`. Evidence is loaded for the start only. `summary` comes from `buildSummary`, and `countedTotal` counts every counted entity, customers included.
+- [x] T027 [US1] Create `apps/api/src/impact/impact.controller.ts`, with `@Controller('entities')` and `@Get(':id/impact')`: `ParseUUIDPipe` on `id`, then `ZodValidationPipe(ImpactQuerySchema)`, then `ImpactService.summary`.
 
   Create `apps/api/src/impact/impact.module.ts`, importing `GraphModule`, `TracingModule` and `PrismaModule`, providing `ImpactService` and `OrderValueReader`. Register `ImpactModule` in `apps/api/src/app.module.ts`.
-- [ ] T028 [US1] Create `apps/api/test/impact-seed.e2e-spec.ts`. In `beforeAll`, run `resetDb`, `seedScenario39()`, `seedScenario40()`, and create a manager user. Resolve entity ids by display name. Add:
+- [x] T028 [US1] Create `apps/api/test/impact-seed.e2e-spec.ts`. In `beforeAll`, run `resetDb`, `seedScenario39()`, `seedScenario40()`, and create a manager user. Resolve entity ids by display name. Add:
   - **Fixture I1**: assert the full categories table, exposure, not-counted summary, `countedTotal`, `startClass`, `startOwnValue`, limits and the **exact** 6 summary lines;
   - **Fixture I5** (summary part): 100 consecutive calls are deep-equal after deleting `computedAt`.
 
