@@ -120,8 +120,8 @@
 
 ### Pure analysis modules (`apps/api/src/root-cause/analysis/`, no Nest, no Prisma, no clock)
 
-- [ ] T011 [P] Create `types.ts` with `ConfidenceInput` and `ConfidenceResult` (data-model §3c). Also add `CandidateGroup { deepestEntityId: string; primary: BlockingPathDto; primaryIndex: number; alternatives: BlockingPathDto[] }`.
-- [ ] T012 [P] Create `label.ts` (research R5):
+- [x] T011 [P] Create `types.ts` with `ConfidenceInput` and `ConfidenceResult` (data-model §3c). Also add `CandidateGroup { deepestEntityId: string; primary: BlockingPathDto; primaryIndex: number; alternatives: BlockingPathDto[] }`.
+- [x] T012 [P] Create `label.ts` (research R5):
   - `stateWords(state)`;
   - `humanize(field)`;
   - `rootCauseLabel(entity: TracedEntityDto, attributes: Record<string, JsonValue> | undefined): { label: string; labelRule: LabelRule }`.
@@ -131,8 +131,8 @@
   - `cost_center` gives `Cost Center`, `po-number` gives `Po Number`, and `x` gives `X`;
   - an empty-string or non-string `requiredField` falls back to DISPLAY_NAME_STATE (`Payment PAY-88213 Pending`);
   - `stateWords` for all 12 states (AT_RISK gives `At Risk`).
-- [ ] T013 [P] Create `roles.ts`: `toCausalChain(start: TracedEntityDto, path: BlockingPathDto, sentences: string[]): CausalChainDto`. Use the research R3 role table, set `possible` from `currentState === 'UNKNOWN'`, set `hop` to `null` at index 0, and copy `length`, `weakestConfidence`, `nonSourceHops`, `continuesBeyondDepth` and `endsInCycle` from the path. Create `roles.spec.ts` with hand-built paths of 1, 2, 3 and 6 hops (asserting each step's `roles` array exactly), plus an UNKNOWN step giving `possible: true`.
-- [ ] T014 [P] Create `candidates.ts`:
+- [x] T013 [P] Create `roles.ts`: `toCausalChain(start: TracedEntityDto, path: BlockingPathDto, sentences: string[]): CausalChainDto`. Use the research R3 role table, set `possible` from `currentState === 'UNKNOWN'`, set `hop` to `null` at index 0, and copy `length`, `weakestConfidence`, `nonSourceHops`, `continuesBeyondDepth` and `endsInCycle` from the path. Create `roles.spec.ts` with hand-built paths of 1, 2, 3 and 6 hops (asserting each step's `roles` array exactly), plus an UNKNOWN step giving `possible: true`.
+- [x] T014 [P] Create `candidates.ts`:
   - `groupCandidates(paths: readonly BlockingPathDto[]): CandidateGroup[]`: group by the last hop's `entity.id`, in first-appearance order, keeping alternatives in `paths` order;
   - `orderCandidates<T extends { confidence: Confidence; primaryIndex: number }>(items: T[]): T[]`: CONFIDENCE_RANK descending, then `primaryIndex` ascending, without mutating the input.
 
