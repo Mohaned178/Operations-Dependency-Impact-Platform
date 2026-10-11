@@ -58,6 +58,64 @@ describe('RootCauseCandidate', () => {
     expect(screen.queryByRole('button', { name: /Alternative chains/ })).not.toBeInTheDocument();
   });
 
+  it('collapses the 8 confidence rules until the disclosure is opened', async () => {
+    const user = userEvent.setup();
+    renderCandidate(candidateOf(R1_ORDER), R1_ORDER.evidence);
+
+    const disclosure = screen.getByRole('button', { name: 'Confidence: HIGH — show the 8 rules' });
+    expect(screen.queryByText('Not applied')).not.toBeInTheDocument();
+
+    await user.click(disclosure);
+
+    expect(screen.getAllByText('Not applied')).toHaveLength(7);
+    expect(screen.getByText('Applied')).toBeInTheDocument();
+    expect(screen.queryByText('Insufficient evidence')).not.toBeInTheDocument();
+  });
+
+  it('flags a LOW candidate as insufficient evidence, with hedged sentences and the applied reasons', () => {
+    const base = candidateOf(R1_ORDER);
+    const hedged = [
+      'Order #18492 may be blocked because it requires Payment PAY-88213, which is PENDING.',
+      'Payment PAY-88213 may be pending because it requires Finance approval APR-2291, which is BLOCKED.',
+      'Finance approval APR-2291 may be blocked because it requires Budget code for Order #18492, which is MISSING.',
+    ];
+    const reason =
+      'Confidence starts at LOW, the confidence of the weakest link: Finance approval APR-2291 REQUIRES Budget code for Order #18492 (inferred, low confidence).';
+    const low: RootCauseCandidateDto = {
+      ...base,
+      confidence: 'LOW',
+      insufficientEvidence: true,
+      confidenceRules: base.confidenceRules.map((outcome) => ({
+        ...outcome,
+        confidenceAfter: 'LOW',
+        ...(outcome.rule === 'WEAKEST_LINK' ? { reason } : {}),
+      })),
+      explanation: {
+        ...base.explanation,
+        headline: 'Possible root cause — insufficient evidence: Budget Code Missing. Confidence: LOW.',
+        chain: hedged,
+        confidence: [reason],
+      },
+    };
+    renderCandidate(low, R1_ORDER.evidence);
+
+    const heading = screen.getByRole('heading', {
+      name: /^Possible root cause — insufficient evidence/,
+    });
+    expect(heading).toBeInTheDocument();
+    const badge = screen.getByText('Insufficient evidence');
+    expect(badge).toBeInTheDocument();
+    for (const text of hedged) {
+      expect(screen.getByText(sentence(text))).toBeInTheDocument();
+    }
+
+    const article = screen.getByRole('article');
+    const describedBy = article.getAttribute('aria-describedby');
+    expect(describedBy).not.toBeNull();
+    expect(document.getElementById(describedBy ?? '')).toHaveTextContent(reason);
+    expect(screen.getByRole('button', { name: 'Confidence: LOW — show the 8 rules' })).toBeInTheDocument();
+  });
+
   it('keeps the R2 alternative chain collapsed until its disclosure is expanded', async () => {
     const user = userEvent.setup();
     const candidate = candidateOf(R2_SHIPMENT);

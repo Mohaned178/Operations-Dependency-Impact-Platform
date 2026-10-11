@@ -1,6 +1,7 @@
 import type { CausalChainDto, RootCauseCandidateDto, RootCauseResponse } from '@opsgraph/shared';
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { CausalChainView } from './CausalChainView';
+import { ConfidenceRules } from './ConfidenceRules';
 import { ExplanationSentence, linkTargets } from './ExplanationSentence';
 
 export interface RootCauseCandidateProps {
@@ -13,10 +14,22 @@ export function RootCauseCandidate({ candidate, evidence }: RootCauseCandidatePr
   const [showAlternatives, setShowAlternatives] = useState(false);
   const { explanation, primaryChain, alternativeChains } = candidate;
   const primaryTargets = linkTargets(primaryChain.steps.map((step) => step.entity));
+  const reasonsId = useId();
 
   return (
-    <article className="flex flex-col gap-4">
-      <h3 className="text-base font-semibold">{explanation.headline}</h3>
+    <article
+      className="flex flex-col gap-4"
+      aria-describedby={candidate.insufficientEvidence ? reasonsId : undefined}
+    >
+      <div className="flex flex-wrap items-center gap-2">
+        <h3 className="text-base font-semibold">{explanation.headline}</h3>
+        {candidate.insufficientEvidence ? (
+          <span className="rounded border border-amber-300 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800">
+            Insufficient evidence
+          </span>
+        ) : null}
+        {candidate.possible ? <span className="text-sm text-slate-600">possible</span> : null}
+      </div>
 
       <ul className="flex flex-col gap-1 text-sm">
         {explanation.chain.map((sentence, index) => (
@@ -26,11 +39,13 @@ export function RootCauseCandidate({ candidate, evidence }: RootCauseCandidatePr
         ))}
       </ul>
 
-      <ul className="flex flex-col gap-1 text-sm text-slate-700">
+      <ul id={reasonsId} className="flex flex-col gap-1 text-sm text-slate-700">
         {explanation.confidence.map((reason, index) => (
           <li key={index}>{reason}</li>
         ))}
       </ul>
+
+      <ConfidenceRules confidence={candidate.confidence} rules={candidate.confidenceRules} />
 
       <p className="text-sm text-slate-700">{explanation.evidence}</p>
 

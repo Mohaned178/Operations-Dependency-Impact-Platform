@@ -84,4 +84,37 @@ describe('RootCauseSection', () => {
     const [candidate] = R1_ORDER.candidates;
     expect(screen.getByText(candidate?.explanation.headline ?? 'missing')).toBeInTheDocument();
   });
+
+  it('renders two candidates with their headlines in the given order', async () => {
+    const first = R1_ORDER.candidates.at(0);
+    if (first === undefined) {
+      throw new Error('fixture: missing candidate');
+    }
+    const headlines = [
+      'Possible root cause: Budget Code Missing. Confidence: HIGH.',
+      'Possible root cause: Contract Review Pending. Confidence: MEDIUM.',
+    ];
+    apiFetchMock.mockResolvedValue({
+      ...R1_ORDER,
+      summary:
+        'Order #18492 is BLOCKED. 2 possible root causes found; highest ranked: Budget Code Missing (HIGH).',
+      candidates: [
+        { ...first, explanation: { ...first.explanation, headline: headlines[0] ?? '' } },
+        {
+          ...first,
+          rootCause: { ...first.rootCause, id: '66666666-6666-4666-8666-666666666666' },
+          label: 'Contract Review Pending',
+          confidence: 'MEDIUM',
+          explanation: { ...first.explanation, headline: headlines[1] ?? '' },
+        },
+      ],
+    });
+    renderSection();
+
+    expect(await screen.findByText(/2 possible root causes found/)).toBeInTheDocument();
+    const rendered = screen
+      .getAllByRole('heading', { level: 3 })
+      .map((heading) => heading.textContent);
+    expect(rendered).toEqual(headlines);
+  });
 });

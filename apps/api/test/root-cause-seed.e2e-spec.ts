@@ -14,10 +14,12 @@ import { SeedService } from '../src/ingestion/seed/seed.service';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { createTestApp, createUser, entityIdByKey, login, resetDb, TEST_PASSWORD } from './helpers';
 
-// Acceptance fixtures R1–R4 and R8 (contracts/api.md), asserted literally against the seeded §39
+// Acceptance fixtures R1–R6, R8 and R9 (contracts/api.md), asserted literally against the seeded §39
 // scenario, plus SC-002 (every delivery SLA names Budget Code Missing) and SC-004 determinism.
 const EVALUATED_AT = '2026-09-29T16:00:00Z';
 const EVALUATED_AT_ECHO = '2026-09-29T16:00:00.000Z';
+const STALE_EVALUATED_AT = '2026-10-06T12:00:00Z';
+const STALE_EVALUATED_AT_ECHO = '2026-10-06T12:00:00.000Z';
 const CLAUSE = 'Orders above 10,000.00 USD require finance approval with a budget code';
 
 describe('Root-cause analysis on the seeded §39 scenario (e2e)', () => {
@@ -37,7 +39,9 @@ describe('Root-cause analysis on the seeded §39 scenario (e2e)', () => {
     | 'sla4215'
     | 'sla4330'
     | 'wh'
-    | 'contract',
+    | 'contract'
+    | 'order18532'
+    | 'contract4330',
     string
   >;
 
@@ -66,6 +70,8 @@ describe('Root-cause analysis on the seeded §39 scenario (e2e)', () => {
     ids.sla4330 = await key('SLA', 'ContractMgmt', 'SLA-4330-DEL');
     ids.wh = await key('Warehouse', 'WMS', 'WH-EAST-02');
     ids.contract = await key('Contract', 'ContractMgmt', 'CON-3982');
+    ids.order18532 = await key('Order', 'OMS', '18532');
+    ids.contract4330 = await key('Contract', 'ContractMgmt', 'CON-4330');
   });
 
   afterAll(async () => {
@@ -459,6 +465,118 @@ describe('Root-cause analysis on the seeded §39 scenario (e2e)', () => {
       expect(body.summary).toBe(
         'East Distribution Center 02 is ACTIVE. It is not blocked: no unsatisfied dependency was found within 6 steps, so no root cause applies.',
       );
+    });
+  });
+
+  describe('R5: Order #18532 (PENDING, no blocker relationships)', () => {
+    it('is UNEXPLAINED, names no cause, and returns start-only evidence', async () => {
+      const body = await analyze(ids.order18532);
+      expectDefaults(body, ids.order18532);
+      expect(body.status).toBe('UNEXPLAINED');
+      expect(body.candidates).toEqual([]);
+      expect(body.summary).toBe(
+        'Order #18532 is PENDING, but no recorded dependency within 6 steps explains this state. No root cause can be named.',
+      );
+
+      expect(body.evidence.entities.map((entry) => entry.entityId)).toEqual([ids.order18532]);
+      expect(body.evidence.relationships).toEqual([]);
+      const order = evidenceOf(body, ids.order18532);
+      expect(
+        order.stateRecords.map((record) => ({
+          system: record.sourceRecord.sourceSystem,
+          sourceId: record.sourceRecord.sourceId,
+          state: record.observation.state,
+          current: record.current,
+        })),
+      ).toEqual([{ system: 'OMS', sourceId: '18532', state: 'PENDING', current: true }]);
+      expect(order.requirementSources.total).toBe(1);
+      expect(order.requirementSources.items).toHaveLength(1);
+      expect(order.requirementSources.items[0]?.entity.id).toBe(ids.contract4330);
+      expect(order.requirementSources.items[0]?.entity.displayName).toBe('Contract CON-4330');
+      expect(order.requirementSources.items[0]?.relationship.type).toBe('GOVERNS');
+      expect(order.events.total).toBe(0);
+      expect(order.events.items).toEqual([]);
+    });
+  });
+
+  describe('R6: Order #18492 evaluated at 2026-10-06T12:00:00Z (stale evidence)', () => {
+    let fresh: RootCauseResponse;
+    let body: RootCauseResponse;
+    let candidate: RootCauseCandidateDto;
+
+    beforeAll(async () => {
+      fresh = await analyze(ids.order);
+      body = await analyze(ids.order, `?evaluatedAt=${STALE_EVALUATED_AT}`);
+      candidate = only(body);
+    });
+
+    it('lowers the candidate to MEDIUM and echoes the evaluation time', () => {
+      expect(body.status).toBe('ROOT_CAUSES_FOUND');
+      expect(body.query).toEqual({ entityId: ids.order, depth: 6, evaluatedAt: STALE_EVALUATED_AT_ECHO });
+      expect(body.truncation).toEqual({ depthLimit: false, explorationLimit: false, pathLimit: false });
+      expect(candidate.confidence).toBe('MEDIUM');
+      expect(candidate.insufficientEvidence).toBe(false);
+      expect(candidate.explanation.headline).toBe('Root cause: Budget Code Missing. Confidence: MEDIUM.');
+      expect(body.summary).toBe(
+        'Order #18492 is BLOCKED. 1 root cause found: Budget Code Missing (MEDIUM).',
+      );
+    });
+
+    it('applies STALE_EVIDENCE with the exact reason and refs, and carries MEDIUM through rules 6–8', () => {
+      const rules = rulesOf(candidate);
+      expect(rules.map((rule) => rule.rule)).toEqual(RULE_ORDER);
+      expect(rules.filter((rule) => rule.applied).map((rule) => rule.rule)).toEqual([
+        'WEAKEST_LINK',
+        'STALE_EVIDENCE',
+      ]);
+      const stale = rules[4];
+      expect(stale).toMatchObject({
+        rule: 'STALE_EVIDENCE',
+        applied: true,
+        confidenceAfter: 'MEDIUM',
+        refs: { stepIndexes: [0, 1, 2, 3], relationshipIds: [], noteIds: [] },
+        reason:
+          'Confidence lowered to MEDIUM: the state of Order #18492 (2026-09-29T11:40:00.000Z), Payment PAY-88213 (2026-09-29T10:05:00.000Z), Finance approval APR-2291 (2026-09-29T10:05:00.000Z), Budget code for Order #18492 (2026-09-29T10:05:00.000Z) was last observed more than 72 hours before 2026-10-06T12:00:00.000Z.',
+      });
+      expect(rules.slice(0, 4).every((rule) => rule.confidenceAfter === 'HIGH')).toBe(true);
+      expect(rules.slice(4).every((rule) => rule.confidenceAfter === 'MEDIUM')).toBe(true);
+      expect(rules[5]?.reason).toBe(R1_DISAGREEMENT);
+      expect(rules[6]?.reason).toBe(
+        'The state of Budget code for Order #18492 is corroborated by 1 operational event.',
+      );
+      expect(rules[7]?.reason).toBe('No active note disputes this chain.');
+    });
+
+    it('lists the weakest-link and stale reasons in explanation.confidence', () => {
+      expect(candidate.explanation.confidence).toEqual([
+        'Confidence starts at HIGH, the confidence of the weakest link: Order #18492 REQUIRES Payment PAY-88213 (source-recorded, high confidence).',
+        rulesOf(candidate)[4]?.reason,
+      ]);
+    });
+
+    it('leaves the label, steps, key evidence and chain sentences unchanged from R1', () => {
+      const unchanged = only(fresh);
+      expect(candidate.label).toBe(unchanged.label);
+      expect(candidate.labelRule).toBe(unchanged.labelRule);
+      expect(candidate.rootCause.id).toBe(ids.br);
+      expect(stepsOf(candidate.primaryChain)).toEqual(stepsOf(unchanged.primaryChain));
+      expect(candidate.keyEvidence).toEqual(unchanged.keyEvidence);
+      expect(candidate.eventCount).toBe(unchanged.eventCount);
+      expect(candidate.explanation.chain).toEqual(unchanged.explanation.chain);
+      expect(candidate.explanation.evidence).toBe(unchanged.explanation.evidence);
+    });
+  });
+
+  describe('R9: Budget code for Order #18492 itself', () => {
+    it('is UNEXPLAINED: a MISSING entity with no dependencies has no cause to name', async () => {
+      const body = await analyze(ids.br);
+      expectDefaults(body, ids.br);
+      expect(body.status).toBe('UNEXPLAINED');
+      expect(body.candidates).toEqual([]);
+      expect(body.summary).toBe(
+        'Budget code for Order #18492 is MISSING, but no recorded dependency within 6 steps explains this state. No root cause can be named.',
+      );
+      expect(body.evidence.entities.map((entry) => entry.entityId)).toEqual([ids.br]);
     });
   });
 

@@ -303,8 +303,8 @@
 **Goal**: every confidence rule is shown with its outcome, and weak evidence is reported as "Possible root cause — insufficient evidence" with "may be" wording. Unexplained states name no cause.
 **Independent test**: fixtures R5, R6 and R9 pass, every Story 2 acceptance scenario passes on built graphs, and the confidence details are visible on the page.
 
-- [ ] T032 [US2] Extend `apps/api/test/root-cause-seed.e2e-spec.ts` with fixtures **R5** (Order #18532 UNEXPLAINED, start-only evidence), **R6** (`evaluatedAt=2026-10-06T12:00:00Z`, exact stale reason, MEDIUM) and **R9** (BR-18492 UNEXPLAINED). Assert every line.
-- [ ] T033 [US2] Extend `apps/api/test/root-cause.e2e-spec.ts` with built graphs, one `describe` per spec Story 2 scenario. Assert the candidate `confidence`, which rule outcomes have `applied`, the exact reason for the applied rule, and the headline form:
+- [x] T032 [US2] Extend `apps/api/test/root-cause-seed.e2e-spec.ts` with fixtures **R5** (Order #18532 UNEXPLAINED, start-only evidence), **R6** (`evaluatedAt=2026-10-06T12:00:00Z`, exact stale reason, MEDIUM) and **R9** (BR-18492 UNEXPLAINED). Assert every line.
+- [x] T033 [US2] Extend `apps/api/test/root-cause.e2e-spec.ts` with built graphs, one `describe` per spec Story 2 scenario. Assert the candidate `confidence`, which rule outcomes have `applied`, the exact reason for the applied rule, and the headline form:
   1. **Inferred low link**: a chain of SOURCE/HIGH, SOURCE/HIGH and INFERRED/LOW hops. Expect LOW, the `Possible root cause — insufficient evidence:` headline, and every chain sentence containing `may be` (except INDETERMINATE subjects).
   2. **Unknown root**: the deepest entity is UNKNOWN. Expect LOW, `possible: true`, a ` (state unknown)` headline suffix, and sentences saying `whose state is unknown`.
   3. **Depth limit**: depth 2 on a 4-hop chain. Expect `continuesBeyondDepth`, a cap at MEDIUM, and the ` (deepest cause found within 2 steps)` suffix.
@@ -314,8 +314,8 @@
   7. **Two root causes**: one entity REQUIRES two separate MISSING entities. Expect 2 candidates, headlines starting `Possible root cause:`, and a summary starting `… 2 possible root causes found; highest ranked:`.
   8. **Cycle**: A REQUIRES B, B REQUIRES A, both BLOCKED. Expect a `(circular dependency)` suffix and LOW.
   9. **Uncorroborated root**: one source system and no events. Expect rule 7 applied.
-- [ ] T034 [P] [US2] Create `apps/web/src/pages/entities/ConfidenceRules.tsx`. It is a disclosure labeled `Confidence: <LEVEL> — show the 8 rules`, containing a list with one row per outcome: the rule name in words, `Applied` or `Not applied` as text (not colour only), `confidenceAfter`, and the `reason`. Create `ConfidenceRules.test.tsx` checking that R1 shows 8 rows with only Weakest link applied, and that an R6-like outcome list marks Stale evidence as applied.
-- [ ] T035 [US2] In `RootCauseCandidate.tsx`:
+- [x] T034 [P] [US2] Create `apps/web/src/pages/entities/ConfidenceRules.tsx`. It is a disclosure labeled `Confidence: <LEVEL> — show the 8 rules`, containing a list with one row per outcome: the rule name in words, `Applied` or `Not applied` as text (not colour only), `confidenceAfter`, and the `reason`. Create `ConfidenceRules.test.tsx` checking that R1 shows 8 rows with only Weakest link applied, and that an R6-like outcome list marks Stale evidence as applied.
+- [x] T035 [US2] In `RootCauseCandidate.tsx`:
   - render `ConfidenceRules` under the explanation;
   - when `insufficientEvidence`, give the candidate an amber "Insufficient evidence" text badge and an `aria-describedby` pointing at the applied reasons;
   - show "possible" on `possible` candidates.
