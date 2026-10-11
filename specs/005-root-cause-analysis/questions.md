@@ -27,3 +27,15 @@ contracts/api.md § Refs defines `stepIndexes` as "the triggering steps" and fix
 ## Q3. Naming: `toCausalChain` vs `assignRoles` — no action needed
 
 plan.md and data-model §4 call the roles function `assignRoles`; tasks.md T013/T019 call it `toCausalChain`. Implemented as `toCausalChain` (tasks.md is the implementer's authority), with no alias.
+
+## Q4. Fixture R7 DISPUTED reason: trailing period — OPEN, needs a contract fix before the Phase 3 e2e
+
+- **Conflict**: contracts/api.md fixture R7 shows the reason ending `…suppli…"` with no final period, but the DISPUTED template (§ Confidence reasons) is `…: ${items}.`, which ends `…suppli…".`.
+- **Done**: the code follows the template (`explanation.ts`, asserted in `explanation.spec.ts`). The template is the more specific source.
+- **Needed**: settle which is right in the contract before the e2e for R7 copies the fixture string literally.
+
+## Q5. Rule 8 sees only the capped notes list — OPEN, decide for Phase 3 (T018)
+
+- **Gap**: `computeConfidence` reads `notes.items`, which the evidence reader caps at the 50 newest notes per target, retracted ones included (research R4). An old active DISPUTES note behind 50 newer SUPPORTS or retracted notes would be missed, and DISPUTED would not apply.
+- **Done**: implemented exactly as research R4/R6 describe. This is not an implementation error.
+- **Needed**: if it matters, T018 should also return the active DISPUTES notes uncapped (or a separate list) for rule 8. That changes the evidence bundle shape, so it needs your decision.
