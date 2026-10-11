@@ -50,7 +50,7 @@
 
 ### Vocabulary (research R10, data-model §1a/§1b/§2)
 
-- [ ] T002 Create `packages/shared/src/money.ts`:
+- [x] T002 Create `packages/shared/src/money.ts`:
   - move `AMOUNT_PATTERN` and `CURRENCY_PATTERN` out of `packages/shared/src/imports.ts` into it, as exports;
   - add `AmountStringSchema`, `CurrencyCodeSchema` and `MoneyDtoSchema` (`MoneyDto` type), exactly as in data-model §1b;
   - make `imports.ts` import the two patterns from `./money`, with no behavior change;
@@ -60,7 +60,7 @@
   - accepted amounts: `'0'`, `'12480.00'`, `'1.2345'`;
   - rejected amounts: `'01'`, `'1.23456'`, `'-1'`, `'1e3'`;
   - currency `'usd'` is rejected.
-- [ ] T003 In `packages/shared/src/graph.ts`:
+- [x] T003 In `packages/shared/src/graph.ts`:
   - append `'PurchaseOrder'` as the **last** option of `EntityTypeSchema`;
   - set `RELATIONSHIP_RULES.CONTAINS` to `{ from: ['Order','PurchaseOrder'], to: ['Product'] }`;
   - set `RELATIONSHIP_RULES.SUPPLIED_BY` to `{ from: ['Product','PurchaseOrder'], to: ['Supplier'] }`.
@@ -73,11 +73,11 @@
   - Product CONTAINS Product and PurchaseOrder SUPPLIED_BY Product are refused.
 
   Rebuild shared.
-- [ ] T004 In `apps/api/prisma/schema.prisma`, append `PurchaseOrder` to `enum EntityType`.
+- [x] T004 In `apps/api/prisma/schema.prisma`, append `PurchaseOrder` to `enum EntityType`.
   1. Run `pnpm --filter api prisma migrate dev --create-only --name purchase_order_entity_type`.
   2. Check that the generated `migration.sql` contains only `ALTER TYPE "EntityType" ADD VALUE 'PurchaseOrder';` (with Prisma's comment).
   3. Apply it with `pnpm --filter api prisma migrate dev`.
-- [ ] T005 [P] In `apps/api/src/ingestion/seed/scenario-39.ts`, add `PurchaseOrder: 'ERP'` to `PRIMARY_SYSTEM`. No row may change; `scenario-39.spec.ts` must pass unchanged.
+- [x] T005 [P] In `apps/api/src/ingestion/seed/scenario-39.ts`, add `PurchaseOrder: 'ERP'` to `PRIMARY_SYSTEM`. No row may change; `scenario-39.spec.ts` must pass unchanged.
 
   In `docs/import-format.md`:
   - add `PurchaseOrder` to the entity `type` list;
@@ -85,7 +85,7 @@
 
 ### Shared impact contract (data-model §1c, contracts/api.md)
 
-- [ ] T006 Create `packages/shared/src/impact.ts`:
+- [x] T006 Create `packages/shared/src/impact.ts`:
   - **Constants**, exactly as in data-model §1c: `ImpactStateClassSchema`, `IMPACT_STATE_CLASS`, `IMPAIRED_STATES`, `TERMINAL_STATES`, `IMPACT_HEADLINE_TYPES`, `IMPACT_NOUNS`, `impactCategoryLabel` and `IMPACT_LIMITS`. `impactCategoryLabel` returns the plural with its first letter upper-cased, for example `'Customer orders'`, `'SLA commitments'`, `'Purchase orders'`.
   - **Query schemas** from contracts/api.md: `ImpactQuerySchema`, `ImpactCategoryBucketSchema`, `ImpactExposureBucketSchema`, `ImpactListSelectorSchema` and `ImpactListQuerySchema`.
     - Implement the `superRefine` rules and the error messages listed there.
@@ -94,7 +94,7 @@
   - **Response schemas**: every schema in contracts/api.md § Response schemas, from `ImpactClassificationSchema` through `ImpactItemDetailResponseSchema`.
 
   Import `TraceDepthSchema`, `TracedEntityDtoSchema`, `PathDtoSchema` and `CycleClosingHopDtoSchema` from `./tracing`, `PageQuerySchema` from `./common`, the money schemas from `./money`, and base schemas from `./graph`. Export an inferred type for every schema. Add `export * from './impact';` to `index.ts`, then rebuild shared.
-- [ ] T007 Create `packages/shared/src/impact.spec.ts` (Vitest). It covers:
+- [x] T007 Create `packages/shared/src/impact.spec.ts` (Vitest). It covers:
   - **`IMPACT_STATE_CLASS`**: every `OperationalState` has exactly the class in research R3;
   - **derived lists**: `IMPAIRED_STATES` has 8 entries and `TERMINAL_STATES` is `['COMPLETED','CANCELLED']`;
   - **`IMPACT_NOUNS`**: covers every `EntityType`;

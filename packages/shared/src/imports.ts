@@ -9,6 +9,7 @@ import {
   RelationshipTypeSchema,
   type EntityType,
 } from './graph';
+import { AMOUNT_PATTERN, CURRENCY_PATTERN } from './money';
 
 export const IMPORT_MAX_BYTES = 10 * 1024 * 1024;
 export const IMPORT_MAX_ROWS = 10_000;
@@ -37,9 +38,6 @@ export type EntityIdRef = z.infer<typeof EntityIdRefSchema>;
 
 export const EntityRefSchema = z.union([EntityIdRefSchema, EntityKeyRefSchema]);
 export type EntityRef = z.infer<typeof EntityRefSchema>;
-
-const AMOUNT_PATTERN = /^(0|[1-9]\d{0,12})(\.\d{1,4})?$/;
-const CURRENCY_PATTERN = /^[A-Z]{3}$/;
 
 function checkMoney(
   value: { type: EntityType; attributes: Record<string, JsonValue> },

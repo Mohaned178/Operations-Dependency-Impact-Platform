@@ -14,6 +14,7 @@ export const EntityTypeSchema = z.enum([
   'Supplier',
   'SLA',
   'BudgetRequirement',
+  'PurchaseOrder',
 ]);
 export type EntityType = z.infer<typeof EntityTypeSchema>;
 
@@ -63,10 +64,10 @@ export const RELATIONSHIP_RULES: Record<
   HAS: { from: ['Customer'], to: ['Contract'] },
   PLACED: { from: ['Customer'], to: ['Order'] },
   GOVERNS: { from: ['Contract'], to: ['Order'] },
-  CONTAINS: { from: ['Order'], to: ['Product'] },
+  CONTAINS: { from: ['Order', 'PurchaseOrder'], to: ['Product'] },
   GENERATES: { from: ['Order'], to: ['Invoice'] },
   FULFILLED_BY: { from: ['Order', 'Shipment'], to: ['Warehouse'] },
-  SUPPLIED_BY: { from: ['Product'], to: ['Supplier'] },
+  SUPPLIED_BY: { from: ['Product', 'PurchaseOrder'], to: ['Supplier'] },
   DEFINES: { from: ['Contract'], to: ['SLA', 'BudgetRequirement'] },
   REQUIRES: { from: null, to: null },
   DEPENDS_ON: { from: null, to: null },
